@@ -7,5 +7,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Long> {
 
-    WeatherRecord findFirstByOrderByCreatedAtDesc();
+    WeatherRecord findFirstByOrderByMeasuredAtDesc();
 }

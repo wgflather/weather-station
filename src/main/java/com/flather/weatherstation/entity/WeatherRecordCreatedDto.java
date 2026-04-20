@@ -1,20 +1,20 @@
 package com.flather.weatherstation.entity;
 
-
 import lombok.*;
 
 import java.time.Instant;
+import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
 @AllArgsConstructor
 @Builder
 @Data
 @ToString
-public class WeatherRecordDto {
+public class WeatherRecordCreatedDto {
 
     private double temperature;
 
     private double pressure;
 
-    private Instant createdAt;
+    private Instant measuredAt;
 }

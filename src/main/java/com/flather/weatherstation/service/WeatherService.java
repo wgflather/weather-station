@@ -1,6 +1,7 @@
 package com.flather.weatherstation.service;
 
-import com.flather.weatherstation.entity.WeatherRecordDto;
+import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
+import com.flather.weatherstation.entity.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,7 @@ public class WeatherService {
     private final WeatherRecordMapper mapper;
     private final WeatherReportRepository repository;
 
-    public WeatherRecordDto saveWeatherRecord(WeatherRecordDto weatherRecordDto){
+    public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
         return mapper.weatherEntityToDto(
                 repository.save(
                         mapper.weatherDtoToEntity(weatherRecordDto)
@@ -20,8 +21,8 @@ public class WeatherService {
         );
     }
 
-    public WeatherRecordDto getLatestWeatherRecord(){
-        return mapper.weatherEntityToDto(repository.findFirstByOrderByCreatedAtDesc());
+    public WeatherRecordResponseDto getLatestWeatherRecord(){
+        return mapper.weatherEntityToDto(repository.findFirstByOrderByMeasuredAtDesc());
     }
 
 }

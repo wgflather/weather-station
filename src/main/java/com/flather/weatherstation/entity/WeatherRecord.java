@@ -27,7 +27,7 @@ public class WeatherRecord {
     private double pressure;
 
     @NotNull
-    private Instant createdAt;
+    private Instant measuredAt;
 
     @CreationTimestamp
     private Instant savedAt;
