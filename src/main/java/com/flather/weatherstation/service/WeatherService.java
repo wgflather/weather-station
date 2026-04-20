@@ -5,13 +5,20 @@ import com.flather.weatherstation.entity.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 public class WeatherService {
-    private final WeatherRecordMapper mapper;
     private final WeatherReportRepository repository;
+    private final WeatherRecordMapper mapper;
+
+    @Autowired
+    public WeatherService(WeatherRecordMapper mapper, WeatherReportRepository repository){
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
 
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
         return mapper.weatherEntityToDto(
