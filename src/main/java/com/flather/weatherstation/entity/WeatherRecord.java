@@ -1,9 +1,6 @@
 package com.flather.weatherstation.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -19,7 +16,7 @@ import java.time.Instant;
 @Setter
 public class WeatherRecord {
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private double temperature;
@@ -27,8 +24,10 @@ public class WeatherRecord {
     private double pressure;
 
     @NotNull
+    @Column(name = "measured_at")
     private Instant measuredAt;
 
     @CreationTimestamp
+    @Column(name = "saved_at")
     private Instant savedAt;
 }
