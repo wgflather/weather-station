@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class WeatherController {
 
-    static final String BASE_PATH = "/weather";
+    static final String BASE_PATH = "/api/weather";
     static final String LATEST_WEATHER_PATH = BASE_PATH + "/latest";
 
     private final WeatherService service;

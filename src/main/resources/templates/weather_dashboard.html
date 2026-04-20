@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" http-equiv="refresh" content="120">
+  <title>Title</title>
+</head>
+<body>
+<h1>Current weather</h1>
+
+<h2>Temperature: <span th:text="${temp}"></span></h2>
+<h2>Pressure: <span th:text="${pressure}"></span></h2>
+<h2>Measured At: <span th:text="${#temporals.format(measuredAt, 'dd-MM-yyyy HH:mm:ss')}"></span></h2>
+</body>
+</html>
