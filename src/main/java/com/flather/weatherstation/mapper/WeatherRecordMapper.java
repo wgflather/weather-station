@@ -6,11 +6,13 @@ import com.flather.weatherstation.entity.WeatherRecordResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
+@Component
 @Mapper(componentModel = "spring")
 public interface WeatherRecordMapper {
 
