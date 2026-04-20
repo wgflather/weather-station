@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-@Mapper
+@Mapper(componentModel = "spring")
 public interface WeatherRecordMapper {
 
     WeatherRecord weatherDtoToEntity(WeatherRecordCreatedDto dto);
