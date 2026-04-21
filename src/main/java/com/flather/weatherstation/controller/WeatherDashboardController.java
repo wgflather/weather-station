@@ -20,10 +20,9 @@ public class WeatherDashboardController {
 
     @GetMapping(BASE_PATH)
     public String getLatestWeather(Model model){
-        WeatherRecordResponseDto dto = service.getLatestWeatherRecord();
-        model.addAttribute("temp", dto.getTemperature());
-        model.addAttribute("pressure", dto.getPressure());
-        model.addAttribute("measuredAt", dto.getMeasuredAtTimeZoned());
+
+         model.addAttribute("weather", service.getLatestWeatherRecord().orElse(null));
+        System.out.println(service.getLatestWeatherRecord());
 
         return "weather_dashboard";
     }

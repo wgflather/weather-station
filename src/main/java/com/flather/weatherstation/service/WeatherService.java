@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 public class WeatherService {
     private final WeatherReportRepository repository;
@@ -28,8 +30,8 @@ public class WeatherService {
         );
     }
 
-    public WeatherRecordResponseDto getLatestWeatherRecord(){
-        return mapper.weatherEntityToDto(repository.findFirstByOrderByMeasuredAtDesc());
+    public Optional<WeatherRecordResponseDto> getLatestWeatherRecord(){
+       return repository.findFirstByOrderByMeasuredAtDesc().map(mapper::weatherEntityToDto);
     }
 
 }

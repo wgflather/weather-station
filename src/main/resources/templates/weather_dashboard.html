@@ -1,14 +1,29 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="UTF-8" http-equiv="refresh" content="120">
+  <meta charset="UTF-8" http-equiv="refresh" content="60">
   <title>Title</title>
 </head>
 <body>
 <h1>Current weather</h1>
 
-<h2>Temperature: <span th:text="${temp}"></span></h2>
-<h2>Pressure: <span th:text="${pressure}"></span></h2>
-<h2>Measured At: <span th:text="${#temporals.format(measuredAt, 'dd-MM-yyyy HH:mm:ss')}"></span></h2>
+
+<div>
+  <h1 th:if="${weather == null}"> No data in database </h1>
+</div>
+
+<div th:with="hasWeather=${weather != null}">
+  <h2>Temperature: <span
+          th:text="${hasWeather && weather.temperature != null} ?
+          ${weather.temperature} + ' ℃' : 'No data'"
+  ></span></h2>
+  <h2>Pressure: <span
+          th:text="${hasWeather && weather.pressure != null} ?
+          ${weather.pressure} + ' hPa' : 'No data'"
+  ></span></h2>
+  <h2>Measured At: <span th:text="${hasWeather && weather.measuredAtTimeZoned != null} ?
+      ${#temporals.format(weather.measuredAtTimeZoned, 'dd-MM-yyyy HH:mm:ss')} : 'No data'"></span></h2>
+</div>
+
 </body>
 </html>
