@@ -1,5 +1,7 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.entity.WeatherDashboardDto;
+import com.flather.weatherstation.entity.WeatherRecord;
 import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
 import com.flather.weatherstation.entity.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
@@ -9,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -34,6 +38,28 @@ public class WeatherService {
                 repository.save(
                         mapper.weatherDtoToEntity(weatherRecordDto)
                 ));
+    }
+
+    public List<WeatherRecordResponseDto> getMinMaxTodayTemperature(){
+        return repository.findFullObjectsWithMaxValOnLatestDate()
+                .stream()
+                .map(mapper::weatherEntityToDto)
+                .sorted(Comparator.comparingDouble(WeatherRecordResponseDto::getTemperature))
+                .toList();
+    }
+
+    public WeatherDashboardDto getDashboardSummary(){
+        WeatherDashboardDto dto = new WeatherDashboardDto();
+
+        getLatestWeatherRecord().ifPresent(dto::setLatestRecord);
+
+        List<WeatherRecordResponseDto> minMaxTemp = getMinMaxTodayTemperature();
+
+        if(minMaxTemp.size() == 2){
+            dto.setMaxTempRecord(minMaxTemp.getLast());
+            dto.setMinTempRecord(minMaxTemp.getFirst());
+        }
+        return dto;
     }
 
     public Optional<WeatherRecordResponseDto> getLatestWeatherRecord(){
