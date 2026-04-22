@@ -19,9 +19,9 @@ public class WeatherRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private double temperature;
+    private Double temperature;
 
-    private double pressure;
+    private Double pressure;
 
     @NotNull
     @Column(name = "measured_at")

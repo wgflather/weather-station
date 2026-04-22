@@ -1,6 +1,7 @@
 package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.WeatherStationApplication;
+import com.flather.weatherstation.entity.WeatherDashboardDto;
 import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
 import com.flather.weatherstation.entity.WeatherRecordResponseDto;
 import com.flather.weatherstation.service.WeatherService;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -39,5 +42,16 @@ public class WeatherController {
         return ResponseEntity.ok(service.getLatestWeatherRecord().orElse(null));
     }
 
+    @GetMapping(BASE_PATH + "/stats")
+    public ResponseEntity<List<WeatherRecordResponseDto>> getStats(){
+        return ResponseEntity.ok(service.getMinMaxTodayTemperature());
+    }
+
+
+
+    @GetMapping(BASE_PATH + "/dashboard")
+    public ResponseEntity<WeatherDashboardDto> getDashboard(){
+        return ResponseEntity.ok(service.getDashboardSummary());
+    }
 
 }

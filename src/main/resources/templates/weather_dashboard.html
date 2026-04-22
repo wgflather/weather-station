@@ -4,26 +4,35 @@
   <meta charset="UTF-8" http-equiv="refresh" content="60">
   <title>Title</title>
 </head>
-<body>
-<h1>Current weather</h1>
-
+<body th:with="d=${dashboard}">
+  <h1>Today Weather: <span th:text="${#temporals.createNow().toLocalDate()}"></span></h1>
 
 <div>
-  <h1 th:if="${weather == null}"> No data in database </h1>
+  <h1 th:if="${dashboard.latestRecord == null}"> No data in database </h1>
 </div>
 
-<div th:with="hasWeather=${weather != null}">
-  <h2>Temperature: <span
-          th:text="${hasWeather && weather.temperature != null} ?
-          ${weather.temperature} + ' ℃' : 'No data'"
-  ></span></h2>
-  <h2>Pressure: <span
-          th:text="${hasWeather && weather.pressure != null} ?
-          ${weather.pressure} + ' hPa' : 'No data'"
-  ></span></h2>
-  <h2>Measured At: <span th:text="${hasWeather && weather.measuredAtTimeZoned != null} ?
-      ${#temporals.format(weather.measuredAtTimeZoned, 'dd-MM-yyyy HH:mm:ss')} : 'No data'"></span></h2>
+<div>
+  <h1>Current weather</h1>
+  <h2 th:if="${d.latestRecord != null}">
+    Temperature: <span th:text="${d.latestRecord.temperature != null} ? ${d.latestRecord.temperature} + ' ℃' : 'No data'"></span> |
+    Pressure: <span th:text="${d.latestRecord.pressure != null} ? ${d.latestRecord.pressure} + ' hPa' : 'No data'"></span> |
+    Time: <span th:text="${d.latestRecord.measuredAtTimeZoned != null} ? ${#temporals.format(d.latestRecord.measuredAtTimeZoned, 'HH:mm:ss')} : 'No data'"></span>
+  </h2>
 </div>
+
+  <h1>Min and Max today temperature</h1>
+<div>
+  <h2 th:if="${d.minTempRecord == null or d.maxTempRecord == null}"> Not enough data</h2>
+</div>
+
+  <div th:if="${d.minTempRecord != null or d.maxTempRecord != null}">
+    <h2 >
+      Min temperature: <span th:text="${dashboard.minTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.minTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
+    </h2>
+    <h2>
+      Min temperature: <span th:text="${dashboard.maxTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.maxTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
+    </h2>
+  </div>
 
 </body>
 </html>

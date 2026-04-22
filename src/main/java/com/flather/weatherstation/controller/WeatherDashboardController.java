@@ -1,5 +1,6 @@
 package com.flather.weatherstation.controller;
 
+import com.flather.weatherstation.entity.WeatherDashboardDto;
 import com.flather.weatherstation.entity.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.service.WeatherService;
@@ -23,9 +24,9 @@ public class WeatherDashboardController {
 
     @GetMapping(BASE_PATH)
     public String getLatestWeather(Model model){
-        Optional<WeatherRecordResponseDto> dto = service.getLatestWeatherRecord();
-        model.addAttribute("weather", dto.orElse(null));
-        log.info("Retrieved Weather Record: {}",dto);
+        WeatherDashboardDto dto = service.getDashboardSummary();
+        model.addAttribute("dashboard", dto);
+        log.info("Retrieved Weather Record Dashboard Object: {}",dto);
 
         return "weather_dashboard";
     }
