@@ -30,7 +30,7 @@
       Min temperature: <span th:text="${dashboard.minTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.minTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
     </h2>
     <h2>
-      Min temperature: <span th:text="${dashboard.maxTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.maxTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
+      Max temperature: <span th:text="${dashboard.maxTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.maxTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
     </h2>
   </div>
 
