@@ -55,7 +55,7 @@ public class WeatherService {
 
         List<WeatherRecordResponseDto> minMaxTemp = getMinMaxTodayTemperature();
 
-        if(minMaxTemp.size() == 2){
+        if(minMaxTemp.size() >= 2){
             dto.setMaxTempRecord(minMaxTemp.getLast());
             dto.setMinTempRecord(minMaxTemp.getFirst());
         }
