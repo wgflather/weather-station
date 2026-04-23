@@ -39,7 +39,7 @@ public class WeatherController {
     @GetMapping(LATEST_WEATHER_PATH)
     public ResponseEntity<WeatherRecordResponseDto> getLatestWeatherRecord(){
 
-        return ResponseEntity.ok(service.getLatestWeatherRecord().orElse(null));
+        return ResponseEntity.ok(service.getLatestTodayWeatherRecord().orElse(null));
     }
 
     @GetMapping(BASE_PATH + "/stats")

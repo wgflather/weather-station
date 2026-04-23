@@ -6,18 +6,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Long> {
 
-    Optional<WeatherRecord> findFirstByOrderByMeasuredAtDesc();
-    @Query(value = "SELECT , MAX(temperature) " +
-            "FROM weather_records " +
-            "WHERE measured_at::date = (SELECT MAX(measured_at::date) FROM weather_records)",
-            nativeQuery = true)
-    List<Object[]> findMinMaxByLatestDate();
+    Optional<WeatherRecord> findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(Instant start, Instant end);
 
     @Query(value = "SELECT * FROM weather_records " +
             "WHERE measured_at::date = (SELECT MAX(measured_at)::date FROM weather_records)" +

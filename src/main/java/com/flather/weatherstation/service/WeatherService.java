@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.*;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -31,7 +32,7 @@ public class WeatherService {
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
 
         checkForDataAnomaly(weatherRecordDto);
-        getLatestWeatherRecord().ifPresent(lr ->
+        getLatestTodayWeatherRecord().ifPresent(lr ->
                 checkForDataSpikes(weatherRecordDto, lr));
 
         return mapper.weatherEntityToDto(
@@ -51,7 +52,7 @@ public class WeatherService {
     public WeatherDashboardDto getDashboardSummary(){
         WeatherDashboardDto dto = new WeatherDashboardDto();
 
-        getLatestWeatherRecord().ifPresent(dto::setLatestRecord);
+        getLatestTodayWeatherRecord().ifPresent(dto::setLatestRecord);
 
         List<WeatherRecordResponseDto> minMaxTemp = getMinMaxTodayTemperature();
 
@@ -59,11 +60,25 @@ public class WeatherService {
             dto.setMaxTempRecord(minMaxTemp.getLast());
             dto.setMinTempRecord(minMaxTemp.getFirst());
         }
+        if(!minMaxTemp.isEmpty()) {
+            log.info("{} {} {}", minMaxTemp.getLast(), minMaxTemp.getFirst(), minMaxTemp.size());
+        }
+
         return dto;
     }
 
-    public Optional<WeatherRecordResponseDto> getLatestWeatherRecord(){
-       return repository.findFirstByOrderByMeasuredAtDesc().map(mapper::weatherEntityToDto);
+    public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord(){
+        //TODO: make a time range factory based on specified zone ID
+
+        ZoneId zoneId = ZoneId.systemDefault();
+
+        LocalDate currentDate = LocalDate.now(zoneId);
+
+        Instant startOfTheCurrentDate = currentDate.atStartOfDay(zoneId).toInstant();
+
+        Instant endOfTheCurrentDate = currentDate.plusDays(1).atStartOfDay(zoneId).toInstant();
+
+       return repository.findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(startOfTheCurrentDate, endOfTheCurrentDate).map(mapper::weatherEntityToDto);
     }
 
     private void checkForDataAnomaly(WeatherRecordCreatedDto anomalyDto){
