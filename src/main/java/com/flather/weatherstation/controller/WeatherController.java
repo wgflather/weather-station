@@ -21,8 +21,8 @@ import java.util.List;
 @Slf4j
 public class WeatherController {
 
-    static final String BASE_PATH = "/api/weather";
-    static final String LATEST_WEATHER_PATH = BASE_PATH + "/latest";
+    public static final String BASE_PATH = "/api/weather";
+    public static final String LATEST_WEATHER_PATH = BASE_PATH + "/latest";
 
     private final WeatherService service;
 

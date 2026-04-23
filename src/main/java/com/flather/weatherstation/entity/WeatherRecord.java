@@ -14,6 +14,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @Getter
 @Setter
+@ToString
 public class WeatherRecord {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,6 +23,11 @@ public class WeatherRecord {
     private Double temperature;
 
     private Double pressure;
+
+    @Column(name = "data_quality")
+    @Enumerated(EnumType.STRING)
+    private DataQuality dataQuality;
+
 
     @NotNull
     @Column(name = "measured_at")

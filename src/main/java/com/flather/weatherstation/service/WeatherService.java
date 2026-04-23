@@ -1,9 +1,6 @@
 package com.flather.weatherstation.service;
 
-import com.flather.weatherstation.entity.WeatherDashboardDto;
-import com.flather.weatherstation.entity.WeatherRecord;
-import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
-import com.flather.weatherstation.entity.WeatherRecordResponseDto;
+import com.flather.weatherstation.entity.*;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,25 +17,35 @@ import java.util.Optional;
 @Slf4j
 public class WeatherService {
     private final WeatherReportRepository repository;
+    private final DataQualityValidator qualityValidator;
     private final WeatherRecordMapper mapper;
 
     @Autowired
-    public WeatherService(WeatherRecordMapper mapper, WeatherReportRepository repository){
+    public WeatherService(WeatherRecordMapper mapper, WeatherReportRepository repository,
+                          DataQualityValidator validator){
         this.repository = repository;
         this.mapper = mapper;
+        this.qualityValidator = validator;
     }
 
 
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
 
-        checkForDataAnomaly(weatherRecordDto);
-        getLatestTodayWeatherRecord().ifPresent(lr ->
-                checkForDataSpikes(weatherRecordDto, lr));
+        WeatherRecord record = mapper.weatherDtoToEntity(weatherRecordDto);
+        Optional<WeatherRecordResponseDto> latestRecord = getLatestTodayWeatherRecord();
 
-        return mapper.weatherEntityToDto(
-                repository.save(
-                        mapper.weatherDtoToEntity(weatherRecordDto)
-                ));
+        boolean isAnomaly = qualityValidator.checkForDataAnomaly(weatherRecordDto);
+
+        boolean isSpike = latestRecord.map(
+                last ->
+                        qualityValidator.checkForDataSpikes(weatherRecordDto, last))
+                .orElse(false);
+
+        DataQuality quality = qualityValidator.setDataQualityStatus(isAnomaly, isSpike);
+
+        record.setDataQuality(quality);
+
+        return mapper.weatherEntityToDto(repository.save(record));
     }
 
     public List<WeatherRecordResponseDto> getMinMaxTodayTemperature(){
@@ -79,33 +86,6 @@ public class WeatherService {
         Instant endOfTheCurrentDate = currentDate.plusDays(1).atStartOfDay(zoneId).toInstant();
 
        return repository.findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(startOfTheCurrentDate, endOfTheCurrentDate).map(mapper::weatherEntityToDto);
-    }
-
-    private void checkForDataAnomaly(WeatherRecordCreatedDto anomalyDto){
-        if(anomalyDto.getTemperature() < -40 || anomalyDto.getTemperature() > 50){
-            log.warn("[DATA_ANOMALY] Temperature is unrealistic: {} ℃", anomalyDto.getTemperature());
-        }
-        if(anomalyDto.getPressure() < 950 || anomalyDto.getPressure() > 1100){
-            log.warn("[DATA_ANOMALY] Pressure is unrealistic: {} hPa", anomalyDto.getPressure());
-        }
-    }
-
-    private void checkForDataSpikes(WeatherRecordCreatedDto weatherRecordDto, WeatherRecordResponseDto lastRecord){
-            double newTemp = weatherRecordDto.getTemperature();
-            double lastTemp = lastRecord.getTemperature();
-
-            double newPressure = weatherRecordDto.getPressure();
-            double lastPressure = lastRecord.getPressure();
-
-            if (Math.abs(newTemp - lastTemp) > 10) {
-                log.warn("[DATA_SPIKE] Last temp read: {} ℃ Current temp read: {} ℃",
-                        lastRecord.getTemperature(), weatherRecordDto.getTemperature());
-            }
-            if (Math.abs(newPressure - lastPressure) > 3) {
-                log.warn("[DATA_SPIKE] Last pressure read: {} pHa Current pressure read: {} hPa",
-                        lastRecord.getPressure(), weatherRecordDto.getPressure());
-            }
-
     }
 
 }
