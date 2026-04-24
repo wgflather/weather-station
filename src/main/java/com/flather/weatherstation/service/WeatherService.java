@@ -67,9 +67,6 @@ public class WeatherService {
             dto.setMaxTempRecord(minMaxTemp.getLast());
             dto.setMinTempRecord(minMaxTemp.getFirst());
         }
-        if(!minMaxTemp.isEmpty()) {
-            log.info("{} {} {}", minMaxTemp.getLast(), minMaxTemp.getFirst(), minMaxTemp.size());
-        }
 
         return dto;
     }
