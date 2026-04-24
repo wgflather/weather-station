@@ -5,15 +5,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
-import java.time.ZonedDateTime;
-
 @Data
 @AllArgsConstructor
 @RequiredArgsConstructor
 @Builder
-public class WeatherDashboardDto {
-    private WeatherAvgDto avgData;
-    private ZonedDateTime lastUpdate;
-    private long lagTime;
-    private DataStatus status;
+public class WeatherAvgDto {
+    private Double avgTemperature;
+    private Double avgPressure;
 }
