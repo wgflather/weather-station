@@ -44,7 +44,7 @@ public class WeatherController {
 
     @GetMapping(BASE_PATH + "/stats")
     public ResponseEntity<List<WeatherRecordResponseDto>> getStats(){
-        return ResponseEntity.ok(service.getMinMaxTodayTemperature());
+        return ResponseEntity.ok(service.getMaxTodayTemperature());
     }
 
 

@@ -12,8 +12,11 @@ import java.time.ZonedDateTime;
 @RequiredArgsConstructor
 @Builder
 public class WeatherDashboardDto {
-    private WeatherAvgDto avgData;
-    private ZonedDateTime lastUpdate;
-    private long lagTime;
+    private WeatherAvgDto averages;
+    private WeatherRecordResponseDto maxTodayTemp;
+    private WeatherRecordResponseDto minTodayTemp;
+    private ZonedDateTime lastMeasuredAt;
+    private long lagMinutes;
+    private long recordsToday;
     private DataStatus status;
 }

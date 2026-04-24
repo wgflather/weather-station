@@ -1,5 +1,6 @@
 package com.flather.weatherstation.repository;
 
+import com.flather.weatherstation.entity.WeatherAvgDto;
 import com.flather.weatherstation.entity.WeatherRecord;
 import com.flather.weatherstation.entity.WeatherRecordResponseDto;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,4 +26,24 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
             nativeQuery = true)
 
     List<WeatherRecord> findFullObjectsWithMaxValOnLatestDate();
+
+    // Query 1: Fresh data
+    @Query(value = "SELECT AVG(temperature) AS avgTemperature, AVG(pressure) AS avgPressure " +
+            "FROM weather_records " +
+            "WHERE measured_at >= NOW() - INTERVAL '5 minutes'",
+            nativeQuery = true)
+    WeatherAvgDto findLatestAvgComparedToNow();
+
+    // Query 2: Fallback data
+    @Query(value = "SELECT AVG(temperature) AS avgTemperature, AVG(pressure) AS avgPressure " +
+            "FROM weather_records " +
+            "WHERE measured_at >= (SELECT MAX(measured_at) FROM weather_records) - INTERVAL '5 minutes'",
+            nativeQuery = true)
+    WeatherAvgDto findLatestAvailableAvg();
+
+    @Query(value = "SELECT MAX(measured_at) FROM weather_records", nativeQuery = true)
+    Instant findMaxMeasuredAt();
+
+    @Query(value = "SELECT COUNT(*) FROM weather_records WHERE measured_at::date = CURRENT_DATE", nativeQuery = true)
+    long findRecordsToday();
 }

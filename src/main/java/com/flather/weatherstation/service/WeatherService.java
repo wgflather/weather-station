@@ -48,7 +48,8 @@ public class WeatherService {
         return mapper.weatherEntityToDto(repository.save(record));
     }
 
-    public List<WeatherRecordResponseDto> getMinMaxTodayTemperature(){
+
+    public List<WeatherRecordResponseDto> getMaxTodayTemperature(){
         return repository.findFullObjectsWithMaxValOnLatestDate()
                 .stream()
                 .map(mapper::weatherEntityToDto)
@@ -56,19 +57,49 @@ public class WeatherService {
                 .toList();
     }
 
-    public WeatherDashboardDto getDashboardSummary(){
-        WeatherDashboardDto dto = new WeatherDashboardDto();
 
-        getLatestTodayWeatherRecord().ifPresent(dto::setLatestRecord);
+    public WeatherDashboardDto getDashboardSummary() {
+        Instant latestRecordTime = repository.findMaxMeasuredAt();
 
-        List<WeatherRecordResponseDto> minMaxTemp = getMinMaxTodayTemperature();
-
-        if(minMaxTemp.size() >= 2){
-            dto.setMaxTempRecord(minMaxTemp.getLast());
-            dto.setMinTempRecord(minMaxTemp.getFirst());
+        if(latestRecordTime == null){
+            return WeatherDashboardDto
+                    .builder()
+                    .status(DataStatus.EMPTY)
+                    .build();
         }
+        ZonedDateTime latestRecordTimeZoned = latestRecordTime.atZone(ZoneId.systemDefault());
 
-        return dto;
+        long lagMinutes = Duration.between(latestRecordTime, Instant.now()).toMinutes();
+        DataStatus status = setStatus(lagMinutes);
+        WeatherAvgDto latestAvg = repository.findLatestAvgComparedToNow();
+        List<WeatherRecordResponseDto> minMaxTemp = getMaxTodayTemperature();
+
+        WeatherAvgDto averages = (latestAvg.getAvgPressure() != null && latestAvg.getAvgTemperature() != null)
+                ? latestAvg : repository.findLatestAvailableAvg();
+
+
+
+        return WeatherDashboardDto.builder()
+                .averages(averages)
+                .lagMinutes(lagMinutes)
+                .lastMeasuredAt(latestRecordTimeZoned)
+                .maxTodayTemp(minMaxTemp.getLast())
+                .minTodayTemp(minMaxTemp.getFirst())
+                .recordsToday(repository.findRecordsToday())
+                .status(status)
+                .build();
+    }
+
+    private DataStatus setStatus(long lagMinutes){
+        if(lagMinutes < 5){
+             return DataStatus.LIVE;
+        } else if (lagMinutes < 10) {
+            return DataStatus.DELAYED;
+        } else if (lagMinutes < 1440) {
+            return DataStatus.STALE;
+        } else {
+            return DataStatus.OFFLINE;
+        }
     }
 
     public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord(){

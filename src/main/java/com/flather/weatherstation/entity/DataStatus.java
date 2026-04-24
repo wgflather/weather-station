@@ -1,8 +1,13 @@
 package com.flather.weatherstation.entity;
 
+import lombok.Getter;
+
+@Getter
 public enum DataStatus {
-    FRESH,
+    LIVE,
     DELAYED,
     STALE,
-    OFFLINE
+    OFFLINE,
+    EMPTY;
+
 }
