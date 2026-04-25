@@ -1,11 +1,9 @@
-package com.flather.weatherstation.service;
+package com.flather.weatherstation.controller;
 
-import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
+import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
+import com.flather.weatherstation.service.WeatherService;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 

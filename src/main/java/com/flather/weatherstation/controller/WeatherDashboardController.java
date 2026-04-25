@@ -1,7 +1,6 @@
 package com.flather.weatherstation.controller;
 
-import com.flather.weatherstation.entity.WeatherDashboardDto;
-import com.flather.weatherstation.entity.WeatherRecordResponseDto;
+import com.flather.weatherstation.model.dto.WeatherDashboardDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.service.WeatherService;
 import lombok.RequiredArgsConstructor;
@@ -9,9 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-
-import java.time.format.DateTimeFormatter;
-import java.util.Optional;
 
 @Controller
 @RequiredArgsConstructor

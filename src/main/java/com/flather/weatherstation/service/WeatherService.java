@@ -1,7 +1,10 @@
 package com.flather.weatherstation.service;
 
-import com.flather.weatherstation.entity.*;
+import com.flather.weatherstation.model.constant.DataQuality;
+import com.flather.weatherstation.model.constant.DataStatus;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
+import com.flather.weatherstation.model.dto.*;
+import com.flather.weatherstation.model.entity.WeatherRecord;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

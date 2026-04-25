@@ -1,9 +1,8 @@
-package com.flather.weatherstation.entity;
+package com.flather.weatherstation.model.dto;
 
 import lombok.*;
 
 import java.time.Instant;
-import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
 @AllArgsConstructor

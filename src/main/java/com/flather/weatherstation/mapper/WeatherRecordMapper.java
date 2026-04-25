@@ -1,8 +1,8 @@
 package com.flather.weatherstation.mapper;
 
-import com.flather.weatherstation.entity.WeatherRecord;
-import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
-import com.flather.weatherstation.entity.WeatherRecordResponseDto;
+import com.flather.weatherstation.model.entity.WeatherRecord;
+import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
+import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;

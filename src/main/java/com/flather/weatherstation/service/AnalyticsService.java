@@ -1,6 +1,9 @@
 package com.flather.weatherstation.service;
 
-import com.flather.weatherstation.entity.*;
+import com.flather.weatherstation.model.dto.MinMaxValueDto;
+import com.flather.weatherstation.model.dto.WeatherAvgDto;
+import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
+import com.flather.weatherstation.model.constant.DataStatus;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
@@ -67,8 +70,6 @@ public class AnalyticsService {
                 .build()
         );
 
-
-
     }
 
     public WeatherAvgDto getAvgRoundedMetricsData(){
@@ -76,8 +77,10 @@ public class AnalyticsService {
         WeatherAvgDto latestAvg = repository.findLatestAvgComparedToNow();
 
         //Use latest available data in database if no records arrived in last 5 minutes
-        WeatherAvgDto avgDto = (latestAvg.getAvgPressure() != null && latestAvg.getAvgTemperature() != null)
-                ? latestAvg : repository.findLatestAvailableAvg();
+        WeatherAvgDto avgDto = ( latestAvg != null &&
+                latestAvg.getAvgPressure() != null &&
+                latestAvg.getAvgTemperature() != null) ?
+                latestAvg : repository.findLatestAvailableAvg();
 
         return roundAvgData(avgDto, 1);
     }

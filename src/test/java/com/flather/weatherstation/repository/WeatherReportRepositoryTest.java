@@ -1,16 +1,12 @@
 package com.flather.weatherstation.repository;
 
 import com.flather.weatherstation.controller.WeatherController;
-import com.flather.weatherstation.entity.DataQuality;
-import com.flather.weatherstation.entity.WeatherRecord;
-import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
-import com.flather.weatherstation.entity.WeatherRecordResponseDto;
-import com.flather.weatherstation.mapper.WeatherRecordMapper;
+import com.flather.weatherstation.model.constant.DataQuality;
+import com.flather.weatherstation.model.entity.WeatherRecord;
+import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
 import com.flather.weatherstation.service.WeatherService;
-import jakarta.persistence.criteria.CriteriaBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -18,13 +14,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
-import org.testcontainers.shaded.com.fasterxml.jackson.core.JsonProcessingException;
 import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.ObjectMapper;
 

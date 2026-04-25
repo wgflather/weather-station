@@ -1,5 +1,6 @@
-package com.flather.weatherstation.entity;
+package com.flather.weatherstation.model.entity;
 
+import com.flather.weatherstation.model.constant.DataQuality;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;

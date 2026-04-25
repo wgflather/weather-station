@@ -1,5 +1,6 @@
-package com.flather.weatherstation.entity;
+package com.flather.weatherstation.model.dto;
 
+import com.flather.weatherstation.model.constant.DataStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
