@@ -1,6 +1,5 @@
 package com.flather.weatherstation.controller;
 
-import com.flather.weatherstation.WeatherStationApplication;
 import com.flather.weatherstation.entity.WeatherDashboardDto;
 import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
 import com.flather.weatherstation.entity.WeatherRecordResponseDto;
@@ -41,12 +40,6 @@ public class WeatherController {
 
         return ResponseEntity.ok(service.getLatestTodayWeatherRecord().orElse(null));
     }
-
-    @GetMapping(BASE_PATH + "/stats")
-    public ResponseEntity<List<WeatherRecordResponseDto>> getStats(){
-        return ResponseEntity.ok(service.getMaxTodayTemperature());
-    }
-
 
 
     @GetMapping(BASE_PATH + "/dashboard")

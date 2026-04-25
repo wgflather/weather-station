@@ -3,30 +3,22 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.entity.*;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.decimal4j.util.DoubleRounder;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class WeatherService {
     private final WeatherReportRepository repository;
     private final DataQualityValidator qualityValidator;
     private final WeatherRecordMapper mapper;
-
-    @Autowired
-    public WeatherService(WeatherRecordMapper mapper, WeatherReportRepository repository,
-                          DataQualityValidator validator){
-        this.repository = repository;
-        this.mapper = mapper;
-        this.qualityValidator = validator;
-    }
+    private final AnalyticsService analyticsService;
 
 
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
@@ -49,62 +41,33 @@ public class WeatherService {
     }
 
 
-    public List<WeatherRecordResponseDto> getMaxTodayTemperature(){
-        return repository.findFullObjectsWithMaxValOnLatestDate()
-                .stream()
-                .map(mapper::weatherEntityToDto)
-                .sorted(Comparator.comparingDouble(WeatherRecordResponseDto::getTemperature))
-                .toList();
-    }
-
-
     public WeatherDashboardDto getDashboardSummary() {
         Instant latestRecordTime = repository.findMaxMeasuredAt();
-
+        // Check for empty database
         if(latestRecordTime == null){
             return WeatherDashboardDto
                     .builder()
                     .status(DataStatus.EMPTY)
                     .build();
         }
+
         ZonedDateTime latestRecordTimeZoned = latestRecordTime.atZone(ZoneId.systemDefault());
-
         long lagMinutes = Duration.between(latestRecordTime, Instant.now()).toMinutes();
-        DataStatus status = setStatus(lagMinutes);
-        WeatherAvgDto latestAvg = repository.findLatestAvgComparedToNow();
-        List<WeatherRecordResponseDto> minMaxTemp = getMaxTodayTemperature();
+        DataStatus status = analyticsService.setStatus(lagMinutes);
 
-        WeatherAvgDto averages = (latestAvg.getAvgPressure() != null && latestAvg.getAvgTemperature() != null)
-                ? latestAvg : repository.findLatestAvailableAvg();
+        Optional<MinMaxValueDto> minMaxValueDto = analyticsService.getMinMaxTodayTemperature();
 
-        roundAvgData(averages, 2);
+        //Use latest available data in database if no records arrived in last 5 minutes
+        WeatherAvgDto averages = analyticsService.getAvgRoundedMetricsData();
 
         return WeatherDashboardDto.builder()
                 .averages(averages)
                 .lagMinutes(lagMinutes)
                 .lastMeasuredAt(latestRecordTimeZoned)
-                .maxTodayTempRecord(minMaxTemp.getLast())
-                .minTodayTempRecord(minMaxTemp.getFirst())
+                .minMaxValue(minMaxValueDto.orElse(null))
                 .recordsToday(repository.findRecordsToday())
                 .status(status)
                 .build();
-    }
-
-    private void roundAvgData(WeatherAvgDto data, int precision){
-        data.setAvgPressure(DoubleRounder.round(data.getAvgPressure(), precision));
-        data.setAvgTemperature(DoubleRounder.round(data.getAvgTemperature(), precision));
-    }
-
-    private DataStatus setStatus(long lagMinutes){
-        if(lagMinutes < 5){
-             return DataStatus.LIVE;
-        } else if (lagMinutes < 10) {
-            return DataStatus.DELAYED;
-        } else if (lagMinutes < 1440) {
-            return DataStatus.STALE;
-        } else {
-            return DataStatus.OFFLINE;
-        }
     }
 
     public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord(){
@@ -118,7 +81,8 @@ public class WeatherService {
 
         Instant endOfTheCurrentDate = currentDate.plusDays(1).atStartOfDay(zoneId).toInstant();
 
-       return repository.findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(startOfTheCurrentDate, endOfTheCurrentDate).map(mapper::weatherEntityToDto);
+        return repository.findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(startOfTheCurrentDate, endOfTheCurrentDate).map(mapper::weatherEntityToDto);
     }
+
 
 }
