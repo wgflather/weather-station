@@ -3,29 +3,35 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.entity.DataQuality;
 import com.flather.weatherstation.entity.WeatherRecordCreatedDto;
 import com.flather.weatherstation.entity.WeatherRecordResponseDto;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DataQualityValidator {
 
-    public boolean checkForDataAnomaly(WeatherRecordCreatedDto anomalyDto){
-        boolean isAnomaly = false;
+    private final WeatherValidationProperties properties;
 
-        if(anomalyDto.getTemperature() < -40 || anomalyDto.getTemperature() > 50){
+    public boolean checkForDataAnomaly(WeatherRecordCreatedDto anomalyDto){
+        boolean isAnomaly = false; //Anomaly represents unrealistic data connected to sensor failures
+
+        if(anomalyDto.getTemperature() < properties.getTempMinimal() || anomalyDto.getTemperature() > properties.getTempMaximum()){
             log.warn("[DATA_ANOMALY] Temperature is unrealistic: {} ℃", anomalyDto.getTemperature());
             isAnomaly = true;
 
         }
 
-        if(anomalyDto.getPressure() < 950 || anomalyDto.getPressure() > 1100){
+        if(anomalyDto.getPressure() < properties.getPressureMinimal() || anomalyDto.getPressure() > properties.getPressureMaximum()){
             log.warn("[DATA_ANOMALY] Pressure is unrealistic: {} hPa", anomalyDto.getPressure());
             isAnomaly = true;
         }
 
         return isAnomaly;
     }
+
 
     public boolean checkForDataSpikes(WeatherRecordCreatedDto weatherRecordDto, WeatherRecordResponseDto lastRecord){
         double newTemp = weatherRecordDto.getTemperature();
@@ -34,15 +40,15 @@ public class DataQualityValidator {
         double newPressure = weatherRecordDto.getPressure();
         double lastPressure = lastRecord.getPressure();
 
-        boolean isSpike = false;
+        boolean isSpike = false; //Spike represents a sharp jump in data values
 
-        if (Math.abs(newTemp - lastTemp) > 10) {
+        if (Math.abs(newTemp - lastTemp) > properties.getTempSpikeLimit()) {
             log.warn("[DATA_SPIKE] Last temp read: {} ℃ Current temp read: {} ℃",
                     lastRecord.getTemperature(), weatherRecordDto.getTemperature());
             isSpike = true;
         }
 
-        if (Math.abs(newPressure - lastPressure) > 3) {
+        if (Math.abs(newPressure - lastPressure) > properties.getPressureSpikeLimit()) {
             log.warn("[DATA_SPIKE] Last pressure read: {} pHa Current pressure read: {} hPa",
                     lastRecord.getPressure(), weatherRecordDto.getPressure());
             isSpike = true;
