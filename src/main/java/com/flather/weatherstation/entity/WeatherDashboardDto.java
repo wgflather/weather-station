@@ -13,7 +13,7 @@ import java.time.ZonedDateTime;
 @Builder
 public class WeatherDashboardDto {
     private WeatherAvgDto averages;
-    private MinMaxValueDto minMaxValue;
+    private MinMaxValueDto minMaxTempValue;
     private ZonedDateTime lastMeasuredAt;
     private long lagMinutes;
     private long recordsToday;

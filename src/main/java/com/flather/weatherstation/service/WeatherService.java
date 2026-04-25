@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -64,7 +63,7 @@ public class WeatherService {
                 .averages(averages)
                 .lagMinutes(lagMinutes)
                 .lastMeasuredAt(latestRecordTimeZoned)
-                .minMaxValue(minMaxValueDto.orElse(null))
+                .minMaxTempValue(minMaxValueDto.orElse(null))
                 .recordsToday(repository.findRecordsToday())
                 .status(status)
                 .build();
