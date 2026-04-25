@@ -20,7 +20,7 @@ public class MqttService {
         connect();
     }
     String broker = "tcp://192.168.0.69:1883";
-    String clientId = "spring-client";
+    String clientId = "spring-client-test";
 
     private void connect(){
         try(MqttClient client = new MqttClient(broker, clientId)){

@@ -3,8 +3,8 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.entity.*;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.decimal4j.util.DoubleRounder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -77,17 +77,22 @@ public class WeatherService {
         WeatherAvgDto averages = (latestAvg.getAvgPressure() != null && latestAvg.getAvgTemperature() != null)
                 ? latestAvg : repository.findLatestAvailableAvg();
 
-
+        roundAvgData(averages, 2);
 
         return WeatherDashboardDto.builder()
                 .averages(averages)
                 .lagMinutes(lagMinutes)
                 .lastMeasuredAt(latestRecordTimeZoned)
-                .maxTodayTemp(minMaxTemp.getLast())
-                .minTodayTemp(minMaxTemp.getFirst())
+                .maxTodayTempRecord(minMaxTemp.getLast())
+                .minTodayTempRecord(minMaxTemp.getFirst())
                 .recordsToday(repository.findRecordsToday())
                 .status(status)
                 .build();
+    }
+
+    private void roundAvgData(WeatherAvgDto data, int precision){
+        data.setAvgPressure(DoubleRounder.round(data.getAvgPressure(), precision));
+        data.setAvgTemperature(DoubleRounder.round(data.getAvgTemperature(), precision));
     }
 
     private DataStatus setStatus(long lagMinutes){

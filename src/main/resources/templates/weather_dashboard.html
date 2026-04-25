@@ -8,31 +8,38 @@
   <h1>Today Weather: <span th:text="${#temporals.createNow().toLocalDate()}"></span></h1>
 
 <div>
-  <h1 th:if="${dashboard.latestRecord == null}"> No data in database </h1>
+  <h1 th:if="${dashboard.status == EMPTY}"> No data in database </h1>
 </div>
 
 <div>
-  <h1>Current weather</h1>
-  <h2 th:if="${d.latestRecord != null}">
-    Temperature: <span th:text="${d.latestRecord.temperature != null} ? ${d.latestRecord.temperature} + ' ℃' : 'No data'"></span> |
-    Pressure: <span th:text="${d.latestRecord.pressure != null} ? ${d.latestRecord.pressure} + ' hPa' : 'No data'"></span> |
-    Time: <span th:text="${d.latestRecord.measuredAtTimeZoned != null} ? ${#temporals.format(d.latestRecord.measuredAtTimeZoned, 'HH:mm:ss')} : 'No data'"></span>
+  <h1>Current weather (5-min avg)</h1>
+  <h2 th:if="${d.status != EMPTY}">
+    Temperature: <span th:text="${d.averages.avgTemperature != null} ? ${d.averages.avgTemperature} + ' ℃' : 'No data'"></span> |
+    Pressure: <span th:text="${d.averages.avgPressure != null} ? ${d.averages.avgPressure} + ' hPa' : 'No data'"></span>
   </h2>
 </div>
 
   <h1>Min and Max today temperature</h1>
 <div>
-  <h2 th:if="${d.minTempRecord == null or d.maxTempRecord == null}"> Not enough data</h2>
+  <h2 th:if="${d.minTodayTempRecord == null or d.maxTodayTempRecord == null}"> Not enough data</h2>
 </div>
 
-  <div th:if="${d.minTempRecord != null or d.maxTempRecord != null}">
+  <div th:if="${d.minTodayTempRecord != null or d.maxTodayTempRecord != null}">
     <h2 >
-      Min temperature: <span th:text="${dashboard.minTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.minTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
+      Min temperature: <span th:text="${dashboard.minTodayTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.minTodayTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
     </h2>
     <h2>
-      Max temperature: <span th:text="${dashboard.maxTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.maxTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
+      Max temperature: <span th:text="${dashboard.maxTodayTempRecord.temperature} + ' ℃' + ' at ' +  ${#temporals.format(d.maxTodayTempRecord.measuredAtTimeZoned, 'HH:mm:ss')}"></span>
     </h2>
   </div>
+
+<h1>System health data</h1>
+<div th:if="${d.status != EMPTY}">
+  <h2> STATUS: <span th:text="${d.status}"></span></h2>
+  <h2> Lag time(minutes): <span th:text="${d.lagMinutes}"></span></h2>
+  <h2> Today records received: <span th:text="${d.recordsToday}"></span></h2>
+  <h2> Last record arrived at: <span th:text="${#temporals.format(d.lastMeasuredAt, 'HH:mm:ss')}"></span></h2>
+</div>
 
 </body>
 </html>
