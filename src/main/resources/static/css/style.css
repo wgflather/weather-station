@@ -1,0 +1,73 @@
+@font-face {
+    font-family: Nunito;
+    src: url(fonts/Nunito-VariableFont_wght.ttf);
+}
+body {
+    background-color: #7ba7ad;
+    font-family: 'Nunito', sans-serif;
+    color: #2c3e50;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.today_data_block {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* The magic for side-by-side blocks */
+.dashboard-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 850px;
+    margin-bottom: 20px;
+}
+
+/* Shared Card Styling */
+.weather_block, .min_max_block, .system_health_block {
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-sizing: border-box;
+}
+
+h3 { margin-top: 0; color: #1a252f; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px; }
+
+/* Block Specific Sizes */
+.weather_block { width: 300px; }
+.min_max_block { width: 500px; }
+.system_health_block { width: 820px; max-width: 100%; }
+
+/* Internal Data Layouts */
+.min-max-container {
+    display: flex;
+    justify-content: space-around;
+    text-align: center;
+}
+
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    text-align: center;
+}
+
+.health-item label { display: block; font-size: 0.8rem; font-weight: bold; opacity: 0.7; }
+.health-item span { font-size: 1.2rem; font-weight: bold; }
+
+.status-live { color: #27ae60; text-shadow: 0 0 5px rgba(39,174,96,0.3); }
+
+/* Responsive fix */
+@media (max-width: 850px) {
+    .weather_block, .min_max_block, .system_health_block {
+        width: 100%;
+    }
+}

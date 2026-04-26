@@ -1,49 +1,73 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="UTF-8" http-equiv="refresh" content="60">
-  <title>Title</title>
+    <meta charset="UTF-8" http-equiv="refresh" content="60">
+    <title>Weather Dashboard</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
 </head>
 <body th:with="d=${dashboard}">
-  <h1>Today Weather: <span th:text="${#temporals.createNow().toLocalDate()}"></span></h1>
-  <hr>
-<div>
-  <h1 th:if="${dashboard.status == EMPTY}"> No data in database </h1>
-</div>
 
-<div>
-  <h1>Current weather (5-min avg)</h1>
-  <hr>
-  <h2 th:if="${d.status != EMPTY}">
-    Temperature: <span th:text="${d.averages.avgTemperature != null} ? ${d.averages.avgTemperature} + ' ℃' : 'No data'"></span> |
-    Pressure: <span th:text="${d.averages.avgPressure != null} ? ${d.averages.avgPressure} + ' hPa' : 'No data'"></span>
-  </h2>
-  <hr>
-</div>
+    <div class="today_data_block">
+        <h1>Weather Report: <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}"></span></h1>
+        <div th:if="${d.status.name() == 'EMPTY'}" class="error-msg">
+            <h1>⚠️ No data available in database</h1>
+        </div>
+    </div>
 
-  <h1>Min and Max today temperature</h1>
-<div>
-  <hr>
-  <div th:if="${d.minMaxTempValue}">
-    <h2 >
-      Min temperature: <span th:text="${dashboard.minMaxTempValue.minValue} + ' ℃' + ' at ' +  ${#temporals.format(d.minMaxTempValue.minAt, 'HH:mm:ss')}"></span>
-    </h2>
-    <h2>
-      Max temperature: <span th:text="${dashboard.minMaxTempValue.maxValue} + ' ℃' + ' at ' +  ${#temporals.format(d.minMaxTempValue.maxAt, 'HH:mm:ss')}"></span>
-    </h2>
-  </div>
-  <h2 th:if="${d.minMaxTempValue == null}"> Not enough data</h2>
-  <hr>
-</div>
+    <div class="dashboard-row" th:if="${d.status.name() != 'EMPTY'}">
+        
+        <div class="weather_block">
+            <h3>Current Weather <small>(5-min avg)</small></h3>
+            <div class="data-point">
+                <p>Temperature</p>
+                <span th:text="${d.averages.avgTemperature != null ? d.averages.avgTemperature + ' °C' : 'N/A'}"></span>
+            </div>
+            <div class="data-point">
+                <p>Pressure</p>
+                <span th:text="${d.averages.avgPressure != null ? d.averages.avgPressure + ' hPa' : 'N/A'}"></span>
+            </div>
+        </div>
 
-<h1>System health data</h1>
-  <hr>
-<div th:if="${d.status != EMPTY}">
-  <h2> STATUS: <span th:text="${d.status}"></span></h2>
-  <h2> Lag time(minutes): <span th:text="${d.lagMinutes}"></span></h2>
-  <h2> Today records received: <span th:text="${d.recordsToday}"></span></h2>
-  <h2> Last record received at: <span th:text="${#temporals.format(d.lastMeasuredAt, 'HH:mm:ss')}"></span></h2>
-</div>
+        <div class="min_max_block">
+            <h3>Temperature Extremes</h3>
+            <div th:if="${d.minMaxTempValue}" class="min-max-container">
+                <div class="temp-stat min">
+                    <p>Min</p>
+                    <h2 th:text="${d.minMaxTempValue.minValue} + ' °C'"></h2>
+                    <small th:text="'at ' + ${#temporals.format(d.minMaxTempValue.minAt, 'HH:mm:ss')}"></small>
+                </div>
+                <div class="temp-stat max">
+                    <p>Max</p>
+                    <h2 th:text="${d.minMaxTempValue.maxValue} + ' °C'"></h2>
+                    <small th:text="'at ' + ${#temporals.format(d.minMaxTempValue.maxAt, 'HH:mm:ss')}"></small>
+                </div>
+            </div>
+            <h2 th:unless="${d.minMaxTempValue}">Not enough data</h2>
+        </div>
+        
+    </div>
+
+    <div class="system_health_block" th:if="${d.status.name() != 'EMPTY'}">
+        <h3>System Health</h3>
+        <div class="health-grid">
+            <div class="health-item">
+                <label>Status</label>
+                <span th:text="${d.status}" th:classappend="${d.status.name() == 'LIVE' ? 'status-live' : ''}"></span>
+            </div>
+            <div class="health-item">
+                <label>Lag</label>
+                <span th:text="${d.lagMinutes} + ' min'"></span>
+            </div>
+            <div class="health-item">
+                <label>Records</label>
+                <span th:text="${d.recordsToday}"></span>
+            </div>
+            <div class="health-item">
+                <label>Last Update</label>
+                <span th:text="${#temporals.format(d.lastMeasuredAt, 'HH:mm:ss')}"></span>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>
