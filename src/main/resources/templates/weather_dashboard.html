@@ -21,11 +21,11 @@
             <h3>Current Weather <small>(5-min avg)</small></h3>
             <div class="data-point">
                 <p>Temperature</p>
-                <span th:text="${d.averages.avgTemperature != null ? d.averages.avgTemperature + ' °C' : 'N/A'}"></span>
+                <span class="temperature" th:text="${d.averages.avgTemperature != null ? d.averages.avgTemperature + ' °C' : 'N/A'}"></span>
             </div>
             <div class="data-point">
                 <p>Pressure</p>
-                <span th:text="${d.averages.avgPressure != null ? d.averages.avgPressure + ' hPa' : 'N/A'}"></span>
+                <span class="pressure" th:text="${d.averages.avgPressure != null ? d.averages.avgPressure + ' hPa' : 'N/A'}"></span>
             </div>
         </div>
 
