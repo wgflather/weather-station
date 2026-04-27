@@ -9,6 +9,7 @@ import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.util.Optional;
@@ -22,7 +23,7 @@ public class WeatherService {
     private final WeatherRecordMapper mapper;
     private final AnalyticsService analyticsService;
 
-
+    @Transactional
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
 
         WeatherRecord record = mapper.weatherDtoToEntity(weatherRecordDto);
@@ -42,7 +43,7 @@ public class WeatherService {
         return mapper.weatherEntityToDto(repository.save(record));
     }
 
-
+    @Transactional(readOnly = true)
     public WeatherDashboardDto getDashboardSummary() {
         Instant latestRecordTime = repository.findMaxMeasuredAt();
         // Check for empty database
@@ -72,6 +73,7 @@ public class WeatherService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord(){
         //TODO: make a time range factory based on specified zone ID
 
