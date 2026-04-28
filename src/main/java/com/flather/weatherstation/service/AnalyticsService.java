@@ -1,5 +1,6 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.model.dto.MinMaxProjection;
 import com.flather.weatherstation.model.dto.MinMaxValueDto;
 import com.flather.weatherstation.model.dto.WeatherAvgDto;
 import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
@@ -12,6 +13,9 @@ import org.decimal4j.util.DoubleRounder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +35,10 @@ public class AnalyticsService {
                 .build();
     }
 
+    private ZonedDateTime instantTOZoned(Instant instant){
+        return instant.atZone(ZoneId.systemDefault());
+    }
+
     public DataStatus setStatus(long lagMinutes){
         if(lagMinutes < 5){
             return DataStatus.LIVE;
@@ -44,31 +52,21 @@ public class AnalyticsService {
     }
 
     public Optional<MinMaxValueDto> getMinMaxTodayTemperature(){
-        List<WeatherRecordResponseDto> minMaxTemp = repository.findFullObjectsWithMinMaxTempOnLatestDate()
-                .stream()
-                .map(mapper::weatherEntityToDto)
-                .toList();
+        List<MinMaxProjection> minMaxTemp = repository.findFullObjectsWithMinMaxTempOnLatestDate();
 
-        if(minMaxTemp.size() < 2){
+        if(minMaxTemp.size() != 2){
             return Optional.empty();
         }
 
-        WeatherRecordResponseDto min = minMaxTemp
-                .stream()
-                .min(Comparator.comparingDouble(WeatherRecordResponseDto::getTemperature))
-                .get();
-
-        WeatherRecordResponseDto max = minMaxTemp
-                .stream()
-                .max(Comparator.comparingDouble(WeatherRecordResponseDto::getTemperature))
-                .get();
+        MinMaxProjection min = minMaxTemp.get(0);
+        MinMaxProjection max = minMaxTemp.get(1);
 
         return Optional.of(
                 MinMaxValueDto.builder()
-                .maxValue(max.getTemperature())
-                .minValue(min.getTemperature())
-                .maxAt(max.getMeasuredAtTimeZoned())
-                .minAt(min.getMeasuredAtTimeZoned())
+                .maxValue(max.value())
+                .minValue(min.value())
+                .maxAt(instantTOZoned(max.time()))
+                .minAt(instantTOZoned(min.time()))
                 .build()
         );
 

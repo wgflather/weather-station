@@ -1,8 +1,0 @@
-weather:
-  validation:
-    temp-minimal: -45
-    temp-maximum: 60
-    pressure-minimal: 940
-    pressure-maximum: 1060
-    temp-spike-limit: 2.0
-    pressure-spike-limit: 0.5

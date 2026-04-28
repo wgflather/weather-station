@@ -1,5 +1,7 @@
 package com.flather.weatherstation.repository;
 
+import com.flather.weatherstation.model.dto.MinMaxProjection;
+import com.flather.weatherstation.model.dto.MinMaxValueDto;
 import com.flather.weatherstation.model.dto.WeatherAvgDto;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,15 +17,31 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
 
     Optional<WeatherRecord> findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(Instant start, Instant end);
 
-    @Query(value = "SELECT * FROM weather_records " +
-            "WHERE measured_at::date = (SELECT MAX(measured_at)::date FROM weather_records)" +
-            "AND temperature IN (" +
-            "SELECT MAX(temperature) FROM weather_records WHERE measured_at::date = (SELECT MAX(measured_at::date) FROM weather_records)" +
-            "UNION " +
-            "SELECT MIN(temperature) FROM weather_records WHERE measured_at::date = (SELECT MAX(measured_at)::date FROM weather_records))",
-            nativeQuery = true)
 
-    List<WeatherRecord> findFullObjectsWithMinMaxTempOnLatestDate();
+    @Query(value = """
+    with latest_date AS(
+    select DATE_TRUNC('day', MAX(measured_at)) as day
+    from weather_records)
+        
+    (select temperature, measured_at
+    from  weather_records w
+    join latest_date l\s
+    on w.measured_at >= l.day
+    and w.measured_at < l.day + interval '1 day'
+    order by temperature asc
+    limit 1)
+    
+    union
+    
+    (select temperature, measured_at
+    from  weather_records w
+    join latest_date l\s
+    on w.measured_at >= l.day
+    and w.measured_at < l.day + interval '1 day'
+    order by temperature desc
+    limit 1)
+    """, nativeQuery = true)
+    List<MinMaxProjection> findFullObjectsWithMinMaxTempOnLatestDate();
 
     // Query 1: Fresh data
     @Query(value = "SELECT AVG(temperature) AS avgTemperature, AVG(pressure) AS avgPressure " +

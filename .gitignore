@@ -46,6 +46,8 @@ Thumbs.db
 ### SENSITIVE DATA ###
 .env
 *.properties
+application-local.yml
+application-dev.yml
 
 # Compiled class file
 *.class
