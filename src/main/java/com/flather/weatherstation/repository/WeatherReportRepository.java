@@ -1,5 +1,6 @@
 package com.flather.weatherstation.repository;
 
+import com.flather.weatherstation.model.dto.HourlyChartAvgDto;
 import com.flather.weatherstation.model.dto.MinMaxProjection;
 import com.flather.weatherstation.model.dto.MinMaxValueDto;
 import com.flather.weatherstation.model.dto.WeatherAvgDto;
@@ -62,4 +63,14 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
 
     @Query(value = "SELECT COUNT(*) FROM weather_records WHERE measured_at::date = CURRENT_DATE", nativeQuery = true)
     long findRecordsToday();
+
+    @Query(value = """
+    select date_trunc('hour', measured_at) as hour, AVG(temperature) hourlyValue
+    from weather_records
+    where measured_at >= CURRENT_DATE
+    and measured_at < CURRENT_DATE + interval '1 day'
+    group by hour
+    order by hour desc;
+    """)
+    List<HourlyChartAvgDto> findTodayHourlyTemperature();
 }
