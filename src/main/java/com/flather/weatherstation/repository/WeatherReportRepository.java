@@ -25,20 +25,20 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
         
     (select temperature, measured_at
     from  weather_records w
-    join latest_date l\s
+    join latest_date l
     on w.measured_at >= l.day
     and w.measured_at < l.day + interval '1 day'
-    order by temperature asc
+    order by temperature asc, measured_at
     limit 1)
     
-    union
+    union all
     
     (select temperature, measured_at
     from  weather_records w
-    join latest_date l\s
+    join latest_date l
     on w.measured_at >= l.day
     and w.measured_at < l.day + interval '1 day'
-    order by temperature desc
+    order by temperature desc, measured_at
     limit 1)
     """, nativeQuery = true)
     List<MinMaxProjection> findFullObjectsWithMinMaxTempOnLatestDate();

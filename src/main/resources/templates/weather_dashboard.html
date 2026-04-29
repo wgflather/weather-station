@@ -5,6 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weather Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let weatherChartInstance = null; // Track the chart instance
+
+        async function initWeatherChart() {
+            try {
+                const response = await fetch('/api/weather/chart');
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const backendData = await response.json();
+
+                const labels = backendData.map(item => {
+        // 1. Try to parse the date (works for "2026-04-29T20:00:00.000Z")
+        const date = new Date(item.hour);
+
+    // 2. Check if parsing failed
+        if (isNaN(date.getTime())) {
+            // Fallback: If it's a standard ISO string, just cut out the "HH:mm" part
+            // Example: "2026-04-29T15:30:00" -> returns "15:30"
+            if (typeof item.hour === 'string' && item.hour.includes('T')) {
+                return item.hour.split('T')[1].substring(0, 5);
+            }
+            return "??:??"; // Last resort
+        }
+
+        // 3. If parsing worked, format it to local time (Kharkiv)
+        return date.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false // Use 24-hour format
+        });
+    });
+
+                const temperatures = backendData.map(item => item.hourlyValue);
+
+                const ctx = document.getElementById('weatherChart').getContext('2d');
+
+                // Fix: If chart already exists, destroy it before creating a new one
+                if (weatherChartInstance) {
+                    weatherChartInstance.destroy();
+                }
+
+                weatherChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Temperature (°C)',
+                            data: temperatures,
+                            borderColor: '#4bc0c0',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, // Allows it to fill the container height
+                        scales: {
+                            x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error loading chart data:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initWeatherChart);
+    </script>
 </head>
 <body th:with="d=${dashboard}">
 
@@ -45,7 +116,13 @@
             </div>
             <h2 th:unless="${d.minMaxTempValue}">Not enough data</h2>
         </div>
-        
+    </div>
+
+    <div class="chart_block" th:if="${d.status.name() != 'EMPTY'}">
+        <h3>24-Hour Temperature Trend</h3>
+        <div class="chart-container" style="position: relative; height:300px; width:100%;">
+            <canvas id="weatherChart"></canvas>
+        </div>
     </div>
 
     <div class="system_health_block" th:if="${d.status.name() != 'EMPTY'}">

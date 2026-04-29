@@ -41,7 +41,7 @@ body {
 }
 
 /* Shared Card Styling */
-.weather_block, .min_max_block, .system_health_block {
+.weather_block, .min_max_block, .system_health_block, .chart_block {
     background-color: rgba(255, 255, 255, 0.25);
     backdrop-filter: blur(15px);
     border: 1px solid rgba(255, 255, 255, 0.5);
@@ -50,6 +50,13 @@ body {
     box-shadow: 0 10px 15px rgba(0,0,0,0.1);
     box-sizing: border-box; /* Ensures padding doesn't add to width */
     width: 100%; /* Default to full width for mobile */
+}
+
+/* Set the width for the chart block */
+.chart_block {
+    width: 820px;
+    max-width: 100%;
+    margin-bottom: 20px; /* Space between chart and health block */
 }
 
 h3 { margin-top: 0; color: #1a252f; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px; }

@@ -26,7 +26,4 @@ public class WeatherDashboardController {
 
         return "weather_dashboard";
     }
-
-
-
 }

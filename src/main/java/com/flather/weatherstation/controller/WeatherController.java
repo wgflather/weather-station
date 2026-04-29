@@ -1,8 +1,10 @@
 package com.flather.weatherstation.controller;
 
+import com.flather.weatherstation.model.dto.HourlyChartAvgDto;
 import com.flather.weatherstation.model.dto.WeatherDashboardDto;
 import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
 import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
+import com.flather.weatherstation.service.AnalyticsService;
 import com.flather.weatherstation.service.WeatherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @Slf4j
@@ -22,6 +26,7 @@ public class WeatherController {
     public static final String LATEST_WEATHER_PATH = BASE_PATH + "/latest";
 
     private final WeatherService service;
+    private final AnalyticsService analyticsService;
 
 
     @PostMapping(BASE_PATH)
@@ -43,6 +48,11 @@ public class WeatherController {
     @GetMapping(BASE_PATH + "/dashboard")
     public ResponseEntity<WeatherDashboardDto> getDashboard(){
         return ResponseEntity.ok(service.getDashboardSummary());
+    }
+
+    @GetMapping(BASE_PATH + "/chart")
+    public ResponseEntity<List<HourlyChartAvgDto>> getChart(){
+        return ResponseEntity.ok(analyticsService.getHourlyTemperatureChartData());
     }
 
 }
