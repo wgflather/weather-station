@@ -1,12 +1,10 @@
 package com.flather.weatherstation.service;
 
-import com.flather.weatherstation.model.dto.MinMaxProjection;
-import com.flather.weatherstation.model.dto.MinMaxValueDto;
-import com.flather.weatherstation.model.dto.WeatherAvgDto;
-import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
+import com.flather.weatherstation.model.dto.*;
 import com.flather.weatherstation.model.constant.DataStatus;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 
 import org.decimal4j.util.DoubleRounder;
@@ -16,9 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +29,10 @@ public class AnalyticsService {
                 .avgTemperature(DoubleRounder.round(data.getAvgTemperature(), precision))
                 .avgPressure(DoubleRounder.round(data.getAvgPressure(), precision))
                 .build();
+    }
+
+    private double roundDouble(Double data, int precision){
+        return DoubleRounder.round(data, precision);
     }
 
     private ZonedDateTime instantTOZoned(Instant instant){
@@ -83,6 +83,15 @@ public class AnalyticsService {
                 latestAvg : repository.findLatestAvailableAvg();
 
         return roundAvgData(avgDto, 1);
+    }
+
+    public List<HourlyChartAvgDto> getHourlyTemperatureChartData(){
+        return repository.findTodayHourlyTemperature().stream()
+                .map(projection ->
+                     new HourlyChartAvgDto(instantTOZoned(projection.hour()),
+                             roundDouble(projection.value(), 2))
+                )
+                .toList();
     }
 
 }

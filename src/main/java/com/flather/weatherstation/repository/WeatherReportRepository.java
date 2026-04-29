@@ -1,16 +1,15 @@
 package com.flather.weatherstation.repository;
 
-import com.flather.weatherstation.model.dto.HourlyChartAvgDto;
-import com.flather.weatherstation.model.dto.MinMaxProjection;
-import com.flather.weatherstation.model.dto.MinMaxValueDto;
-import com.flather.weatherstation.model.dto.WeatherAvgDto;
+import com.flather.weatherstation.model.dto.*;
 import com.flather.weatherstation.model.entity.WeatherRecord;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -65,12 +64,13 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
     long findRecordsToday();
 
     @Query(value = """
-    select date_trunc('hour', measured_at) as hour, AVG(temperature) hourlyValue
+    select date_trunc('hour', measured_at) as hour, 
+               AVG(temperature) as value
     from weather_records
     where measured_at >= CURRENT_DATE
     and measured_at < CURRENT_DATE + interval '1 day'
     group by hour
-    order by hour desc;
-    """)
-    List<HourlyChartAvgDto> findTodayHourlyTemperature();
+    order by hour asc
+    """, nativeQuery = true)
+    List<HourlyProjection> findTodayHourlyTemperature();
 }
