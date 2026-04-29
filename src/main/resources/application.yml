@@ -1,0 +1,26 @@
+spring:
+  profiles:
+    active: local
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    clean-disabled: true
+
+  hikari:
+    maximum-pool-size: 10
+    minimum-idle: 2
+    idle-timeout: 30000
+    max-lifetime: 1800000
+    connection-timeout: 20000
+
+weather:
+  validation:
+    temp-minimal: -45
+    temp-maximum: 60
+    pressure-minimal: 940
+    pressure-maximum: 1060
+    temp-spike-limit: 2.0
+    pressure-spike-limit: 0.5
