@@ -34,6 +34,8 @@ async function initWeatherChart() {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
 
+        const startOfTheChart = new Date();
+        startOfTheChart.setHours(2, 0, 0, 0);
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
@@ -48,7 +50,7 @@ async function initWeatherChart() {
                     backgroundColor: 'rgba(75, 192, 192, 0.1)',
                     fill: true,
                     tension: 0.4,
-                    pointRadius: 3
+                    pointRadius: 0
                 }]
             },
             options: {
@@ -60,7 +62,7 @@ async function initWeatherChart() {
                         time: {
                             unit: 'hour',
                             displayFormats: {
-                                hour: 'HH:mm'
+                                hour: 'H'
                             },
                             tooltipFormat: 'HH:mm'
                         },

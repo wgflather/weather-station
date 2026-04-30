@@ -66,7 +66,7 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
     @Query(value = """
 
             SELECT
-    date_bin('30 minutes', measured_at, current_date) AS bucket,
+    date_bin('10 minutes', measured_at, current_date) AS bucket,
     AVG(temperature) as avgTemp
 FROM weather_records
 where measured_at  >= current_date and measured_at < current_date + interval '1 day'
