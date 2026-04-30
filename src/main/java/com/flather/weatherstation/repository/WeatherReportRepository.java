@@ -64,13 +64,16 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
     long findRecordsToday();
 
     @Query(value = """
-    select date_trunc('hour', measured_at) as hour, 
-               AVG(temperature) as value
-    from weather_records
-    where measured_at >= CURRENT_DATE
-    and measured_at < CURRENT_DATE + interval '1 day'
-    group by hour
-    order by hour asc
+
+            SELECT
+    date_bin('30 minutes', measured_at, current_date) AS bucket,
+    AVG(temperature) as avgTemp
+FROM weather_records
+where measured_at  >= current_date and measured_at < current_date + interval '1 day'
+GROUP BY bucket
+ORDER BY bucket ASC;
+
+    
     """, nativeQuery = true)
     List<HourlyProjection> findTodayHourlyTemperature();
 }
