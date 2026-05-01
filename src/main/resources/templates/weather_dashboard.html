@@ -10,6 +10,20 @@
     <script>
         let weatherChartInstance = null;
 
+/**
+ * Calculates the dynamic Y-axis bounds based on the data range.
+ * Adds a +/- 3 degree buffer to keep the line from hitting the edges.
+ */
+function getDynamicYBounds(points) {
+    if (!points || points.length === 0) return { min: 10, max: 30 }; // Default fallbacks
+    
+    const values = points.map(p => p.y);
+    return {
+        suggestedMin: Math.min(...values) - 3,
+        suggestedMax: Math.max(...values) + 3
+    };
+}
+
 async function initWeatherChart() {
     try {
         const response = await fetch('/api/weather/chart');
@@ -17,40 +31,39 @@ async function initWeatherChart() {
 
         const backendData = await response.json();
 
-        // 1. Create Data Points (Objects with x and y)
-        // Chart.js 'time' scale works best when you provide an object: {x: Date, y: Value}
+        // 1. Map to Chart.js objects
         const chartPoints = backendData.map(item => ({
-            x: new Date(item.hour), // Keep it as a Date object!
+            x: new Date(item.hour),
             y: item.hourlyValue
         }));
 
-        const ctx = document.getElementById('weatherChart').getContext('2d');
+        // 2. Define Chart Window (00:00 to 23:59)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
 
+        // 3. Get Scale Buffer
+        const yBounds = getDynamicYBounds(chartPoints);
+
+        const ctx = document.getElementById('weatherChart').getContext('2d');
         if (weatherChartInstance) {
             weatherChartInstance.destroy();
         }
 
-        // 2. Define your fixed 24h window
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-
-        const startOfTheChart = new Date();
-        startOfTheChart.setHours(2, 0, 0, 0);
-        const endOfDay = new Date();
-        endOfDay.setHours(23, 59, 59, 999);
-
-        // 3. Initialize Chart
+        // 4. Create Instance
         weatherChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
                 datasets: [{
                     label: 'Temperature (°C)',
-                    data: chartPoints, // Pass the array of {x, y} objects
+                    data: chartPoints,
                     borderColor: '#4bc0c0',
                     backgroundColor: 'rgba(75, 192, 192, 0.1)',
                     fill: true,
                     tension: 0.4,
-                    pointRadius: 0
+                    pointRadius: 0, // Clean look for 5-min intervals
+                    borderWidth: 2
                 }]
             },
             options: {
@@ -61,9 +74,7 @@ async function initWeatherChart() {
                         type: 'time',
                         time: {
                             unit: 'hour',
-                            displayFormats: {
-                                hour: 'H'
-                            },
+                            displayFormats: { hour: 'H' }, // Clean mobile-friendly format
                             tooltipFormat: 'HH:mm'
                         },
                         min: startOfDay,
@@ -73,30 +84,26 @@ async function initWeatherChart() {
                             maxTicksLimit: 12,
                             color: '#2c3e50'
                         },
-                        grid: {
-                            display: true,
-                            color: 'rgba(0,0,0,0.05)'
-                        }
+                        grid: { color: 'rgba(0,0,0,0.05)' }
                     },
                     y: {
-                        beginAtZero: false,
+                        suggestedMin: yBounds.suggestedMin,
+                        suggestedMax: yBounds.suggestedMax,
                         ticks: {
-                            callback: (value) => value + '°'
-                        }
+                            stepSize: 1, // Cleaner grid spacing
+                            callback: (val) => val + '°'
+                        },
+                        grid: { color: 'rgba(0,0,0,0.05)' }
                     }
                 },
                 plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
+                    legend: { display: false } // Hide if title is already descriptive
                 }
             }
         });
 
     } catch (error) {
         console.error('Error loading chart data:', error);
-        // Optional: Draw "No Data" text on canvas here if fetch fails
     }
 }
 
