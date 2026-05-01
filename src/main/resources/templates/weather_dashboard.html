@@ -19,8 +19,8 @@ function getDynamicYBounds(points) {
     
     const values = points.map(p => p.y);
     return {
-        suggestedMin: Math.min(...values) - 3,
-        suggestedMax: Math.max(...values) + 3
+        suggestedMin: Math.min(...values) - 2,
+        suggestedMax: Math.max(...values) + 2
     };
 }
 

@@ -1,11 +1,13 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.model.dto.*;
 import com.flather.weatherstation.model.constant.DataStatus;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,16 +17,20 @@ import java.time.ZonedDateTime;
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AnalyticsService {
     private final WeatherReportRepository repository;
-    private final WeatherRecordMapper mapper;
+    private final TimezoneProperties timezoneProperties;
+    private final ZoneId zoneId;
 
-
-    private ZonedDateTime instantTOZoned(Instant instant){
-        return instant.atZone(ZoneId.systemDefault());
+    public AnalyticsService(WeatherReportRepository repository, TimezoneProperties timezoneProperties) {
+        this.repository = repository;
+        this.timezoneProperties = timezoneProperties;
+        zoneId = ZoneId.of(timezoneProperties.getZoneId());
     }
+
+
+
 
     public DataStatus setStatus(long lagMinutes){
         if(lagMinutes < 5){
@@ -52,8 +58,8 @@ public class AnalyticsService {
                 MinMaxValueDto.builder()
                 .maxValue(max.value())
                 .minValue(min.value())
-                .maxAt(instantTOZoned(max.time()))
-                .minAt(instantTOZoned(min.time()))
+                .maxAt(max.time().atZone(zoneId))
+                .minAt(min.time().atZone(zoneId))
                 .build()
         );
 
@@ -74,7 +80,7 @@ public class AnalyticsService {
     public List<HourlyChartAvgDto> getHourlyTemperatureChartData(){
         return repository.findTodayHourlyTemperature().stream()
                 .map(projection ->
-                     new HourlyChartAvgDto(instantTOZoned(projection.hour()), projection.value())
+                     new HourlyChartAvgDto(projection.hour().atZone(zoneId), projection.value())
                 )
                 .toList();
     }

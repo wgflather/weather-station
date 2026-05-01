@@ -75,7 +75,6 @@ public class WeatherService {
 
     @Transactional(readOnly = true)
     public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord(){
-        //TODO: make a time range factory based on specified zone ID
 
         ZoneId zoneId = ZoneId.systemDefault();
 
