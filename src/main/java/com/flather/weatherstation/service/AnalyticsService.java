@@ -4,10 +4,8 @@ import com.flather.weatherstation.model.dto.*;
 import com.flather.weatherstation.model.constant.DataStatus;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
-import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 
-import org.decimal4j.util.DoubleRounder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,17 +21,6 @@ public class AnalyticsService {
     private final WeatherReportRepository repository;
     private final WeatherRecordMapper mapper;
 
-    private WeatherAvgDto roundAvgData(WeatherAvgDto data, int precision){
-
-        return WeatherAvgDto.builder()
-                .avgTemperature(DoubleRounder.round(data.getAvgTemperature(), precision))
-                .avgPressure(DoubleRounder.round(data.getAvgPressure(), precision))
-                .build();
-    }
-
-    private double roundDouble(Double data, int precision){
-        return DoubleRounder.round(data, precision);
-    }
 
     private ZonedDateTime instantTOZoned(Instant instant){
         return instant.atZone(ZoneId.systemDefault());
@@ -52,7 +39,7 @@ public class AnalyticsService {
     }
 
     public Optional<MinMaxValueDto> getMinMaxTodayTemperature(){
-        List<MinMaxProjection> minMaxTemp = repository.findFullObjectsWithMinMaxTempOnLatestDate();
+        List<MinMaxProjection> minMaxTemp = repository.findMinMaxTemp();
 
         if(minMaxTemp.size() != 2){
             return Optional.empty();
@@ -77,19 +64,17 @@ public class AnalyticsService {
         WeatherAvgDto latestAvg = repository.findLatestAvgComparedToNow();
 
         //Use latest available data in database if no records arrived in last 5 minutes
-        WeatherAvgDto avgDto = ( latestAvg != null &&
+        return ( latestAvg != null &&
                 latestAvg.getAvgPressure() != null &&
                 latestAvg.getAvgTemperature() != null) ?
                 latestAvg : repository.findLatestAvailableAvg();
 
-        return roundAvgData(avgDto, 1);
     }
 
     public List<HourlyChartAvgDto> getHourlyTemperatureChartData(){
         return repository.findTodayHourlyTemperature().stream()
                 .map(projection ->
-                     new HourlyChartAvgDto(instantTOZoned(projection.hour()),
-                             roundDouble(projection.value(), 2))
+                     new HourlyChartAvgDto(instantTOZoned(projection.hour()), projection.value())
                 )
                 .toList();
     }
