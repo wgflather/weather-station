@@ -58,7 +58,7 @@ public class WeatherService {
         long lagMinutes = Duration.between(latestRecordTime, Instant.now()).toMinutes();
         DataStatus status = analyticsService.setStatus(lagMinutes);
 
-        Optional<MinMaxValueDto> minMaxValueDto = analyticsService.getMinMaxTodayTemperature();
+        MinMaxValueDto minMaxValueDto = analyticsService.getMinMaxTodayTemperature();
 
         //Use latest available data in database if no records arrived in last 5 minutes
         WeatherAvgDto averages = analyticsService.getAvgRoundedMetricsData();
@@ -67,7 +67,7 @@ public class WeatherService {
                 .averages(averages)
                 .lagMinutes(lagMinutes)
                 .lastMeasuredAt(latestRecordTimeZoned)
-                .minMaxTempValue(minMaxValueDto.orElse(null))
+                .minMaxTempValue(minMaxValueDto)
                 .recordsToday(repository.findRecordsToday())
                 .status(status)
                 .build();

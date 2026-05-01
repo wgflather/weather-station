@@ -20,12 +20,10 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class AnalyticsService {
     private final WeatherReportRepository repository;
-    private final TimezoneProperties timezoneProperties;
     private final ZoneId zoneId;
 
     public AnalyticsService(WeatherReportRepository repository, TimezoneProperties timezoneProperties) {
         this.repository = repository;
-        this.timezoneProperties = timezoneProperties;
         zoneId = ZoneId.of(timezoneProperties.getZoneId());
     }
 
@@ -44,12 +42,8 @@ public class AnalyticsService {
         }
     }
 
-    public Optional<MinMaxValueDto> getMinMaxTodayTemperature(){
+    public MinMaxValueDto getMinMaxTodayTemperature(){
         List<MinMaxProjection> minMaxTemp = repository.findMinMaxTemp();
-
-        if(minMaxTemp.size() != 2){
-            return Optional.empty();
-        }
 
         MinMaxProjection min = minMaxTemp.get(0);
         MinMaxProjection max = minMaxTemp.get(1);
@@ -61,7 +55,7 @@ public class AnalyticsService {
                 .maxAt(max.time().atZone(zoneId))
                 .minAt(min.time().atZone(zoneId))
                 .build()
-        );
+        ).orElse(null);
 
     }
 
