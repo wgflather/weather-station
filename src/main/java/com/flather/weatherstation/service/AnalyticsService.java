@@ -5,15 +5,14 @@ import com.flather.weatherstation.model.dto.*;
 import com.flather.weatherstation.model.constant.DataStatus;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.util.*;
 
 @Service
@@ -28,18 +27,20 @@ public class AnalyticsService {
     }
 
 
+    public long findTodayRecordsCount(){
+        return repository.findRecordsToday();
+    }
 
+    public ZonedDateTime findLastRecordTime(){
+        return repository.findMaxMeasuredAt().atZone(zoneId);
+    }
 
-    public DataStatus setStatus(long lagMinutes){
-        if(lagMinutes < 5){
-            return DataStatus.LIVE;
-        } else if (lagMinutes < 10) {
-            return DataStatus.DELAYED;
-        } else if (lagMinutes < 1440) {
-            return DataStatus.STALE;
-        } else {
-            return DataStatus.OFFLINE;
-        }
+    public long getLagMinutes(){
+        Instant lastMeasurement = repository.findMaxMeasuredAt();
+
+        return Duration.between(lastMeasurement.atZone(zoneId),
+                Instant.now().atZone(zoneId))
+                .toMinutes();
     }
 
     public MinMaxValueDto getMinMaxTodayTemperature(){

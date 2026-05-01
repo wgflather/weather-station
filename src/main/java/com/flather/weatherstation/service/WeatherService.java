@@ -43,35 +43,6 @@ public class WeatherService {
         return mapper.weatherEntityToDto(repository.save(record));
     }
 
-    @Transactional(readOnly = true)
-    public WeatherDashboardDto getDashboardSummary() {
-        Instant latestRecordTime = repository.findMaxMeasuredAt();
-        // Check for empty database
-        if(latestRecordTime == null){
-            return WeatherDashboardDto
-                    .builder()
-                    .status(DataStatus.EMPTY)
-                    .build();
-        }
-
-        ZonedDateTime latestRecordTimeZoned = latestRecordTime.atZone(ZoneId.systemDefault());
-        long lagMinutes = Duration.between(latestRecordTime, Instant.now()).toMinutes();
-        DataStatus status = analyticsService.setStatus(lagMinutes);
-
-        MinMaxValueDto minMaxValueDto = analyticsService.getMinMaxTodayTemperature();
-
-        //Use latest available data in database if no records arrived in last 5 minutes
-        WeatherAvgDto averages = analyticsService.getAvgRoundedMetricsData();
-
-        return WeatherDashboardDto.builder()
-                .averages(averages)
-                .lagMinutes(lagMinutes)
-                .lastMeasuredAt(latestRecordTimeZoned)
-                .minMaxTempValue(minMaxValueDto)
-                .recordsToday(repository.findRecordsToday())
-                .status(status)
-                .build();
-    }
 
     @Transactional(readOnly = true)
     public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord(){
