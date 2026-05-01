@@ -112,73 +112,103 @@ document.addEventListener('DOMContentLoaded', initWeatherChart);
 </head>
 <body th:with="d=${dashboard}">
 
-    <div class="today_data_block">
-        <h1>Weather Report: <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}"></span></h1>
-        <div th:if="${d.status.name() == 'EMPTY'}" class="error-msg">
-            <h1>⚠️ No data available in database</h1>
+<div class="today_data_block">
+    <h1>
+        Weather Report:
+        <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd')}"></span>
+    </h1>
+
+    <div th:if="${d.systemHealthDashboardDto.status.name() == 'EMPTY'}" class="error-msg">
+        <h1>⚠️ No data available in database</h1>
+    </div>
+</div>
+
+<div class="dashboard-row"
+     th:if="${d.systemHealthDashboardDto.status.name() != 'EMPTY'}">
+
+    <!-- Weather block -->
+    <div class="weather_block">
+        <h3>Current Weather <small>(5-min avg)</small></h3>
+
+        <div class="data-point">
+            <p>Temperature</p>
+            <span class="temperature"
+                  th:text="${d.metricsDashboardDto.averages.avgTemperature != null
+                                ? d.metricsDashboardDto.averages.avgTemperature + ' °C'
+                                : 'N/A'}"></span>
+        </div>
+
+        <div class="data-point">
+            <p>Pressure</p>
+            <span class="pressure"
+                  th:text="${d.metricsDashboardDto.averages.avgPressure != null
+                                ? d.metricsDashboardDto.averages.avgPressure + ' hPa'
+                                : 'N/A'}"></span>
         </div>
     </div>
 
-    <div class="dashboard-row" th:if="${d.status.name() != 'EMPTY'}">
-        
-        <div class="weather_block">
-            <h3>Current Weather <small>(5-min avg)</small></h3>
-            <div class="data-point">
-                <p>Temperature</p>
-                <span class="temperature" th:text="${d.averages.avgTemperature != null ? d.averages.avgTemperature + ' °C' : 'N/A'}"></span>
+    <!-- Min / Max block -->
+    <div class="min_max_block">
+        <h3>Temperature Extremes</h3>
+
+        <div th:if="${d.metricsDashboardDto.minMaxTempValue}" class="min-max-container">
+            <div class="temp-stat min">
+                <p>Min</p>
+                <h2 th:text="${d.metricsDashboardDto.minMaxTempValue.minValue} + ' °C'"></h2>
+                <small th:text="'at ' + ${#temporals.format(d.metricsDashboardDto.minMaxTempValue.minAt, 'HH:mm:ss')}"></small>
             </div>
-            <div class="data-point">
-                <p>Pressure</p>
-                <span class="pressure" th:text="${d.averages.avgPressure != null ? d.averages.avgPressure + ' hPa' : 'N/A'}"></span>
+
+            <div class="temp-stat max">
+                <p>Max</p>
+                <h2 th:text="${d.metricsDashboardDto.minMaxTempValue.maxValue} + ' °C'"></h2>
+                <small th:text="'at ' + ${#temporals.format(d.metricsDashboardDto.minMaxTempValue.maxAt, 'HH:mm:ss')}"></small>
             </div>
         </div>
 
-        <div class="min_max_block">
-            <h3>Temperature Extremes</h3>
-            <div th:if="${d.minMaxTempValue}" class="min-max-container">
-                <div class="temp-stat min">
-                    <p>Min</p>
-                    <h2 th:text="${d.minMaxTempValue.minValue} + ' °C'"></h2>
-                    <small th:text="'at ' + ${#temporals.format(d.minMaxTempValue.minAt, 'HH:mm:ss')}"></small>
-                </div>
-                <div class="temp-stat max">
-                    <p>Max</p>
-                    <h2 th:text="${d.minMaxTempValue.maxValue} + ' °C'"></h2>
-                    <small th:text="'at ' + ${#temporals.format(d.minMaxTempValue.maxAt, 'HH:mm:ss')}"></small>
-                </div>
-            </div>
-            <h2 th:unless="${d.minMaxTempValue}">Not enough data</h2>
+        <h2 th:unless="${d.metricsDashboardDto.minMaxTempValue}">
+            Not enough data
+        </h2>
+    </div>
+</div>
+
+<!-- Chart -->
+<div class="chart_block"
+     th:if="${d.systemHealthDashboardDto.status.name() != 'EMPTY'}">
+    <h3>24-Hour Temperature Trend</h3>
+    <div class="chart-container" style="position: relative; height:300px; width:100%;">
+        <canvas id="weatherChart"></canvas>
+    </div>
+</div>
+
+<!-- System health -->
+<div class="system_health_block"
+     th:if="${d.systemHealthDashboardDto.status.name() != 'EMPTY'}">
+
+    <h3>System Health</h3>
+
+    <div class="health-grid">
+        <div class="health-item">
+            <label>Status</label>
+            <span th:text="${d.systemHealthDashboardDto.status}"
+                  th:classappend="${d.systemHealthDashboardDto.status.name() == 'LIVE' ? 'status-live' : ''}">
+                </span>
+        </div>
+
+        <div class="health-item">
+            <label>Lag</label>
+            <span th:text="${d.systemHealthDashboardDto.lagMinutes} + ' min'"></span>
+        </div>
+
+        <div class="health-item">
+            <label>Records</label>
+            <span th:text="${d.systemHealthDashboardDto.recordsToday}"></span>
+        </div>
+
+        <div class="health-item">
+            <label>Last Update</label>
+            <span th:text="${#temporals.format(d.systemHealthDashboardDto.lastMeasuredAt, 'HH:mm:ss')}"></span>
         </div>
     </div>
-
-    <div class="chart_block" th:if="${d.status.name() != 'EMPTY'}">
-        <h3>24-Hour Temperature Trend</h3>
-        <div class="chart-container" style="position: relative; height:300px; width:100%;">
-            <canvas id="weatherChart"></canvas>
-        </div>
-    </div>
-
-    <div class="system_health_block" th:if="${d.status.name() != 'EMPTY'}">
-        <h3>System Health</h3>
-        <div class="health-grid">
-            <div class="health-item">
-                <label>Status</label>
-                <span th:text="${d.status}" th:classappend="${d.status.name() == 'LIVE' ? 'status-live' : ''}"></span>
-            </div>
-            <div class="health-item">
-                <label>Lag</label>
-                <span th:text="${d.lagMinutes} + ' min'"></span>
-            </div>
-            <div class="health-item">
-                <label>Records</label>
-                <span th:text="${d.recordsToday}"></span>
-            </div>
-            <div class="health-item">
-                <label>Last Update</label>
-                <span th:text="${#temporals.format(d.lastMeasuredAt, 'HH:mm:ss')}"></span>
-            </div>
-        </div>
-    </div>
-
+</div>
 </body>
 </html>

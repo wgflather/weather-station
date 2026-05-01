@@ -21,7 +21,6 @@ public class WeatherService {
     private final WeatherReportRepository repository;
     private final DataQualityValidator qualityValidator;
     private final WeatherRecordMapper mapper;
-    private final AnalyticsService analyticsService;
 
     @Transactional
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){

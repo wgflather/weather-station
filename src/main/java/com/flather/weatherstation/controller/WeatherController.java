@@ -5,6 +5,7 @@ import com.flather.weatherstation.model.dto.WeatherDashboardDto;
 import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
 import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
 import com.flather.weatherstation.service.AnalyticsService;
+import com.flather.weatherstation.service.DashboardService;
 import com.flather.weatherstation.service.WeatherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class WeatherController {
 
     private final WeatherService service;
     private final AnalyticsService analyticsService;
+    private final DashboardService dashboardService;
 
 
     @PostMapping(BASE_PATH)
@@ -47,7 +49,7 @@ public class WeatherController {
 
     @GetMapping(BASE_PATH + "/dashboard")
     public ResponseEntity<WeatherDashboardDto> getDashboard(){
-        return ResponseEntity.ok(service.getDashboardSummary());
+        return ResponseEntity.ok(dashboardService.getWeatherDashboard());
     }
 
     @GetMapping(BASE_PATH + "/chart")
