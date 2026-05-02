@@ -1,9 +1,9 @@
 package com.flather.weatherstation.controller;
 
-import com.flather.weatherstation.model.dto.HourlyChartAvgDto;
-import com.flather.weatherstation.model.dto.WeatherDashboardDto;
-import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
-import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
+import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
+import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.service.AnalyticsService;
 import com.flather.weatherstation.service.DashboardService;
 import com.flather.weatherstation.service.WeatherService;

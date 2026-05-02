@@ -2,8 +2,8 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.config.WeatherValidationProperties;
 import com.flather.weatherstation.model.constant.DataQuality;
-import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
-import com.flather.weatherstation.model.dto.WeatherRecordResponseDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -1,7 +1,7 @@
 package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.config.MqttProperties;
-import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.service.WeatherService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;

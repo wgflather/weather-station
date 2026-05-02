@@ -1,14 +1,12 @@
 package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.config.TimezoneProperties;
-import com.flather.weatherstation.model.dto.*;
-import com.flather.weatherstation.model.constant.DataStatus;
-import com.flather.weatherstation.mapper.WeatherRecordMapper;
+import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
+import com.flather.weatherstation.dto.analytics.MinMaxValueDto;
+import com.flather.weatherstation.dto.analytics.WeatherAvgDto;
+import com.flather.weatherstation.dto.projection.MinMaxProjection;
 import com.flather.weatherstation.repository.WeatherReportRepository;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import lombok.RequiredArgsConstructor;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,14 +29,13 @@ public class AnalyticsService {
         return repository.findRecordsToday();
     }
 
-    public ZonedDateTime findLastRecordTime(){
-        return repository.findMaxMeasuredAt().atZone(zoneId);
+    public Optional<ZonedDateTime> findLastRecordTime(){
+        return Optional.ofNullable(repository.findMaxMeasuredAt())
+                .map(t -> t.atZone(zoneId));
     }
 
-    public long getLagMinutes(){
-        Instant lastMeasurement = repository.findMaxMeasuredAt();
-
-        return Duration.between(lastMeasurement.atZone(zoneId),
+    public long getLagMinutes(ZonedDateTime lastRecord){
+        return Duration.between(lastRecord,
                 Instant.now().atZone(zoneId))
                 .toMinutes();
     }
@@ -46,17 +43,19 @@ public class AnalyticsService {
     public MinMaxValueDto getMinMaxTodayTemperature(){
         List<MinMaxProjection> minMaxTemp = repository.findMinMaxTemp();
 
+        if(minMaxTemp.isEmpty()){
+            return MinMaxValueDto.builder().build();
+        }
+
         MinMaxProjection min = minMaxTemp.get(0);
         MinMaxProjection max = minMaxTemp.get(1);
 
-        return Optional.of(
-                MinMaxValueDto.builder()
+        return MinMaxValueDto.builder()
                 .maxValue(max.value())
                 .minValue(min.value())
                 .maxAt(max.time().atZone(zoneId))
                 .minAt(min.time().atZone(zoneId))
-                .build()
-        ).orElse(null);
+                .build();
 
     }
 
@@ -65,7 +64,7 @@ public class AnalyticsService {
         WeatherAvgDto latestAvg = repository.findLatestAvgComparedToNow();
 
         //Use latest available data in database if no records arrived in last 5 minutes
-        return ( latestAvg != null &&
+        return (latestAvg != null &&
                 latestAvg.getAvgPressure() != null &&
                 latestAvg.getAvgTemperature() != null) ?
                 latestAvg : repository.findLatestAvailableAvg();

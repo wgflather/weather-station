@@ -1,4 +1,4 @@
-package com.flather.weatherstation.model.dto;
+package com.flather.weatherstation.dto.analytics;
 
 import lombok.Builder;
 
@@ -6,7 +6,7 @@ import java.time.ZonedDateTime;
 
 
 @Builder
-public record MinMaxValueDto(double maxValue,  double minValue,
+public record MinMaxValueDto(Double maxValue,  Double minValue,
          ZonedDateTime maxAt, ZonedDateTime minAt){
 
 }

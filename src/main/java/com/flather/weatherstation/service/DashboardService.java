@@ -1,12 +1,14 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
+import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
+import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
 import com.flather.weatherstation.model.constant.DataStatus;
-import com.flather.weatherstation.model.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.ZonedDateTime;
-import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -15,35 +17,48 @@ public class DashboardService {
 
 
     public MetricsDashboardDto getMetricsDashboard(){
-        WeatherAvgDto averages = analyticsService.getAvgRoundedMetricsData();
-        MinMaxValueDto minMaxValueDto = analyticsService.getMinMaxTodayTemperature();
-        List<HourlyChartAvgDto> temperatureChartPoints = analyticsService.getHourlyTemperatureChartData();
-
-        return MetricsDashboardDto.builder()
-                .averages(averages)
-                .minMaxTempValue(minMaxValueDto)
-                .temperatureChartPoints(temperatureChartPoints)
-                .build();
+       return MetricsDashboardDto.builder()
+               .averages(analyticsService.getAvgRoundedMetricsData())
+               .minMaxTempValue(analyticsService.getMinMaxTodayTemperature())
+               .temperatureChartPoints(analyticsService.getHourlyTemperatureChartData())
+               .build();
     }
 
     public SystemHealthDashboardDto getSystemHealth(){
-        ZonedDateTime lastUpdate = analyticsService.findLastRecordTime();
+        Optional<ZonedDateTime> lastUpdate = analyticsService.findLastRecordTime();
+        if(lastUpdate.isEmpty()){
+            return SystemHealthDashboardDto.builder()
+                    .status(DataStatus.EMPTY)
+                    .lagMinutes(0)
+                    .recordsToday(0)
+                    .lastMeasuredAt(null)
+                    .build();
+        }
+
+        ZonedDateTime last = lastUpdate.get();
         long todayRecordsCount = analyticsService.findTodayRecordsCount();
-        long lagMinutes = analyticsService.getLagMinutes();
+        long lagMinutes = analyticsService.getLagMinutes(last);
         DataStatus dataStatus = DataStatus.fromLag(lagMinutes);
 
         return SystemHealthDashboardDto.builder()
-                .lastMeasuredAt(lastUpdate)
+                .lastMeasuredAt(last)
                 .recordsToday(todayRecordsCount)
                 .status(dataStatus)
                 .lagMinutes(lagMinutes)
                 .build();
     }
 
-    public WeatherDashboardDto getWeatherDashboard(){
-        return WeatherDashboardDto.builder()
-                .metricsDashboardDto(getMetricsDashboard())
-                .systemHealthDashboardDto(getSystemHealth())
+    public WeatherDashboardDto getWeatherDashboard() {
+        SystemHealthDashboardDto systemHealthDashboardDto = getSystemHealth();
+        MetricsDashboardDto metricsDashboardDto = (systemHealthDashboardDto.getStatus() == DataStatus.EMPTY) ?
+                MetricsDashboardDto.empty()
+                : getMetricsDashboard();
+
+
+        return WeatherDashboardDto
+                .builder()
+                .metricsDashboardDto(metricsDashboardDto)
+                .systemHealthDashboardDto(systemHealthDashboardDto)
                 .build();
     }
 

@@ -1,9 +1,7 @@
 package com.flather.weatherstation.controller;
 
-import com.flather.weatherstation.model.dto.WeatherDashboardDto;
-import com.flather.weatherstation.mapper.WeatherRecordMapper;
+import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
 import com.flather.weatherstation.service.DashboardService;
-import com.flather.weatherstation.service.WeatherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;

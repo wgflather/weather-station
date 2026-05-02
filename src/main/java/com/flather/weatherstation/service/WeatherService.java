@@ -1,9 +1,10 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.model.constant.DataQuality;
-import com.flather.weatherstation.model.constant.DataStatus;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
-import com.flather.weatherstation.model.dto.*;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class WeatherService {
     private final WeatherReportRepository repository;
     private final DataQualityValidator qualityValidator;
     private final WeatherRecordMapper mapper;
+    private final TimezoneProperties timezoneProperties;
 
     @Transactional
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
@@ -46,7 +48,7 @@ public class WeatherService {
     @Transactional(readOnly = true)
     public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord(){
 
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = ZoneId.of(timezoneProperties.getZoneId());
 
         LocalDate currentDate = LocalDate.now(zoneId);
 

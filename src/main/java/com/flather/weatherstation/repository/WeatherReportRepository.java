@@ -1,6 +1,8 @@
 package com.flather.weatherstation.repository;
 
-import com.flather.weatherstation.model.dto.*;
+import com.flather.weatherstation.dto.analytics.WeatherAvgDto;
+import com.flather.weatherstation.dto.projection.HourlyProjection;
+import com.flather.weatherstation.dto.projection.MinMaxProjection;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

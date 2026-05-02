@@ -1,4 +1,4 @@
-package com.flather.weatherstation.model.dto;
+package com.flather.weatherstation.dto.projection;
 
 import java.time.Instant;
 
