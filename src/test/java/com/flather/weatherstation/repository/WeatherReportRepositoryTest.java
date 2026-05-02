@@ -3,7 +3,7 @@ package com.flather.weatherstation.repository;
 import com.flather.weatherstation.controller.WeatherController;
 import com.flather.weatherstation.model.constant.DataQuality;
 import com.flather.weatherstation.model.entity.WeatherRecord;
-import com.flather.weatherstation.model.dto.WeatherRecordCreatedDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.service.WeatherService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
