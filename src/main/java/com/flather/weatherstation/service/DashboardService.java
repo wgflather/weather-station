@@ -18,8 +18,7 @@ public class DashboardService {
 
     public MetricsDashboardDto getMetricsDashboard(){
        return MetricsDashboardDto.builder()
-               .averages(analyticsService.getAvgRoundedMetricsData())
-               .minMaxTempValue(analyticsService.getMinMaxTodayTemperature())
+               .temperature(analyticsService.getTemperature())
                .temperatureChartPoints(analyticsService.getHourlyTemperatureChartData())
                .build();
     }

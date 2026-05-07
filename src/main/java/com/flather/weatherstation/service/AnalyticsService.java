@@ -3,6 +3,7 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
 import com.flather.weatherstation.dto.analytics.MinMaxValueDto;
+import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.analytics.WeatherAvgDto;
 import com.flather.weatherstation.dto.projection.MinMaxProjection;
 import com.flather.weatherstation.repository.WeatherReportRepository;
@@ -40,36 +41,10 @@ public class AnalyticsService {
                 .toMinutes();
     }
 
-    public MinMaxValueDto getMinMaxTodayTemperature(){
-        List<MinMaxProjection> minMaxTemp = repository.findMinMaxTemp();
-
-        if(minMaxTemp.isEmpty()){
-            return MinMaxValueDto.builder().build();
-        }
-
-        MinMaxProjection min = minMaxTemp.get(0);
-        MinMaxProjection max = minMaxTemp.get(1);
-
-        return MinMaxValueDto.builder()
-                .maxValue(max.value())
-                .minValue(min.value())
-                .maxAt(max.time().atZone(zoneId))
-                .minAt(min.time().atZone(zoneId))
-                .build();
-
+    public TemperatureDto getTemperature(){
+        return repository.getTemperature();
     }
 
-    public WeatherAvgDto getAvgRoundedMetricsData(){
-
-        WeatherAvgDto latestAvg = repository.findLatestAvgComparedToNow();
-
-        //Use latest available data in database if no records arrived in last 5 minutes
-        return (latestAvg != null &&
-                latestAvg.getAvgPressure() != null &&
-                latestAvg.getAvgTemperature() != null) ?
-                latestAvg : repository.findLatestAvailableAvg();
-
-    }
 
     public List<HourlyChartAvgDto> getHourlyTemperatureChartData(){
         return repository.findTodayHourlyTemperature().stream()
