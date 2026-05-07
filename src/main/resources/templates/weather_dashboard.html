@@ -132,8 +132,8 @@ document.addEventListener('DOMContentLoaded', initWeatherChart);
     <div class="metric-content">
         <!-- Big Left Side -->
         <div class="main-value">
-            <span id="avg-temp" th:text="${d.metricsDashboardDto.averages.avgTemperature != null
-                                ? d.metricsDashboardDto.averages.avgTemperature
+            <span id="avg-temp" th:text="${d.metricsDashboardDto.temperature.avgTemp != null
+                                ? d.metricsDashboardDto.temperature.avgTemp
                                 : 'N/A'}"></span><span class="unit">°C</span>
         </div>
         
@@ -141,11 +141,11 @@ document.addEventListener('DOMContentLoaded', initWeatherChart);
         <div class="extremes-side">
             <div class="extreme-item">
                 <span class="label">Min:</span>
-                <span id="min-temp" th:text="${d.metricsDashboardDto.minMaxTempValue.minValue}"></span>
+                <span id="min-temp" th:text="${d.metricsDashboardDto.temperature.min}"></span>
             </div>
             <div class="extreme-item">
                 <span class="label">Max:</span>
-                <span id="max-temp" th:text="${d.metricsDashboardDto.minMaxTempValue.maxValue}"></span>
+                <span id="max-temp" th:text="${d.metricsDashboardDto.temperature.max}"></span>
             </div>
         </div>
     </div>
@@ -155,8 +155,8 @@ document.addEventListener('DOMContentLoaded', initWeatherChart);
         <h3>Pressure <small>(5-min avg)</small></h3>
             <div class="main-value">
              <span id="avg-temp"
-                  th:text="${d.metricsDashboardDto.averages.avgPressure != null
-                                ? d.metricsDashboardDto.averages.avgPressure
+                  th:text="${d.metricsDashboardDto.pressure.avgPressure != null
+                                ? d.metricsDashboardDto.pressure.avgPressure
                                 : 'N/A'}"></span><span class="unit">hPa</span>
             </div>
         </div>
