@@ -1,8 +1,6 @@
 package com.flather.weatherstation.dto.dashboard;
 
-import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
-import com.flather.weatherstation.dto.analytics.MinMaxValueDto;
-import com.flather.weatherstation.dto.analytics.WeatherAvgDto;
+import com.flather.weatherstation.dto.analytics.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,8 +14,8 @@ import java.util.List;
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class MetricsDashboardDto {
-    private WeatherAvgDto averages;
-    private MinMaxValueDto minMaxTempValue;
+    private TemperatureDto temperature;
+    private PressureDto pressure;
     private List<HourlyChartAvgDto> temperatureChartPoints;
 
     public static MetricsDashboardDto empty(){
