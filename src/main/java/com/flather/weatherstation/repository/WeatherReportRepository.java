@@ -1,5 +1,6 @@
 package com.flather.weatherstation.repository;
 
+import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.analytics.WeatherAvgDto;
 import com.flather.weatherstation.dto.projection.HourlyProjection;
@@ -18,17 +19,15 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
     Optional<WeatherRecord> findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(Instant start, Instant end);
 
 
-    // Query 2: Fallback data
     @Query(value = """
     SELECT
-        ROUND(AVG(temperature)::numeric, 1)::double precision AS avgTemperature,
-        ROUND(AVG(pressure)::numeric, 1)::double precision AS avgPressure
+        ROUND(AVG(pressure)::numeric, 1)::double precision
     FROM weather_records
     WHERE measured_at >= (
         SELECT MAX(measured_at) FROM weather_records
     ) - INTERVAL '5 minutes'
     """, nativeQuery = true)
-    WeatherAvgDto findLatestAvailableAvg();
+    PressureDto getPressure();
 
     @Query(value = """
             WITH latest AS (
