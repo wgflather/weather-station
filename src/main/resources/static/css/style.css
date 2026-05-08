@@ -46,7 +46,7 @@ body {
 }
 
 /* Shared Card Styling */
-.weather_block, .pressure_block, .temperature_block, .min_max_block, .system_health_block, .chart_block {
+.weather_block, .pressure_block, .temperature_block, .min_max_block, .system_health_block, .chart_block, .today_data_block {
     background-color: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(15px);
     border: 1px solid rgba(255, 255, 255, 0.5);
@@ -55,6 +55,15 @@ body {
     box-shadow: 0 10px 15px rgba(0,0,0,0.1);
     box-sizing: border-box; /* Ensures padding doesn't add to width */
     width: 100%; /* Default to full width for mobile */
+}
+
+.today_data_block{
+    width: 820px; max-width: 100%;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between; /* Pushes groups to opposite sides */
+    align-items: flex-start;
+    flex-wrap: wrap; /* Ensures it looks good on small mobile screens */
 }
 
 .chart_block {
@@ -93,6 +102,33 @@ body {
     display: flex;
     align-items: baseline;
     justify-content: center;
+}
+
+/* Styles for the left side */
+#date {
+    font-size: 1.1rem;
+    color: #555;
+}
+
+#fullDay {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #363434;
+}
+
+/* Styles for the right side */
+#realTime {
+    font-size: 2rem;
+    font-weight: 750;
+    color: #363434;
+    text-align: right;
+}
+
+/* Full width for the error message if it appears */
+.error-msg {
+    width: 100%;
+    margin-top: 15px;
+    text-align: center;
 }
 
 #min-temp{
@@ -171,7 +207,7 @@ h3 { margin-top: 0; color: #1a252f; border-bottom: 1px solid rgba(0,0,0,0.1); pa
 .pressure { font-size: 2rem}
 
 .health-item label { display: block; font-size: 0.8rem; font-weight: bold; opacity: 0.7; }
-.health-item span { font-size: 1.2rem; font-weight: bold; }
+.health-item span { font-size: 1.2rem; font-weight: bold;}
 
 .status-live { color: #27ae60; text-shadow: 0 0 5px rgba(39,174,96,0.3); }
 

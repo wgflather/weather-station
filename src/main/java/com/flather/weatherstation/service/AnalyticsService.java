@@ -2,7 +2,6 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.dto.analytics.*;
-import com.flather.weatherstation.dto.projection.MinMaxProjection;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 
 import org.springframework.stereotype.Service;

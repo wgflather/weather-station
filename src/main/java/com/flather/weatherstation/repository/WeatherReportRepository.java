@@ -2,7 +2,6 @@ package com.flather.weatherstation.repository;
 
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
-import com.flather.weatherstation.dto.analytics.WeatherAvgDto;
 import com.flather.weatherstation.dto.projection.HourlyProjection;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,7 +29,7 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
     PressureDto getPressure();
 
     @Query(value = """
-            WITH latest AS (
+        WITH latest AS (
         SELECT MAX(measured_at) AS latest_time
         FROM weather_records
     ),
