@@ -49,9 +49,9 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
           AND measured_at < CURRENT_DATE + INTERVAL '1 day'
     )
     SELECT
+        average.avgTemperature,
         minMax.minTemp,
-        minMax.maxTemp,
-        average.avgTemperature
+        minMax.maxTemp
     FROM minMax
     CROSS JOIN average;
     """, nativeQuery = true)
