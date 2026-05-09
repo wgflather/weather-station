@@ -48,7 +48,7 @@ async function initWeatherChart() {
                     backgroundColor: 'rgba(75, 192, 192, 0.1)',
                     fill: true,
                     tension: 0.4,
-                    pointRadius: 0, // Clean look for 5-min intervals
+                    pointRadius: 0,
                     borderWidth: 2
                 }]
             },
@@ -83,7 +83,7 @@ async function initWeatherChart() {
                     }
                 },
                 plugins: {
-                    legend: { display: false } // Hide if title is already descriptive
+                    legend: { display: false }
                 }
             }
         });

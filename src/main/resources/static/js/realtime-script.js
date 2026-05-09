@@ -25,7 +25,6 @@ function updateClock() {
         // Formats to DD/MM/YYYY or YYYY/MM/DD depending on locale
         dateEl.textContent = dateFormatter.format(now).replace(/-/g, '/');
     }
-    console.log(logTimeFormatter.format(now));
 }
 
 

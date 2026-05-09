@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8" http-equiv="refresh" content="60">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weather Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
@@ -19,13 +19,9 @@
     </div>
     <div id="realTime"></div>
 
-    <div th:if="${d.systemHealthDashboardDto.status.name() == 'EMPTY'}" class="error-msg">
-        <h1>⚠️ No data available in database</h1>
-    </div>
 </div>
 
-<div class="dashboard-row"
-     th:if="${d.systemHealthDashboardDto.status.name() != 'EMPTY'}">
+<div class="dashboard-row">
 
     <!-- Weather block -->
     <div class="temperature_block">
@@ -33,20 +29,18 @@
     <div class="metric-content">
         <!-- Big Left Side -->
         <div class="main-value">
-            <span id="avg-temp" th:text="${d.metricsDashboardDto.temperature.avgTemp != null
-                                ? d.metricsDashboardDto.temperature.avgTemp
-                                : 'N/A'}"></span><span class="unit">°C</span>
+            <span id="avg-temp"></span><span class="unit">°C</span>
         </div>
         
         <!-- Small Right Side -->
         <div class="extremes-side">
             <div class="extreme-item">
                 <span class="label">Min:</span>
-                <span id="min-temp" th:text="${d.metricsDashboardDto.temperature.min}"></span>
+                <span id="min-temp"></span>
             </div>
             <div class="extreme-item">
                 <span class="label">Max:</span>
-                <span id="max-temp" th:text="${d.metricsDashboardDto.temperature.max}"></span>
+                <span id="max-temp"></span>
             </div>
         </div>
     </div>
@@ -55,18 +49,14 @@
     <div class="pressure_block">
         <h3>Pressure <small>(5-min avg)</small></h3>
             <div class="main-value">
-             <span id="avg-temp"
-                  th:text="${d.metricsDashboardDto.pressure.avgPressure != null
-                                ? d.metricsDashboardDto.pressure.avgPressure
-                                : 'N/A'}"></span><span class="unit">hPa</span>
+             <span id="avg-pressure"></span><span class="unit">hPa</span>
             </div>
         </div>
     </div>
 
 
 <!-- Chart -->
-<div class="chart_block"
-     th:if="${d.systemHealthDashboardDto.status.name() != 'EMPTY'}">
+<div class="chart_block">
     <h3>24-Hour Temperature Trend</h3>
     <div class="chart-container" style="position: relative; height:200px; width:100%;">
         <canvas id="weatherChart"></canvas>
@@ -74,36 +64,34 @@
 </div>
 
 <!-- System health -->
-<div class="system_health_block"
-     th:if="${d.systemHealthDashboardDto.status.name() != 'EMPTY'}">
+<div class="system_health_block">
 
     <h3>System Health</h3>
 
     <div class="health-grid">
         <div class="health-item">
             <label>Status</label>
-            <span th:text="${d.systemHealthDashboardDto.status}"
-                  th:classappend="${d.systemHealthDashboardDto.status.name() == 'LIVE' ? 'status-live' : ''}">
-                </span>
+            <span id="status"></span>
         </div>
 
         <div class="health-item">
             <label>Lag</label>
-            <span th:text="${d.systemHealthDashboardDto.lagMinutes} + ' min'"></span>
+            <span id="lag"></span>
         </div>
 
         <div class="health-item">
             <label>Today Records</label>
-            <span th:text="${d.systemHealthDashboardDto.recordsToday}"></span>
+            <span id="todayRecords"></span>
         </div>
 
         <div class="health-item">
             <label>Last Update</label>
-            <span th:text="${#temporals.format(d.systemHealthDashboardDto.lastMeasuredAt, 'HH:mm:ss')}"></span>
+            <span id="lastUpdate"></span>
         </div>
     </div>
 </div>
 <script th:src="@{/js/weather-chart.js}"></script>
 <script th:src="@{/js/realtime-script.js}"></script>
+<script th:src="@{/js/fetch-data.js}"></script>
 </body>
 </html>
