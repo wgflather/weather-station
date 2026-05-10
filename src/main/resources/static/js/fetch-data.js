@@ -1,3 +1,4 @@
+import { renderWeatherChart } from './weather-chart.js';
 const state = {
     metrics: null,
     systemHealth: null
@@ -8,7 +9,7 @@ async function fetchDashboard(){
 
     if(!response.ok){
         console.log(response.status);
-        throw new Error("Some network error occured");
+        throw new Error("Some network error occurred");
     }
 
     const dashboardData = await response.json();
@@ -67,12 +68,15 @@ async function updateDashboard() {
 
         const metrics = data.metricsDashboardDto;
         const systemHealth = data.systemHealthDashboardDto;
+        const chartPoints = metrics.temperatureChartPoints;
 
+        console.log(chartPoints);
         state.metrics = metrics;
         state.systemHealth = systemHealth;
 
         renderMetrics(metrics);
         renderSystemHealth(systemHealth);
+        renderWeatherChart(chartPoints);
     }
     catch(error){
         console.log(error);

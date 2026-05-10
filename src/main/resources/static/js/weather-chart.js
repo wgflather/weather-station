@@ -10,12 +10,8 @@ function getDynamicYBounds(points) {
     };
 }
 
-async function initWeatherChart() {
+export function renderWeatherChart(backendData) {
     try {
-        const response = await fetch('/api/weather/chart');
-        if (!response.ok) throw new Error('Network response was not ok');
-
-        const backendData = await response.json();
 
         // 1. Map to Chart.js objects
         const chartPoints = backendData.map(item => ({
@@ -92,5 +88,3 @@ async function initWeatherChart() {
         console.error('Error loading chart data:', error);
     }
 }
-
-document.addEventListener('DOMContentLoaded', initWeatherChart);
