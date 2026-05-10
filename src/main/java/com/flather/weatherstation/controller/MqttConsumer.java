@@ -11,6 +11,8 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -24,7 +26,7 @@ public class MqttConsumer {
 
     private MqttClient client;
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     void initConnection() {
         connect();
     }
