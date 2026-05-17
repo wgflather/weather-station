@@ -62,10 +62,14 @@ CROSS JOIN average;
     TemperatureDto getTemperature();
 
     @Query(value = """
-SELECT measured_at, temperature
-FROM weather_records 
+SELECT
+    date_bin('5 minutes', measured_at, current_date) AS time,
+    ROUND(AVG(temperature)::numeric, 1)::double precision AS value
+FROM weather_records
 WHERE data_quality = 'OK'
-  AND measured_at >= NOW() - interval '60 minutes';
+  AND measured_at >= NOW() - interval '1 hour'
+GROUP BY time
+ORDER BY time ASC
 """, nativeQuery = true)
     List<DataPoint> getLastHourTemperature();
 
@@ -97,4 +101,15 @@ GROUP BY bucket
 ORDER BY bucket ASC
 """, nativeQuery = true)
     List<DataPoint> findTodayHourlyTemperature();
+    @Query(value = """
+SELECT
+    date_bin('5 minutes', measured_at, current_date) AS time,
+    ROUND(AVG(pressure)::numeric, 1)::double precision AS value
+FROM weather_records
+WHERE data_quality = 'OK'
+  AND measured_at >= NOW() - interval '1 hour'
+GROUP BY time
+ORDER BY time ASC
+""", nativeQuery = true)
+    List<DataPoint> getLastHourPressure();
 }

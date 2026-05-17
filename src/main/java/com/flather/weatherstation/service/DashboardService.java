@@ -21,7 +21,8 @@ public class DashboardService {
                .temperature(analyticsService.getTemperature())
                .pressure(analyticsService.getPressure())
                .temperatureChartPoints(analyticsService.getHourlyTemperatureChartData())
-               .temperatureTrend(analyticsService.getLastHourTemperature())
+               .temperatureTrend(analyticsService.getTempTrend())
+               .pressureTrend(analyticsService.getPressureTrend())
                .build();
     }
 

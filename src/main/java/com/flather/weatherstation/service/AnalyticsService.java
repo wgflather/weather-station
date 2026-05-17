@@ -48,7 +48,6 @@ public class AnalyticsService {
         return repository.getPressure();
     }
 
-
     public List<HourlyChartAvgDto> getHourlyTemperatureChartData(){
         return repository.findTodayHourlyTemperature().stream()
                 .map(projection ->
@@ -57,20 +56,26 @@ public class AnalyticsService {
                 .toList();
     }
 
-    public TrendResult getLastHourTemperature(){
-        List<DataPoint> temperatureLast60min = repository.getLastHourTemperature();
+    public TrendResult getTempTrend(){
+        return calculateTrend(repository.getLastHourTemperature());
+    }
 
-        if(temperatureLast60min == null || temperatureLast60min.size() < 2){
+    public TrendResult getPressureTrend(){
+        return calculateTrend(repository.getLastHourPressure());
+    }
+
+    public TrendResult calculateTrend(List<DataPoint> dataPoints){
+        if(dataPoints == null || dataPoints.size() < 2){
             return new TrendResult(0.0, TrendDirection.STABLE);
         }
 
-        Instant firstDataTime = temperatureLast60min.getFirst().hour();
+        Instant firstDataTime = dataPoints.getFirst().hour();
 
         SimpleRegression regression = new SimpleRegression();
 
-        for(DataPoint point : temperatureLast60min){
+        for(DataPoint point : dataPoints){
             double x = Duration.between(firstDataTime, point.hour())
-                    .toSeconds() / 60;
+                    .toMillis() / 1000.0;
 
             double y = point.value();
 
@@ -79,7 +84,7 @@ public class AnalyticsService {
 
         double slope = regression.getSlope();
 
-        double hourlyChange = slope * 60.0;
+        double hourlyChange = slope * 3600.0;
 
         hourlyChange = Math.round(hourlyChange * 10.0) / 10.0;
 
@@ -93,7 +98,6 @@ public class AnalyticsService {
         } else {
             direction = TrendDirection.DOWN;
         }
-
         return new TrendResult(hourlyChange, direction);
     }
 
