@@ -17,6 +17,7 @@ public class MetricsDashboardDto {
     private TemperatureDto temperature;
     private PressureDto pressure;
     private List<HourlyChartAvgDto> temperatureChartPoints;
+    private TrendResult temperatureTrend;
 
     public static MetricsDashboardDto empty(){
         return MetricsDashboardDto.builder()
