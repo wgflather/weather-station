@@ -1,0 +1,9 @@
+version: '1.0'
+services:
+  weather-backend:
+    image: weather-station:v1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src/main/resources/:/src/config/
+    restart: unless-stopped
