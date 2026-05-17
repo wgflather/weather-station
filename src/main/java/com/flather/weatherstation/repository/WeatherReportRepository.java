@@ -2,7 +2,7 @@ package com.flather.weatherstation.repository;
 
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
-import com.flather.weatherstation.dto.projection.HourlyProjection;
+import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -19,67 +19,82 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
 
 
     @Query(value = """
-    SELECT
-        ROUND(AVG(pressure)::numeric, 1)::double precision
-    FROM weather_records
-    WHERE measured_at >= (
-        SELECT MAX(measured_at) FROM weather_records
-    ) - INTERVAL '5 minutes'
-    """, nativeQuery = true)
+SELECT
+    ROUND(AVG(pressure)::numeric, 1)::double precision
+FROM weather_records
+WHERE data_quality = 'OK'
+  AND measured_at >= (
+    SELECT MAX(measured_at) FROM weather_records WHERE data_quality = 'OK'
+) - INTERVAL '5 minutes'
+""", nativeQuery = true)
     PressureDto getPressure();
 
     @Query(value = """
-        WITH latest AS (
-        SELECT MAX(measured_at) AS latest_time
-        FROM weather_records
-    ),
-    average AS (
-        SELECT
-            ROUND(AVG(wr.temperature)::numeric, 1)::double precision AS avgTemperature
-        FROM weather_records wr
-        CROSS JOIN latest l
-        WHERE wr.measured_at >= l.latest_time - INTERVAL '5 minutes'
-    ),
-    minMax AS (
-        SELECT
-            MIN(temperature) AS minTemp,
-            MAX(temperature) AS maxTemp
-        FROM weather_records
-        WHERE measured_at >= CURRENT_DATE
-          AND measured_at < CURRENT_DATE + INTERVAL '1 day'
-    )
+WITH latest AS (
+    SELECT MAX(measured_at) AS latest_time
+    FROM weather_records
+    WHERE data_quality = 'OK'
+),
+average AS (
     SELECT
-        average.avgTemperature,
-        minMax.minTemp,
-        minMax.maxTemp
-    FROM minMax
-    CROSS JOIN average;
-    """, nativeQuery = true)
+        ROUND(AVG(wr.temperature)::numeric, 1)::double precision AS avgTemperature
+    FROM weather_records wr
+    CROSS JOIN latest l
+    WHERE wr.data_quality = 'OK'
+      AND wr.measured_at >= l.latest_time - INTERVAL '5 minutes'
+),
+minMax AS (
+    SELECT
+        MIN(temperature) AS minTemp,
+        MAX(temperature) AS maxTemp
+    FROM weather_records
+    WHERE data_quality = 'OK'
+      AND measured_at >= CURRENT_DATE
+      AND measured_at < CURRENT_DATE + INTERVAL '1 day'
+)
+SELECT
+    average.avgTemperature,
+    minMax.minTemp,
+    minMax.maxTemp
+FROM minMax
+CROSS JOIN average;
+""", nativeQuery = true)
     TemperatureDto getTemperature();
 
     @Query(value = """
-        SELECT MAX(measured_at) 
-        FROM weather_records
-        """, nativeQuery = true)
+SELECT measured_at, temperature
+FROM weather_records 
+WHERE data_quality = 'OK'
+  AND measured_at >= NOW() - interval '60 minutes';
+""", nativeQuery = true)
+    List<DataPoint> getLastHourTemperature();
+
+    @Query(value = """
+SELECT MAX(measured_at) 
+FROM weather_records
+WHERE data_quality = 'OK'
+""", nativeQuery = true)
     Instant findMaxMeasuredAt();
 
     @Query(value = """
-        SELECT COUNT(*) 
-        FROM weather_records 
-        WHERE measured_at::date >= CURRENT_DATE 
-        AND measured_at < CURRENT_DATE + INTERVAL '1 day'
-        """, nativeQuery = true)
+SELECT COUNT(*) 
+FROM weather_records 
+WHERE data_quality = 'OK'
+  AND measured_at::date >= CURRENT_DATE 
+  AND measured_at < CURRENT_DATE + INTERVAL '1 day'
+""", nativeQuery = true)
     long findRecordsToday();
 
     @Query(value = """
-    SELECT
-        date_bin('10 minutes', measured_at, current_date) AS bucket,
-        ROUND(AVG(temperature)::numeric, 1)::double precision AS value
-    FROM weather_records
-    WHERE measured_at >= CURRENT_DATE
-      AND measured_at < CURRENT_DATE + INTERVAL '1 day'
-    GROUP BY bucket
-    ORDER BY bucket ASC
-    """, nativeQuery = true)
-    List<HourlyProjection> findTodayHourlyTemperature();
+SELECT
+    date_bin('10 minutes', measured_at, current_date) AS bucket,
+    ROUND(AVG(temperature)::numeric, 1)::double precision AS value
+FROM weather_records
+WHERE data_quality = 'OK'
+  AND measured_at >= CURRENT_DATE
+  AND measured_at < CURRENT_DATE + INTERVAL '1 day'
+GROUP BY bucket
+ORDER BY bucket ASC
+""", nativeQuery = true)
+    List<DataPoint> findTodayHourlyTemperature();
 }
