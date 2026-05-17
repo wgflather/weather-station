@@ -11,5 +11,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class MqttProperties {
     private String host;
+    private String port;
     private String clientId;
+    private String username;
+    private String password;
 }

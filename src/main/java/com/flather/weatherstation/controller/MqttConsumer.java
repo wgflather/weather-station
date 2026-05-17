@@ -18,6 +18,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
+import javax.net.ssl.SSLSocketFactory;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -64,9 +65,9 @@ public class MqttConsumer {
             log.debug("MQTT already connected");
             return;
         }
-
+        String hostUri = "ssl://" + properties.getHost() + ":" + properties.getPort();
         client = new MqttClient(
-                properties.getHost(),
+                hostUri,
                 properties.getClientId(),
                 new MemoryPersistence()
         );
@@ -159,10 +160,13 @@ public class MqttConsumer {
 
     private MqttConnectOptions buildOptions() {
         MqttConnectOptions options = new MqttConnectOptions();
+        options.setUserName(properties.getUsername());
+        options.setPassword(properties.getPassword().toCharArray());
         options.setAutomaticReconnect(true);
         options.setCleanSession(false);
         options.setConnectionTimeout(30);
         options.setKeepAliveInterval(60);
+        options.setSocketFactory(SSLSocketFactory.getDefault());
         return options;
     }
 
