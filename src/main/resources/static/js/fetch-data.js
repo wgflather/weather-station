@@ -18,6 +18,32 @@ async function fetchDashboard(){
     return dashboardData;
 }
 
+function updateTemperatureTrend(trendDirection, hourlyChange) {
+    const trendContainer = document.getElementById('temp-trend');
+    
+    // Clear out class lists completely
+    trendContainer.className = ''; 
+
+    if (trendDirection === 'UP') {
+        const displayValue = Math.abs(hourlyChange).toFixed(1);
+        trendContainer.classList.add('trend-up');
+        trendContainer.innerHTML = `
+            <span class="trend-arrow">↑</span>
+            <span class="trend-val">${displayValue}</span>
+        `;
+    } else if (trendDirection === 'DOWN') {
+        const displayValue = Math.abs(hourlyChange).toFixed(1) + '°';
+        trendContainer.classList.add('trend-down');
+        trendContainer.innerHTML = `
+            <span class="trend-arrow">↓</span>
+            <span class="trend-val">${displayValue}</span>
+        `;
+    } else {
+        trendContainer.classList.add('trend-stable');
+        trendContainer.innerHTML = `<span class="trend-arrow">→</span>`;
+    }
+}
+
 function renderMetrics(weather) {
     document.getElementById("avg-temp").textContent =
         weather?.temperature?.avgTemp ?? "--";
@@ -30,6 +56,12 @@ function renderMetrics(weather) {
 
     document.getElementById("avg-pressure").textContent =
         weather?.pressure?.avgPressure ?? "--";
+
+    updateTemperatureTrend(
+        weather?.temperatureTrend?.direction, 
+        weather?.temperatureTrend?.changeValue
+    );
+    
 }
 
 function renderSystemHealth(systemHealth){
