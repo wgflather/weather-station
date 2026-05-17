@@ -32,7 +32,7 @@ function updateTemperatureTrend(trendDirection, hourlyChange) {
             <span class="trend-val">${displayValue}</span>
         `;
     } else if (trendDirection === 'DOWN') {
-        const displayValue = Math.abs(hourlyChange).toFixed(1) + '°';
+        const displayValue = Math.abs(hourlyChange).toFixed(1);
         trendContainer.classList.add('trend-down');
         trendContainer.innerHTML = `
             <span class="trend-arrow">↓</span>
@@ -40,6 +40,32 @@ function updateTemperatureTrend(trendDirection, hourlyChange) {
         `;
     } else {
         trendContainer.classList.add('trend-stable');
+        trendContainer.innerHTML = `<span class="trend-arrow">→</span>`;
+    }
+}
+
+function updatePressureTrend(trendDirection, hourlyChange) {
+    const trendContainer = document.getElementById('pressure-trend');
+
+    // Clear out class lists completely
+    trendContainer.className = '';
+
+    if (trendDirection === 'UP') {
+        const displayValue = Math.abs(hourlyChange).toFixed(1);
+        trendContainer.classList.add('pressure-trend-up');
+        trendContainer.innerHTML = `
+            <span class="trend-arrow">↑</span>
+            <span class="trend-val">${displayValue}</span>
+        `;
+    } else if (trendDirection === 'DOWN') {
+        const displayValue = Math.abs(hourlyChange).toFixed(1);
+        trendContainer.classList.add('pressure-trend-down');
+        trendContainer.innerHTML = `
+            <span class="trend-arrow">↓</span>
+            <span class="trend-val">${displayValue}</span>
+        `;
+    } else {
+        trendContainer.classList.add('pressure-trend-stable');
         trendContainer.innerHTML = `<span class="trend-arrow">→</span>`;
     }
 }
@@ -61,7 +87,11 @@ function renderMetrics(weather) {
         weather?.temperatureTrend?.direction, 
         weather?.temperatureTrend?.changeValue
     );
-    
+
+    updatePressureTrend(
+        weather?.pressureTrend?.direction,
+        weather?.pressureTrend?.changeValue
+    );
 }
 
 function renderSystemHealth(systemHealth){

@@ -100,7 +100,7 @@ body {
 }
 
 /* --- FIXED: TELEMETRY TREND ARROWS (STACKED & PERFECTLY COLORIZED) --- */
-#temp-trend {
+#temp-trend, #pressure-trend {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
@@ -129,6 +129,21 @@ body {
 .trend-up, .trend-up * { color: #ffb088 !important; }     /* Sunset Amber */
 .trend-down, .trend-down * { color: #7dd3fc !important; } /* Arctic Blue */
 .trend-stable, .trend-stable * { color: #94b3e0 !important; } /* Faded Sky Blue */
+
+.pressure-trend-up,
+.pressure-trend-up * {
+    color: #a8c0d8 !important; /* Cool Steel Blue */
+}
+
+.pressure-trend-down,
+.pressure-trend-down * {
+    color: #6f8fa8 !important; /* Stormy Blue Grey */
+}
+
+.pressure-trend-stable,
+.pressure-trend-stable * {
+    color: #8ea3b5 !important; /* Soft Slate Blue */
+}
 
 /* Main container for core numerical readouts */
 .metric-content {
