@@ -1,167 +1,189 @@
 import { renderWeatherChart } from './weather-chart.js';
+import { FetchScheduler } from './FetchScheduler.js';
 
 const state = {
     metrics: null,
     systemHealth: null,
-    currentMetric: 'temperature' // Tracks the active dropdown view across polling updates
-}
+    currentMetric: 'temperature',
 
-async function fetchDashboard(){
-    const response = await fetch(`/api/weather/dashboard`);
-
-    if(!response.ok){
-        console.log(response.status);
-        throw new Error("Some network error occurred");
+    charts: {
+        temperature: null, // initially null
+        pressure: null
     }
+};
 
-    const dashboardData = await response.json();
+const scheduler = new FetchScheduler(
+    async (metric, existingChart) => {
+        let url = `/api/weather/chart?metric=${metric}`;
 
-    console.log(dashboardData);
-    return dashboardData;
-}
-
-async function fetchChart(metric = 'temperature') {
-    try {
-        const response = await fetch(`/api/weather/chart?metric=${metric}`);
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch chart data for ${metric}`);
+        if (existingChart && existingChart.length > 0) {
+            const lastBucket = existingChart[existingChart.length - 1].hour;
+            url += `&since=${encodeURIComponent(lastBucket)}`;
         }
 
-        const chartPoints = await response.json();
-        console.log(`Fetched fresh ${metric} data from DB:`, chartPoints.chartPoints);
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Chart fetch failed for ${metric}`);
+        }
 
-        renderWeatherChart(chartPoints.chartPoints, metric);
-    } catch (error) {
-        console.error("Chart fetch error:", error);
+        return await response.json();
+    },
+
+    (newChartPoints, metric) => {
+        // Enforce fallback initialization: Convert null to empty array if needed
+        if (!state.charts[metric]) {
+            state.charts[metric] = [];
+        }
+
+        // Safe Merge Logic (Retains historical incremental items)
+        if (state.charts[metric].length === 0) {
+            state.charts[metric] = newChartPoints;
+        } else {
+            const existingHours = new Set(state.charts[metric].map(point => point.hour));
+            const uniqueDeltas = newChartPoints.filter(point => !existingHours.has(point.hour));
+            
+            state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
+        }
+
+        // Only flash update the canvas if this metric is currently being looked at
+        if (metric === state.currentMetric) {
+            renderWeatherChart(state.charts[metric], metric);
+        }
+    },
+
+    20000 
+);
+
+function startChart(metric) {
+    // Dynamic runtime callback closure ensures scheduler consistently reads current array length
+    scheduler.start(metric, (m) => state.charts[m]);
+}
+
+// ==========================================
+// DASHBOARD & EVENT INITIALIZATION
+// ==========================================
+
+async function fetchDashboard() {
+    const response = await fetch(`/api/weather/dashboard`);
+    if (!response.ok) throw new Error("Dashboard fetch failed");
+    return await response.json();
+}
+
+// ==========================================
+// TREND RENDERING HELPERS
+// ==========================================
+
+function updateTemperatureTrend(direction, changeValue) {
+    const el = document.getElementById('temp-trend');
+    if (!el) return;
+    el.className = '';
+
+    if (direction === 'UP') {
+        el.classList.add('trend-up');
+        el.innerHTML = `
+            <span class="trend-arrow">↑</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
+        `;
+    } else if (direction === 'DOWN') {
+        el.classList.add('trend-down');
+        el.innerHTML = `
+            <span class="trend-arrow">↓</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
+        `;
+    } else {
+        el.classList.add('trend-stable');
+        el.innerHTML = `<span class="trend-arrow">→</span>`;
     }
 }
 
-function updateTemperatureTrend(trendDirection, hourlyChange) {
-    const trendContainer = document.getElementById('temp-trend');
+function updatePressureTrend(direction, changeValue) {
+    const el = document.getElementById('pressure-trend');
+    if (!el) return;
+    el.className = '';
 
-    // Clear out class lists completely
-    trendContainer.className = '';
-
-    if (trendDirection === 'UP') {
-        const displayValue = Math.abs(hourlyChange).toFixed(1);
-        trendContainer.classList.add('trend-up');
-        trendContainer.innerHTML = `
+    if (direction === 'UP') {
+        el.classList.add('pressure-trend-up');
+        el.innerHTML = `
             <span class="trend-arrow">↑</span>
-            <span class="trend-val">${displayValue}</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
         `;
-    } else if (trendDirection === 'DOWN') {
-        const displayValue = Math.abs(hourlyChange).toFixed(1);
-        trendContainer.classList.add('trend-down');
-        trendContainer.innerHTML = `
+    } else if (direction === 'DOWN') {
+        el.classList.add('pressure-trend-down');
+        el.innerHTML = `
             <span class="trend-arrow">↓</span>
-            <span class="trend-val">${displayValue}</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
         `;
     } else {
-        trendContainer.classList.add('trend-stable');
-        trendContainer.innerHTML = `<span class="trend-arrow">→</span>`;
-    }
-}
-
-function updatePressureTrend(trendDirection, hourlyChange) {
-    const trendContainer = document.getElementById('pressure-trend');
-
-    // Clear out class lists completely
-    trendContainer.className = '';
-
-    if (trendDirection === 'UP') {
-        const displayValue = Math.abs(hourlyChange).toFixed(1);
-        trendContainer.classList.add('pressure-trend-up');
-        trendContainer.innerHTML = `
-            <span class="trend-arrow">↑</span>
-            <span class="trend-val">${displayValue}</span>
-        `;
-    } else if (trendDirection === 'DOWN') {
-        const displayValue = Math.abs(hourlyChange).toFixed(1);
-        trendContainer.classList.add('pressure-trend-down');
-        trendContainer.innerHTML = `
-            <span class="trend-arrow">↓</span>
-            <span class="trend-val">${displayValue}</span>
-        `;
-    } else {
-        trendContainer.classList.add('pressure-trend-stable');
-        trendContainer.innerHTML = `<span class="trend-arrow">→</span>`;
+        el.classList.add('pressure-trend-stable');
+        el.innerHTML = `<span class="trend-arrow">→</span>`;
     }
 }
 
 function renderMetrics(weather) {
-    document.getElementById("avg-temp").textContent =
-        weather?.temperature?.avgTemp ?? "--";
+    document.getElementById("avg-temp").textContent = weather?.temperature?.avgTemp ?? "--";
+    document.getElementById("min-temp").textContent = weather?.temperature?.min ?? "--";
+    document.getElementById("max-temp").textContent = weather?.temperature?.max ?? "--";
+    document.getElementById("avg-pressure").textContent = weather?.pressure?.avgPressure ?? "--";
 
-    document.getElementById("min-temp").textContent =
-        weather?.temperature?.min ?? "--";
-
-    document.getElementById("max-temp").textContent =
-        weather?.temperature?.max ?? "--";
-
-    document.getElementById("avg-pressure").textContent =
-        weather?.pressure?.avgPressure ?? "--";
-
-    updateTemperatureTrend(
-        weather?.temperatureTrend?.direction,
-        weather?.temperatureTrend?.changeValue
-    );
-
-    updatePressureTrend(
-        weather?.pressureTrend?.direction,
-        weather?.pressureTrend?.changeValue
-    );
+    updateTemperatureTrend(weather?.temperatureTrend?.direction, weather?.temperatureTrend?.changeValue);
+    updatePressureTrend(weather?.pressureTrend?.direction, weather?.pressureTrend?.changeValue);
 }
 
-function renderSystemHealth(systemHealth){
-    const lastUpdate = document.getElementById("lastUpdate");
+function renderSystemHealth(systemHealth) {
     document.getElementById("status").textContent = systemHealth.status;
     document.getElementById("lag").textContent = systemHealth.lagMinutes + ' min';
     document.getElementById("todayRecords").textContent = systemHealth.recordsToday;
 
-    let time = "--:--:--";
-    if(systemHealth.lastMeasuredAt != null){
-        time = new Date(systemHealth.lastMeasuredAt).toLocaleTimeString('en-GB');
-    }
+    const lastUpdate = document.getElementById("lastUpdate");
+    lastUpdate.textContent = systemHealth.lastMeasuredAt
+        ? new Date(systemHealth.lastMeasuredAt).toLocaleTimeString('en-GB')
+        : "--:--:--";
 
-    lastUpdate.textContent = time;
-
-
-    function renderSystemStatus(){
-        const lagText = document.getElementById("status");
-
-        const colors = {
-        'LIVE': 'green',
-        'DELAYED': 'yellow',
-        'STALE': 'orange',
-        'OFFLINE': 'red'
-        };
-
-        lagText.style.color = colors[systemHealth.status] || 'black';
-    }
-
-    renderSystemStatus();
+    const colors = { LIVE: 'green', DELAYED: 'yellow', STALE: 'orange', OFFLINE: 'red' };
+    document.getElementById("status").style.color = colors[systemHealth.status] || 'black';
 }
 
 async function updateDashboard() {
     try {
         const data = await fetchDashboard();
+        state.metrics = data.metricsDashboardDto;
+        state.systemHealth = data.systemHealthDashboardDto;
 
-        const metrics = data.metricsDashboardDto;
-        const systemHealth = data.systemHealthDashboardDto;
-
-        state.metrics = metrics;
-        state.systemHealth = systemHealth;
-
-        renderMetrics(metrics);
-        renderSystemHealth(systemHealth);
-
-        // Polling loop pulls fresh data from DB for whatever chart is currently active
-        await fetchChart(state.currentMetric);
+        renderMetrics(state.metrics);
+        renderSystemHealth(state.systemHealth);
+    } catch (error) {
+        console.error(error);
     }
-    catch(error){
-        console.log(error);
-    }
+}
+
+function initEventListeners() {
+    const selector = document.getElementById('metric-selector');
+    if (!selector) return;
+
+    // 1. Establish the baseline default metric from the HTML select element
+    state.currentMetric = selector.value;
+
+    // 2. Only start the default metric immediately on boot
+    startChart(state.currentMetric);
+
+    selector.addEventListener('change', (event) => {
+        const selectedMetric = event.target.value;
+        state.currentMetric = selectedMetric;
+
+        const activeData = state.charts[selectedMetric];
+        
+        // 3. Lazy-loading conditional boundary
+        if (activeData === null) {
+            // This metric has never been loaded. Fetch it fully right now
+            // and activate its standalone background scheduling loop automatically.
+            renderWeatherChart([], selectedMetric); // Show a clean canvas loading state
+            startChart(selectedMetric);
+        } else {
+            // Data exists! Instantly swap the UI canvas with our cache data.
+            // No network calls made, background scheduler keeps handling updates.
+            renderWeatherChart(activeData, selectedMetric);
+        }
+    });
 }
 
 function startPolling(fn, interval) {
@@ -172,26 +194,10 @@ function startPolling(fn, interval) {
         setTimeout(loop, interval);
     }
     loop();
-    return () => { stopped = true; };
+    return () => stopped = true;
 }
 
-function initEventListeners() {
-    const selector = document.getElementById('metric-selector');
 
-    if (selector) {
-        // FIX: Synchronize JavaScript state with whatever the HTML selector shows on boot
-        state.currentMetric = selector.value;
-
-        selector.addEventListener('change', async (event) => {
-            const selectedMetric = event.target.value;
-            state.currentMetric = selectedMetric;
-
-            // Instantly pull from DB when the user flips the dropdown
-            await fetchChart(selectedMetric);
-        });
-    }
-}
-
-// Start applications
+// Kickstart system
 initEventListeners();
 startPolling(updateDashboard, 30000);
