@@ -100,7 +100,21 @@ WHERE data_quality = 'OK'
 GROUP BY bucket
 ORDER BY bucket ASC
 """, nativeQuery = true)
-    List<DataPoint> findTodayHourlyTemperature();
+    List<DataPoint> findTodayChartTemperature();
+
+    @Query(value = """
+SELECT
+    date_bin('10 minutes', measured_at, current_date) AS bucket,
+    ROUND(AVG(pressure)::numeric, 1)::double precision AS value
+FROM weather_records
+WHERE data_quality = 'OK'
+  AND measured_at >= CURRENT_DATE
+  AND measured_at < CURRENT_DATE + INTERVAL '1 day'
+GROUP BY bucket
+ORDER BY bucket ASC
+""", nativeQuery = true)
+    List<DataPoint> findTodayChartPressure();
+
     @Query(value = """
 SELECT
     date_bin('5 minutes', measured_at, current_date) AS time,

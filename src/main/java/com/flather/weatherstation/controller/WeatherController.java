@@ -1,6 +1,7 @@
 package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
+import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
@@ -51,8 +52,8 @@ public class WeatherController {
     }
 
     @GetMapping(BASE_PATH + "/chart")
-    public ResponseEntity<List<HourlyChartAvgDto>> getChart(){
-        return ResponseEntity.ok(analyticsService.getHourlyTemperatureChartData());
+    public ResponseEntity<ChartDto> getChart(@RequestParam(value = "metric", defaultValue = "temperature") String metric){
+        return ResponseEntity.ok(analyticsService.returnChart(metric));
     }
 
 }

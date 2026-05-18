@@ -2,6 +2,7 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.dto.analytics.*;
+import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.model.constant.TrendDirection;
 import com.flather.weatherstation.repository.WeatherReportRepository;
@@ -48,12 +49,28 @@ public class AnalyticsService {
         return repository.getPressure();
     }
 
-    public List<HourlyChartAvgDto> getHourlyTemperatureChartData(){
-        return repository.findTodayHourlyTemperature().stream()
+    public List<HourlyChartAvgDto> getTemperatureChartData(){
+        return repository.findTodayChartTemperature().stream()
                 .map(projection ->
                      new HourlyChartAvgDto(projection.hour().atZone(zoneId), projection.value())
                 )
                 .toList();
+    }
+
+    public List<HourlyChartAvgDto> getPressureChartData(){
+        return repository.findTodayChartPressure().stream()
+                .map(projection ->
+                        new HourlyChartAvgDto(projection.hour().atZone(zoneId), projection.value())
+                )
+                .toList();
+    }
+
+    public ChartDto returnChart(String metric){
+        if("temperature".equals(metric)){
+            return new ChartDto(metric, getTemperatureChartData());
+        }
+
+        return new ChartDto(metric, getPressureChartData());
     }
 
     public TrendResult getTempTrend(){
