@@ -16,13 +16,11 @@ import java.util.List;
 public class MetricsDashboardDto {
     private TemperatureDto temperature;
     private PressureDto pressure;
-    private List<HourlyChartAvgDto> temperatureChartPoints;
     private TrendResult temperatureTrend;
     private TrendResult pressureTrend;
 
     public static MetricsDashboardDto empty(){
         return MetricsDashboardDto.builder()
-                .temperatureChartPoints(Collections.emptyList())
                 .build();
     }
 }

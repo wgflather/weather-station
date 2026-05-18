@@ -3,6 +3,7 @@ package com.flather.weatherstation.repository;
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
+import com.flather.weatherstation.dto.projection.MedianProjection;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -128,4 +129,19 @@ GROUP BY time
 ORDER BY time ASC
 """, nativeQuery = true)
     List<DataPoint> getLastHourPressure();
+
+    @Query(value = """
+WITH last_five AS (
+    SELECT temperature, pressure
+    FROM weather_records
+    WHERE data_quality = 'OK'
+    ORDER BY measured_at DESC
+    LIMIT 5
+)
+SELECT
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY temperature) AS median_temp,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pressure) AS median_pressure
+FROM last_five;
+""", nativeQuery = true)
+    MedianProjection findMedian();
 }

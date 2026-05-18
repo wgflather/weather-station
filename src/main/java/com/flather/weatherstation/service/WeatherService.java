@@ -28,16 +28,12 @@ public class WeatherService {
     public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto){
 
         WeatherRecord record = mapper.weatherDtoToEntity(weatherRecordDto);
-        Optional<WeatherRecordResponseDto> latestRecord = getLatestTodayWeatherRecord();
 
         boolean isAnomaly = qualityValidator.checkForDataAnomaly(weatherRecordDto);
 
-        boolean isSpike = latestRecord.map(
-                last ->
-                        qualityValidator.checkForDataSpikes(weatherRecordDto, last))
-                .orElse(false);
+        boolean isSpike = qualityValidator.checkForDataSpikes(weatherRecordDto, repository.findMedian());
 
-        DataQuality quality = qualityValidator.setDataQualityStatus(isAnomaly, isSpike);
+        DataQuality quality = qualityValidator.determineDataQualityStatus(isAnomaly, isSpike);
 
         record.setDataQuality(quality);
 
