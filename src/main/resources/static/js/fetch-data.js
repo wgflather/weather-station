@@ -1,7 +1,9 @@
 import { renderWeatherChart } from './weather-chart.js';
+
 const state = {
     metrics: null,
-    systemHealth: null
+    systemHealth: null,
+    currentMetric: 'temperature' // Tracks the active dropdown view across polling updates
 }
 
 async function fetchDashboard(){
@@ -18,11 +20,28 @@ async function fetchDashboard(){
     return dashboardData;
 }
 
+async function fetchChart(metric = 'temperature') {
+    try {
+        const response = await fetch(`/api/weather/chart?metric=${metric}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch chart data for ${metric}`);
+        }
+
+        const chartPoints = await response.json();
+        console.log(`Fetched fresh ${metric} data from DB:`, chartPoints.chartPoints);
+
+        renderWeatherChart(chartPoints.chartPoints, metric);
+    } catch (error) {
+        console.error("Chart fetch error:", error);
+    }
+}
+
 function updateTemperatureTrend(trendDirection, hourlyChange) {
     const trendContainer = document.getElementById('temp-trend');
-    
+
     // Clear out class lists completely
-    trendContainer.className = ''; 
+    trendContainer.className = '';
 
     if (trendDirection === 'UP') {
         const displayValue = Math.abs(hourlyChange).toFixed(1);
@@ -84,7 +103,7 @@ function renderMetrics(weather) {
         weather?.pressure?.avgPressure ?? "--";
 
     updateTemperatureTrend(
-        weather?.temperatureTrend?.direction, 
+        weather?.temperatureTrend?.direction,
         weather?.temperatureTrend?.changeValue
     );
 
@@ -125,20 +144,20 @@ function renderSystemHealth(systemHealth){
 }
 
 async function updateDashboard() {
-    try{
+    try {
         const data = await fetchDashboard();
 
         const metrics = data.metricsDashboardDto;
         const systemHealth = data.systemHealthDashboardDto;
-        const chartPoints = metrics.temperatureChartPoints;
 
-        console.log(chartPoints);
         state.metrics = metrics;
         state.systemHealth = systemHealth;
 
         renderMetrics(metrics);
         renderSystemHealth(systemHealth);
-        renderWeatherChart(chartPoints);
+
+        // Polling loop pulls fresh data from DB for whatever chart is currently active
+        await fetchChart(state.currentMetric);
     }
     catch(error){
         console.log(error);
@@ -146,24 +165,33 @@ async function updateDashboard() {
 }
 
 function startPolling(fn, interval) {
-
     let stopped = false;
-
     async function loop() {
-
         if (stopped) return;
-
         await fn();
-
         setTimeout(loop, interval);
     }
-
     loop();
-
-    return () => {
-        stopped = true;
-    };
+    return () => { stopped = true; };
 }
 
+function initEventListeners() {
+    const selector = document.getElementById('metric-selector');
 
+    if (selector) {
+        // FIX: Synchronize JavaScript state with whatever the HTML selector shows on boot
+        state.currentMetric = selector.value;
+
+        selector.addEventListener('change', async (event) => {
+            const selectedMetric = event.target.value;
+            state.currentMetric = selectedMetric;
+
+            // Instantly pull from DB when the user flips the dropdown
+            await fetchChart(selectedMetric);
+        });
+    }
+}
+
+// Start applications
+initEventListeners();
 startPolling(updateDashboard, 30000);

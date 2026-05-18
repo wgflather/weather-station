@@ -25,12 +25,12 @@
 
     <!-- Weather block -->
 <div class="temperature_block">
-    <h3>Temperature (5-min avg)</h3>
+    <h3>Temperature</h3>
     <div class="metric-content">
         <div class="main-value">
             <span id="avg-temp"></span><span class="unit">°C</span><span id="temp-trend"></span>
         </div>
-        
+
         <div class="extremes-side">
             <div class="extreme-item">
                 <span class="label">Min:</span>
@@ -45,7 +45,7 @@
 </div>
 
     <div class="pressure_block">
-        <h3>Pressure <small>(5-min avg)</small></h3>
+        <h3>Pressure</h3>
             <div class="main-value">
              <span id="avg-pressure"></span><span class="unit">hPa</span><span id="pressure-trend"></span>
             </div>
@@ -55,7 +55,16 @@
 
 <!-- Chart -->
 <div class="chart_block">
-    <h3>24-Hour Temperature Trend</h3>
+    <div class="chart-header">
+        <h3>24-Hour Trend</h3>
+        <div class="metric-selector">
+            <span class="selector-label">View:</span>
+            <select id="metric-selector" class="metric-dropdown">
+                <option value="temperature">Temperature</option>
+                <option value="pressure">Pressure</option>
+            </select>
+        </div>
+    </div>
     <div class="chart-container" style="position: relative; height:200px; width:100%;">
         <canvas id="weatherChart"></canvas>
     </div>
@@ -63,9 +72,7 @@
 
 <!-- System health -->
 <div class="system_health_block">
-
     <h3>System Health</h3>
-
     <div class="health-grid">
         <div class="health-item">
             <label>Status</label>
@@ -89,6 +96,6 @@
     </div>
 </div>
 <script th:src="@{/js/realtime-script.js}"></script>
-<script type="module"th:src="@{/js/fetch-data.js}"></script>
+<script type="module" th:src="@{/js/fetch-data.js}"></script>
 </body>
 </html>
