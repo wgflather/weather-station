@@ -151,7 +151,7 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                     borderColor: lineStrokeColor,
                     backgroundColor: gradientFill,
                     fill: true,
-                    tension: 0.42,
+                    tension: 0.53,
                     borderWidth: 2.8,
                     borderCapStyle: 'round',
                     borderJoinStyle: 'round',
