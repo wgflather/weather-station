@@ -20,7 +20,6 @@ public class DashboardService {
        return MetricsDashboardDto.builder()
                .temperature(analyticsService.getTemperature())
                .pressure(analyticsService.getPressure())
-               .temperatureChartPoints(analyticsService.getTemperatureChartData())
                .temperatureTrend(analyticsService.getTempTrend())
                .pressureTrend(analyticsService.getPressureTrend())
                .build();

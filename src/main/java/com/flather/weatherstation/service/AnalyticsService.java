@@ -49,28 +49,50 @@ public class AnalyticsService {
         return repository.getPressure();
     }
 
-    public List<HourlyChartAvgDto> getTemperatureChartData(){
-        return repository.findTodayChartTemperature().stream()
-                .map(projection ->
-                     new HourlyChartAvgDto(projection.hour().atZone(zoneId), projection.value())
-                )
-                .toList();
+    public List<HourlyChartAvgDto> getTemperatureChartData(Instant since){
+        return dataPointToDto(repository.findTodayChartTemperature(since));
     }
 
-    public List<HourlyChartAvgDto> getPressureChartData(){
-        return repository.findTodayChartPressure().stream()
+    public List<HourlyChartAvgDto> getPressureChartData(Instant since){
+        return dataPointToDto(repository.findTodayChartPressure(since));
+    }
+
+    private List<HourlyChartAvgDto> dataPointToDto(List<DataPoint> dataPoints){
+        return dataPoints.stream()
                 .map(projection ->
                         new HourlyChartAvgDto(projection.hour().atZone(zoneId), projection.value())
                 )
                 .toList();
     }
 
-    public ChartDto returnChart(String metric){
+
+    public ChartDto returnChart(String metric, String since){
+        Instant sinceInstant = (since == null) ?
+                LocalDate.now(zoneId)
+                .atStartOfDay(zoneId).
+                toInstant() : OffsetDateTime.parse(since).toInstant();
+
+        List<HourlyChartAvgDto> dtos;
+
+
         if("temperature".equals(metric)){
-            return new ChartDto(metric, getTemperatureChartData());
+            dtos = getTemperatureChartData(sinceInstant);
+        }else {
+            dtos = getPressureChartData(sinceInstant);
         }
 
-        return new ChartDto(metric, getPressureChartData());
+        Instant nextBucketExpectedAt = null;
+
+        if (!dtos.isEmpty()) {
+            nextBucketExpectedAt =
+                    getNextExpectedBucketEpochMillis(dtos.getLast().hour());
+        }
+
+        return new ChartDto(metric, dtos, nextBucketExpectedAt);
+    }
+
+    private Instant getNextExpectedBucketEpochMillis(ZonedDateTime zonedDateTime){
+        return zonedDateTime.toInstant().plusSeconds(600);
     }
 
     public TrendResult getTempTrend(){
@@ -80,6 +102,7 @@ public class AnalyticsService {
     public TrendResult getPressureTrend(){
         return calculateTrend(repository.getLastHourPressure());
     }
+
 
     public TrendResult calculateTrend(List<DataPoint> dataPoints){
         if(dataPoints == null || dataPoints.size() < 2){

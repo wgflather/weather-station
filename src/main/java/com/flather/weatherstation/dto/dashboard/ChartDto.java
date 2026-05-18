@@ -2,7 +2,8 @@ package com.flather.weatherstation.dto.dashboard;
 
 import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
 
+import java.time.Instant;
 import java.util.List;
 
-public record ChartDto(String metric, List<HourlyChartAvgDto> chartPoints) {
+public record ChartDto(String metric, List<HourlyChartAvgDto> chartPoints, Instant nextBucketExpectedAt) {
 }

@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 
 @RestController
@@ -52,8 +53,9 @@ public class WeatherController {
     }
 
     @GetMapping(BASE_PATH + "/chart")
-    public ResponseEntity<ChartDto> getChart(@RequestParam(value = "metric", defaultValue = "temperature") String metric){
-        return ResponseEntity.ok(analyticsService.returnChart(metric));
+    public ResponseEntity<ChartDto> getChart(@RequestParam(value = "metric", defaultValue = "temperature") String metric,
+                                             @RequestParam(required = false, value = "since") String since){
+        return ResponseEntity.ok(analyticsService.returnChart(metric, since));
     }
 
 }

@@ -4,8 +4,10 @@ import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.model.entity.WeatherRecord;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -95,12 +97,12 @@ SELECT
     ROUND(AVG(temperature)::numeric, 1)::double precision AS value
 FROM weather_records
 WHERE data_quality = 'OK'
-  AND measured_at >= CURRENT_DATE
+  AND measured_at >= :since
   AND measured_at < CURRENT_DATE + INTERVAL '1 day'
 GROUP BY bucket
 ORDER BY bucket ASC
 """, nativeQuery = true)
-    List<DataPoint> findTodayChartTemperature();
+    List<DataPoint> findTodayChartTemperature(@Param("since") Instant since);
 
     @Query(value = """
 SELECT
@@ -108,12 +110,12 @@ SELECT
     ROUND(AVG(pressure)::numeric, 1)::double precision AS value
 FROM weather_records
 WHERE data_quality = 'OK'
-  AND measured_at >= CURRENT_DATE
+  AND measured_at >= :since
   AND measured_at < CURRENT_DATE + INTERVAL '1 day'
 GROUP BY bucket
 ORDER BY bucket ASC
 """, nativeQuery = true)
-    List<DataPoint> findTodayChartPressure();
+    List<DataPoint> findTodayChartPressure(@Param("since") Instant since);
 
     @Query(value = """
 SELECT
