@@ -4,16 +4,7 @@
 }
 
 html {
-    min-height: 100%;
-    /* BACKGROUND: Vibrant, atmospheric blue hour zenith that glows down to a twilight horizon */
-    background: #1e3a8a;
-    background: linear-gradient(
-        180deg,
-        #21376e 0%,   /* Rich, vibrant indigo */
-        #1e3e7a 50%,  /* Luminous atmospheric mid-blue */
-        #3b629b 100%  /* Brighter twilight horizon haze */
-    );
-    background-attachment: fixed;
+    background-color: #1e3e7a;
 }
 
 body {
@@ -26,6 +17,48 @@ body {
     align-items: center;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+
+    background: transparent;
+    position: relative;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: linear-gradient(
+        180deg,
+        #21376e 0%,
+        #1e3e7a 50%,
+        #3b629b 100%
+    );
+}
+
+/* =========================================================
+   SAFARI Lliquid glass CHROME TINTING ENGINE
+========================================================= */
+.safari-top-anchor,
+.safari-bottom-anchor {
+    position: fixed;
+    left: 0;
+    width: 100%;
+    height: 6px;          /* Minimum size required for Safari to sample the color */
+    z-index: 9999;        /* Ensures it sits above other structural layers */
+    pointer-events: none; /* Allows clicks and touch gestures to pass straight through */
+}
+
+.safari-top-anchor {
+    top: 0;
+    background-color: #21376e; /* Matches your upper gradient color */
+}
+
+.safari-bottom-anchor {
+    bottom: 0;
+    background-color: #3b629b; /* Matches your bottom gradient color */
 }
 
 .today_data_block {
