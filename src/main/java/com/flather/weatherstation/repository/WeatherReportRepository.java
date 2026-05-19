@@ -158,7 +158,6 @@ ORDER BY time ASC
 WITH last_five AS (
     SELECT temperature, pressure
     FROM weather_records
-    WHERE data_quality = 'OK'
     ORDER BY measured_at DESC
     LIMIT 5
 )
