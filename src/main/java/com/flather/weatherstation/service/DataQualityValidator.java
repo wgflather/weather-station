@@ -37,7 +37,7 @@ public class DataQualityValidator {
 
   public boolean detectDataSpike(
       WeatherRecordCreatedDto weatherRecordDto, MedianProjection median) {
-    if (median == null) return false;
+    if (median == null || median.pressure() == null || median.temp() == null) return false;
     double newTemp = weatherRecordDto.getTemperature();
     double newPressure = weatherRecordDto.getPressure();
 
