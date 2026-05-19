@@ -10,17 +10,20 @@ function getDynamicYBounds(points) {
 
     const values = points.map(p => p.y);
     return {
-        suggestedMin: Math.min(...values) - 2,
-        suggestedMax: Math.max(...values) + 2
+        suggestedMin: Math.min(...values) - 1,
+        suggestedMax: Math.max(...values) + 1
     };
 }
 
 /* =========================================================
    FIND MIN/MAX POINTS
 ========================================================= */
+/* =========================================================
+   FIND MIN/MAX POINTS WITH DISTANCE PROTECTION
+========================================================= */
 function getMinMaxPoints(points) {
-    if (!points.length) {
-        return { minIndex: -1, maxIndex: -1 };
+    if (!points || points.length === 0) {
+        return { minIndex: -1, maxIndex: -1, isTooClose: false };
     }
 
     let minIndex = 0;
@@ -31,11 +34,21 @@ function getMinMaxPoints(points) {
         if (point.y > points[maxIndex].y) maxIndex = index;
     });
 
-    return { minIndex, maxIndex };
+    // Calculate proximity thresholds
+    const indexDistance = Math.abs(maxIndex - minIndex);
+    const valueDelta = Math.abs(points[maxIndex].y - points[minIndex].y);
+
+    // Conflict condition: They are neighboring elements OR values are practically identical
+    const isTooClose = indexDistance <= 1 || valueDelta < 0.2;
+
+    return { minIndex, maxIndex, isTooClose };
 }
 
 /* =========================================================
    MIN / MAX LABEL CANVAS PLUGIN
+========================================================= */
+/* =========================================================
+   MIN / MAX LABEL CANVAS PLUGIN (COLLISION PROOF)
 ========================================================= */
 const minMaxLabelsPlugin = {
     id: 'minMaxLabels',
@@ -43,25 +56,35 @@ const minMaxLabelsPlugin = {
         const { ctx } = chart;
         const meta = chart.getDatasetMeta(0);
 
-        if (!meta.data.length) return;
+        if (!meta.data || !meta.data.length) return;
 
-        const maxPoint = meta.data[pluginOptions.maxIndex];
-        const minPoint = meta.data[pluginOptions.minIndex];
+        const { minIndex, maxIndex, isTooClose, isTemp } = pluginOptions;
+
+        // Skip rendering entirely if the indices are broken or point to the same index
+        if (minIndex === -1 || maxIndex === -1 || minIndex === maxIndex) return;
+
+        const maxPoint = meta.data[maxIndex];
+        const minPoint = meta.data[minIndex];
 
         ctx.save();
-        ctx.font = '600 11px Nunito';
+        ctx.font = '700 11px Nunito'; // Boosted weight for readability
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';  // Makes vertical offsets easier to manage cleanly
 
-        /* --- HIGH LABEL --- */
-        ctx.fillStyle = pluginOptions.isTemp ? '#ffb199' : '#bae6fd';
+        /* --- HIGH LABEL ('H') --- */
         if (maxPoint) {
+            ctx.fillStyle = isTemp ? '#ffb199' : '#bae6fd';
+            // Always keep high label above the data point node line
             ctx.fillText('H', maxPoint.x, maxPoint.y - 14);
         }
 
-        /* --- LOW LABEL --- */
-        ctx.fillStyle = pluginOptions.isTemp ? '#7dd3fc' : '#38bdf8';
+        /* --- LOW LABEL ('L') --- */
         if (minPoint) {
-            ctx.fillText('L', minPoint.x, minPoint.y - 14);
+            ctx.fillStyle = isTemp ? '#7dd3fc' : '#38bdf8';
+
+            // FIX: If points are overlapping or close, push 'L' below the line
+            const yOffset = isTooClose ? 16 : -14;
+            ctx.fillText('L', minPoint.x, minPoint.y + yOffset);
         }
 
         ctx.restore();
@@ -81,19 +104,34 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
         /* =================================================
            MAP RAW DATA FROM DB
         ================================================= */
-        const chartPoints = backendData.map(item => ({
+        const chartPoints = (backendData || []).map(item => ({
             x: new Date(item.hour),
             y: item.hourlyValue
         }));
 
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
+        /* =================================================
+           CALCULATE DYNAMIC TIMELINE RANGE (X-AXIS)
+        ================================================= */
+        let startRange = new Date();
+        let endRange = new Date();
+        endRange.setHours(endRange.getHours() + 3); // Default 4 hour buffer
 
-        const endOfDay = new Date();
-        endOfDay.setHours(23, 59, 59, 999);
+        if (chartPoints.length > 0) {
+            // Anchor start exactly to the first data point
+            startRange = new Date(chartPoints[0].x);
 
+            // Anchor end to the last data point + 4 hours spare space buffer
+            const lastDataPointTime = new Date(chartPoints[chartPoints.length - 1].x);
+            endRange = new Date(lastDataPointTime);
+            endRange.setHours(endRange.getHours() + 2);
+            startRange.setMinutes(startRange.getMinutes() - 2);
+        }
+
+        /* =================================================
+           CALCULATE BOUNDS AND DATA EXTREMES (Y-AXIS / LABELS)
+        ================================================= */
         const yBounds = getDynamicYBounds(chartPoints);
-        const { minIndex, maxIndex } = getMinMaxPoints(chartPoints);
+        const { minIndex, maxIndex, isTooClose } = getMinMaxPoints(chartPoints);
 
         /* =================================================
            CONTEXTUAL CONFIGURATION DRIVER
@@ -214,8 +252,8 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                             displayFormats: { hour: 'H' },
                             tooltipFormat: 'HH:mm'
                         },
-                        min: startOfDay,
-                        max: endOfDay,
+                        min: startRange,
+                        max: endRange,
                         ticks: {
                             autoSkip: true,
                             maxTicksLimit: 8,
@@ -233,7 +271,7 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                         suggestedMin: yBounds.suggestedMin,
                         suggestedMax: yBounds.suggestedMax,
                         ticks: {
-                            stepSize: isTemp ? 1 : 4, // Spread out steps wider for hPa integers
+                            stepSize: isTemp ? 1 : 4, 
                             callback: (val) => `${val}${yAxisAxisSuffix}`,
                             color: '#94a3b8',
                             font: { size: 11 }
@@ -272,6 +310,7 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                     minMaxLabels: {
                         minIndex,
                         maxIndex,
+                        isTooClose,
                         isTemp
                     }
                 }
