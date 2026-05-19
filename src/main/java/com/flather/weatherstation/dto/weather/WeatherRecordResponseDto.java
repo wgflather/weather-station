@@ -1,9 +1,7 @@
 package com.flather.weatherstation.dto.weather;
 
-
-import lombok.*;
-
 import java.time.ZonedDateTime;
+import lombok.*;
 
 @RequiredArgsConstructor
 @AllArgsConstructor
@@ -12,9 +10,9 @@ import java.time.ZonedDateTime;
 @ToString
 public class WeatherRecordResponseDto {
 
-    private double temperature;
+  private double temperature;
 
-    private double pressure;
+  private double pressure;
 
-    private ZonedDateTime measuredAtTimeZoned;
+  private ZonedDateTime measuredAtTimeZoned;
 }

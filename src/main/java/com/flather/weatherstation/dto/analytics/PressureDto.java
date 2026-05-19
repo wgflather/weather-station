@@ -1,4 +1,3 @@
 package com.flather.weatherstation.dto.analytics;
 
-public record PressureDto(Double avgPressure){
-}
+public record PressureDto(Double avgPressure) {}

@@ -10,10 +10,10 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 public class WeatherValidationProperties {
-    private int tempMinimal;
-    private int tempMaximum;
-    private int pressureMinimal;
-    private int pressureMaximum;
-    private double tempSpikeLimit;
-    private double pressureSpikeLimit;
+  private int tempMinimal;
+  private int tempMaximum;
+  private int pressureMinimal;
+  private int pressureMaximum;
+  private double tempSpikeLimit;
+  private double pressureSpikeLimit;
 }

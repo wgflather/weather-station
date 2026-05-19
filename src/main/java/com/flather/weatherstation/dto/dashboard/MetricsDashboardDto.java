@@ -6,21 +6,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
-import java.util.Collections;
-import java.util.List;
-
 @Builder
 @Data
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class MetricsDashboardDto {
-    private TemperatureDto temperature;
-    private PressureDto pressure;
-    private TrendResult temperatureTrend;
-    private TrendResult pressureTrend;
+  private TemperatureDto temperature;
+  private PressureDto pressure;
+  private TrendResult temperatureTrend;
+  private TrendResult pressureTrend;
 
-    public static MetricsDashboardDto empty(){
-        return MetricsDashboardDto.builder()
-                .build();
-    }
+  public static MetricsDashboardDto empty() {
+    return MetricsDashboardDto.builder().build();
+  }
 }

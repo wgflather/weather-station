@@ -10,6 +10,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Builder
 public class WeatherDashboardDto {
-    private MetricsDashboardDto metricsDashboardDto;
-    private SystemHealthDashboardDto systemHealthDashboardDto;
+  private MetricsDashboardDto metricsDashboardDto;
+  private SystemHealthDashboardDto systemHealthDashboardDto;
 }

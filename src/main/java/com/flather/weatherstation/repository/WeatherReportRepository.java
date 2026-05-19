@@ -5,23 +5,23 @@ import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.projection.MedianProjection;
 import com.flather.weatherstation.model.entity.WeatherRecord;
-import jakarta.persistence.criteria.CriteriaBuilder;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-
 @Repository
 public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Long> {
 
-    Optional<WeatherRecord> findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(Instant start, Instant end);
+  Optional<WeatherRecord> findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(
+      Instant start, Instant end);
 
-
-    @Query(value = """
+  @Query(
+      value =
+"""
 SELECT
     ROUND(AVG(pressure)::numeric, 1)::double precision
 FROM weather_records
@@ -29,10 +29,13 @@ WHERE data_quality = 'OK'
   AND measured_at >= (
     SELECT MAX(measured_at) FROM weather_records WHERE data_quality = 'OK'
 ) - INTERVAL '5 minutes'
-""", nativeQuery = true)
-    PressureDto getPressure();
+""",
+      nativeQuery = true)
+  PressureDto getPressure();
 
-    @Query(value = """
+  @Query(
+      value =
+"""
 WITH latest AS (
     SELECT MAX(measured_at) AS latest_time
     FROM weather_records
@@ -61,10 +64,13 @@ SELECT
     minMax.maxTemp
 FROM minMax
 CROSS JOIN average;
-""", nativeQuery = true)
-    TemperatureDto getTemperature();
+""",
+      nativeQuery = true)
+  TemperatureDto getTemperature();
 
-    @Query(value = """
+  @Query(
+      value =
+"""
 SELECT
     date_bin('5 minutes', measured_at, current_date) AS time,
     ROUND(AVG(temperature)::numeric, 1)::double precision AS value
@@ -73,26 +79,35 @@ WHERE data_quality = 'OK'
   AND measured_at >= NOW() - interval '1 hour'
 GROUP BY time
 ORDER BY time ASC
-""", nativeQuery = true)
-    List<DataPoint> getLastHourTemperature();
+""",
+      nativeQuery = true)
+  List<DataPoint> getLastHourTemperature();
 
-    @Query(value = """
-SELECT MAX(measured_at) 
+  @Query(
+      value =
+"""
+SELECT MAX(measured_at)
 FROM weather_records
 WHERE data_quality = 'OK'
-""", nativeQuery = true)
-    Instant findMaxMeasuredAt();
+""",
+      nativeQuery = true)
+  Instant findMaxMeasuredAt();
 
-    @Query(value = """
-SELECT COUNT(*) 
-FROM weather_records 
+  @Query(
+      value =
+"""
+SELECT COUNT(*)
+FROM weather_records
 WHERE data_quality = 'OK'
-  AND measured_at::date >= CURRENT_DATE 
+  AND measured_at::date >= CURRENT_DATE
   AND measured_at < CURRENT_DATE + INTERVAL '1 day'
-""", nativeQuery = true)
-    long findRecordsToday();
+""",
+      nativeQuery = true)
+  long findRecordsToday();
 
-    @Query(value = """
+  @Query(
+      value =
+"""
 SELECT
     date_bin('10 minutes', measured_at, current_date) AS bucket,
     ROUND(AVG(temperature)::numeric, 1)::double precision AS value
@@ -102,10 +117,13 @@ WHERE data_quality = 'OK'
   AND measured_at < CURRENT_DATE + INTERVAL '1 day'
 GROUP BY bucket
 ORDER BY bucket ASC
-""", nativeQuery = true)
-    List<DataPoint> findTodayChartTemperature(@Param("since") Instant since);
+""",
+      nativeQuery = true)
+  List<DataPoint> findTodayChartTemperature(@Param("since") Instant since);
 
-    @Query(value = """
+  @Query(
+      value =
+"""
 SELECT
     date_bin('10 minutes', measured_at, current_date) AS bucket,
     ROUND(AVG(pressure)::numeric, 1)::double precision AS value
@@ -115,10 +133,13 @@ WHERE data_quality = 'OK'
   AND measured_at < CURRENT_DATE + INTERVAL '1 day'
 GROUP BY bucket
 ORDER BY bucket ASC
-""", nativeQuery = true)
-    List<DataPoint> findTodayChartPressure(@Param("since") Instant since);
+""",
+      nativeQuery = true)
+  List<DataPoint> findTodayChartPressure(@Param("since") Instant since);
 
-    @Query(value = """
+  @Query(
+      value =
+"""
 SELECT
     date_bin('5 minutes', measured_at, current_date) AS time,
     ROUND(AVG(pressure)::numeric, 1)::double precision AS value
@@ -127,10 +148,13 @@ WHERE data_quality = 'OK'
   AND measured_at >= NOW() - interval '1 hour'
 GROUP BY time
 ORDER BY time ASC
-""", nativeQuery = true)
-    List<DataPoint> getLastHourPressure();
+""",
+      nativeQuery = true)
+  List<DataPoint> getLastHourPressure();
 
-    @Query(value = """
+  @Query(
+      value =
+"""
 WITH last_five AS (
     SELECT temperature, pressure
     FROM weather_records
@@ -142,6 +166,7 @@ SELECT
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY temperature) AS median_temp,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pressure) AS median_pressure
 FROM last_five;
-""", nativeQuery = true)
-    MedianProjection findMedian();
+""",
+      nativeQuery = true)
+  MedianProjection findMedian();
 }

@@ -2,9 +2,8 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.config.WeatherValidationProperties;
 import com.flather.weatherstation.dto.projection.MedianProjection;
-import com.flather.weatherstation.model.constant.DataQuality;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
-import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
+import com.flather.weatherstation.model.constant.DataQuality;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,52 +13,58 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DataQualityValidator {
 
-    private final WeatherValidationProperties properties;
+  private final WeatherValidationProperties properties;
 
-    public boolean checkForDataAnomaly(WeatherRecordCreatedDto anomalyDto){
-        boolean isAnomaly = false; //Anomaly represents unrealistic data connected to sensor failures
+  public boolean detectDataAnomaly(WeatherRecordCreatedDto anomalyDto) {
+    boolean isAnomaly = false; // Anomaly represents unrealistic data connected to sensor failures
 
-        if(anomalyDto.getTemperature() < properties.getTempMinimal() || anomalyDto.getTemperature() > properties.getTempMaximum()){
-            log.warn("[DATA_ANOMALY][TEMP] Temperature is unrealistic: {} ℃", anomalyDto.getTemperature());
-            isAnomaly = true;
-
-        }
-
-        if(anomalyDto.getPressure() < properties.getPressureMinimal() || anomalyDto.getPressure() > properties.getPressureMaximum()){
-            log.warn("[DATA_ANOMALY][PRESSURE] Pressure is unrealistic: {} hPa", anomalyDto.getPressure());
-            isAnomaly = true;
-        }
-
-        return isAnomaly;
+    if (anomalyDto.getTemperature() < properties.getTempMinimal()
+        || anomalyDto.getTemperature() > properties.getTempMaximum()) {
+      log.warn(
+          "[DATA_ANOMALY][TEMP] Temperature is unrealistic: {} ℃", anomalyDto.getTemperature());
+      isAnomaly = true;
     }
 
-
-    public boolean checkForDataSpikes(WeatherRecordCreatedDto weatherRecordDto, MedianProjection median){
-        if(median == null) return false;
-        double newTemp = weatherRecordDto.getTemperature();
-        double newPressure = weatherRecordDto.getPressure();
-
-        boolean isSpike = false; //Spike represents a sharp jump in data values
-
-        if (Math.abs(newTemp - median.temp()) > properties.getTempSpikeLimit()) {
-            log.warn("[DATA_SPIKE][TEMP] Last 5 temp reads median: {} ℃ Current temp read: {} ℃",
-                    median.temp(), weatherRecordDto.getTemperature());
-            isSpike = true;
-        }
-
-        if (Math.abs(newPressure - median.pressure()) > properties.getPressureSpikeLimit()) {
-            log.warn("[DATA_SPIKE][PRESSURE] Last 5 pressure reads median: {} pHa Current pressure read: {} hPa",
-                    median.pressure(), weatherRecordDto.getPressure());
-            isSpike = true;
-        }
-
-        return isSpike;
-
+    if (anomalyDto.getPressure() < properties.getPressureMinimal()
+        || anomalyDto.getPressure() > properties.getPressureMaximum()) {
+      log.warn(
+          "[DATA_ANOMALY][PRESSURE] Pressure is unrealistic: {} hPa", anomalyDto.getPressure());
+      isAnomaly = true;
     }
 
-    public DataQuality determineDataQualityStatus(boolean anomaly, boolean spike) {
-        if (anomaly) return DataQuality.ANOMALY;
-        if (spike) return DataQuality.SPIKE;
-        return DataQuality.OK;
+    return isAnomaly;
+  }
+
+  public boolean detectDataSpike(
+      WeatherRecordCreatedDto weatherRecordDto, MedianProjection median) {
+    if (median == null) return false;
+    double newTemp = weatherRecordDto.getTemperature();
+    double newPressure = weatherRecordDto.getPressure();
+
+    boolean isSpike = false; // Spike represents a sharp jump in data values
+
+    if (Math.abs(newTemp - median.temp()) > properties.getTempSpikeLimit()) {
+      log.warn(
+          "[DATA_SPIKE][TEMP] Last 5 temp reads median: {} ℃ Current temp read: {} ℃",
+          median.temp(),
+          weatherRecordDto.getTemperature());
+      isSpike = true;
     }
+
+    if (Math.abs(newPressure - median.pressure()) > properties.getPressureSpikeLimit()) {
+      log.warn(
+          "[DATA_SPIKE][PRESSURE] Last 5 pressure reads median: {} hPa Current pressure read: {} hPa",
+          median.pressure(),
+          weatherRecordDto.getPressure());
+      isSpike = true;
+    }
+
+    return isSpike;
+  }
+
+  public DataQuality determineDataQualityStatus(boolean anomaly, boolean spike) {
+    if (anomaly) return DataQuality.ANOMALY;
+    if (spike) return DataQuality.SPIKE;
+    return DataQuality.OK;
+  }
 }

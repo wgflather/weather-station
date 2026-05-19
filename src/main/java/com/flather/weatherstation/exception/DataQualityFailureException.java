@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class DataQualityFailureException extends RuntimeException {
-    public DataQualityFailureException(String message) {
-        super(message);
-    }
+  public DataQualityFailureException(String message) {
+    super(message);
+  }
 }
