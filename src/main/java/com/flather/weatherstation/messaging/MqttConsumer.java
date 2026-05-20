@@ -109,7 +109,7 @@ public class MqttConsumer {
 
   // ---------------- MESSAGE HANDLING ----------------
 
-  private void handleMessage(String topic, MqttMessage message) {
+  void handleMessage(String topic, MqttMessage message) {
     try {
       String normalizedTopic = normalizeTopic(topic);
 

@@ -26,14 +26,6 @@ public class WeatherController {
   private final AnalyticsService analyticsService;
   private final DashboardService dashboardService;
 
-  @PostMapping(BASE_PATH)
-  public ResponseEntity<Void> saveWeatherRecord(@Valid @RequestBody WeatherRecordCreatedDto dto) {
-    WeatherRecordResponseDto savedRecord = service.saveWeatherRecord(dto);
-    log.info("Saved a new weather record: {}", savedRecord);
-
-    return ResponseEntity.noContent().build();
-  }
-
   @GetMapping(LATEST_WEATHER_PATH)
   public ResponseEntity<WeatherRecordResponseDto> getLatestWeatherRecord() {
     return ResponseEntity.ok(service.getLatestTodayWeatherRecord().orElse(null));
@@ -48,6 +40,6 @@ public class WeatherController {
   public ResponseEntity<ChartDto> getChart(
       @RequestParam(value = "metric", defaultValue = "temperature") String metric,
       @RequestParam(required = false, value = "since") String since) {
-    return ResponseEntity.ok(analyticsService.returnChart(metric, since));
+      return ResponseEntity.ok(analyticsService.returnChart(metric, since));
   }
 }

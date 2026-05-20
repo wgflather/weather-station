@@ -80,6 +80,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         request);
   }
 
+  @ExceptionHandler(IllegalArgumentException.class)
+  protected ResponseEntity<Object> handleIllegalArgumentException(Exception ex, WebRequest request){
+    log.warn("Illegal Argument provided: {}", ex.getMessage());
+
+    return buildErrorResponse(
+            HttpStatus.BAD_REQUEST,
+            ex.getMessage(),
+            request
+    );
+  }
+
   /** Generic handler for unexpected runtime exceptions. */
   @ExceptionHandler(Exception.class)
   protected ResponseEntity<Object> handleGlobalException(Exception ex, WebRequest request) {

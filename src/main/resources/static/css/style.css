@@ -424,6 +424,79 @@ h3 {
     text-shadow: none; 
 }
 
+.login-wrapper {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    /* Prevent accidental bounce scrolling on mobile pull-down */
+    overscroll-behavior: none;
+}
+
+/* Card */
+.login-card {
+    width: 100%;
+    /* 380px can sometimes feel slightly tight on small phones like the iPhone SE.
+       400px allows a bit more horizontal balance on slightly wider modern phones. */
+    max-width: 400px;
+    padding: 24px 20px; /* Enhanced internal padding for a more premium look */
+    box-sizing: border-box;
+}
+
+/* Form */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px; /* Slightly widened gap for better thumb separation */
+    margin-top: 16px;
+}
+
+/* Inputs */
+.login-form input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px; /* Enhanced height matching the 44px mobile touch target standard */
+    border-radius: 8px;
+    border: 1px solid rgba(140, 190, 255, 0.4);
+    background: rgba(30, 58, 138, 0.7);
+    color: #ffffff;
+    font-size: 16px;
+    font-family: inherit;
+    /* Removes native iOS inner shadows and default safari styling override issues */
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Clear Focus State for accessibility and mobile navigation interaction */
+.login-form input:focus {
+    outline: none;
+    border-color: rgba(140, 190, 255, 0.9);
+    box-shadow: 0 0 0 3px rgba(140, 190, 255, 0.15);
+}
+
+/* Button */
+.login-form button {
+    width: 100%;
+    padding: 14px; /* Perfectly balances the height of the input fields */
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    /* Eliminates delayed tap response execution lag on mobile browser taps */
+    touch-action: manipulation;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+/* Mobile Pressed/Active State Feedback */
+.login-form button:active {
+    transform: scale(0.98); /* Instant physical press feedback under a user's thumb */
+    opacity: 0.9;
+}
+
 /* --- RESPONSIVE LAYOUT MATRIX WRAPPERS --- */
 
 /* Tablet & Smaller Desktop Reflow Boundaries */
@@ -440,7 +513,7 @@ h3 {
 /* Desktop Expansion Reflow Grids */
 @media (min-width: 600px) {
     .health-grid {
-        grid-template-columns: repeat(4, 1fr); 
+        grid-template-columns: repeat(4, 1fr);
     }
 }
 
@@ -461,12 +534,12 @@ h3 {
     .chart_block {
         padding: 14px;
     }
-    
+
     .main-value {
         justify-content: center;
         padding-left: 0;
     }
-    
+
     .extremes-side {
         justify-content: center;
         text-align: center;
