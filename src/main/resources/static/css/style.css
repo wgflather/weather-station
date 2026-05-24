@@ -9,14 +9,18 @@ html {
 
 body {
     font-family: 'Nunito', sans-serif;
-    color: #f1f5f9; /* Pure starlight white to pop crisply over the vibrant background */
+    color: #f1f5f9;
+
     margin: 0;
     padding: 20px;
+
     display: flex;
     flex-direction: column;
     align-items: center;
+
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 
     background: transparent;
     position: relative;
@@ -25,11 +29,10 @@ body {
 body::before {
     content: "";
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
+
     z-index: -1;
+
     background: linear-gradient(
         180deg,
         #21376e 0%,
@@ -39,26 +42,28 @@ body::before {
 }
 
 /* =========================================================
-   SAFARI Lliquid glass CHROME TINTING ENGINE
+   SAFARI LIQUID GLASS CHROME TINTING ENGINE
 ========================================================= */
 .safari-top-anchor,
 .safari-bottom-anchor {
     position: fixed;
     left: 0;
+
     width: 100%;
-    height: 6px;          /* Minimum size required for Safari to sample the color */
-    z-index: 9999;        /* Ensures it sits above other structural layers */
-    pointer-events: none; /* Allows clicks and touch gestures to pass straight through */
+    height: 6px;
+
+    z-index: 9999;
+    pointer-events: none;
 }
 
 .safari-top-anchor {
     top: 0;
-    background-color: #21376e; /* Matches your upper gradient color */
+    background-color: #21376e;
 }
 
 .safari-bottom-anchor {
     bottom: 0;
-    background-color: #3b629b; /* Matches your bottom gradient color */
+    background-color: #3b629b;
 }
 
 .today_data_block {
@@ -66,18 +71,25 @@ body::before {
     margin-bottom: 20px;
 }
 
-/* Row container for side-by-side card blocks on desktop */
+/* =========================================================
+   DASHBOARD LAYOUT
+========================================================= */
 .dashboard-row {
     display: flex;
     flex-wrap: nowrap;
     justify-content: center;
+
     gap: 20px;
+
     width: 100%;
     max-width: 820px;
+
     margin: 0 auto 20px auto;
 }
 
-/* --- THEME PANELS: Flat Translucent Twilight Panels --- */
+/* =========================================================
+   PANEL SYSTEM
+========================================================= */
 .weather_block,
 .pressure_block,
 .temperature_block,
@@ -88,56 +100,58 @@ body::before {
     position: relative;
     overflow: hidden;
 
-    /* Crisp, flat, translucent twilight panel blue */
     background: rgba(42, 74, 138, 0.75);
 
-    /* Removed 3D blur effect entirely to preserve flat aesthetic */
     backdrop-filter: none;
 
-    /* A solid, flat 2D vector border that cleanly bounds the panels */
-    border: 1px solid rgba(140, 190, 255, 0.25);
+    border: 1px solid rgba(170, 210, 255, 0.34);
     border-radius: 14px;
 
     padding: 20px;
 
-    /* Completely flat look - no shadows */
     box-shadow: none;
 
     box-sizing: border-box;
     width: 100%;
 }
 
-/* Specific styling adjustments for the top info block */
 .today_data_block {
     width: 820px;
     max-width: 100%;
+
     padding: 15px;
+
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     flex-wrap: wrap;
 }
 
-/* Specific styling adjustments for the data chart card */
+/* =========================================================
+   CHART BLOCK
+========================================================= */
 .chart_block {
     width: 100%;
     max-width: 820px;
-    margin: 0 auto 20px auto;
-    box-sizing: border-box;
 
-    /* keep structure stable */
+    margin: 0 auto 20px auto;
+
+    box-sizing: border-box;
     height: auto;
 }
 
-/* Header within chart block */
 .chart_block .chart-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+
     margin-left: 0;
     margin-bottom: 12px;
-    border-bottom: 1px solid rgba(140, 190, 255, 0.15);
+
+    border-bottom: 1px solid rgba(180, 220, 255, 0.22);
+
     padding-bottom: 10px;
+
     width: 100% !important;
 }
 
@@ -145,8 +159,10 @@ body::before {
 .chart_block .chart-container {
     width: 100% !important;
     height: 320px;
-}
 
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
 
 .chart-header h3 {
     border-bottom: none;
@@ -162,7 +178,7 @@ body::before {
 }
 
 /* =========================================================
-   REWRITTEN METRIC SELECTOR ENGINE (FIXES INVISIBLE OPTIONS)
+   METRIC SELECTOR
 ========================================================= */
 .metric-selector {
     display: flex;
@@ -173,63 +189,88 @@ body::before {
 .selector-label {
     font-size: 0.8rem;
     font-weight: 700;
+
     color: #9fc2f5;
+
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .metric-dropdown {
-    /* Critical Fix: Strip out generic OS styling so styles map predictably */
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
 
     padding: 6px 32px 6px 12px;
+
     font-family: 'Nunito', sans-serif;
     font-weight: 600;
     font-size: 0.85rem;
+
     color: #ffffff;
 
-    /* Matches panel aesthetic: Translucent twilight slate */
     background-color: rgba(30, 58, 138, 0.7);
+
     border: 1px solid rgba(140, 190, 255, 0.4);
     border-radius: 6px;
 
     cursor: pointer;
     outline: none;
-    transition: background-color 0.2s, border-color 0.2s;
 
-    /* Custom CSS Down-Arrow Indicator Vector Data */
+    transition:
+        background-color 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.08s ease,
+        opacity 0.08s ease;
+
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2338bdf8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+
     background-repeat: no-repeat;
     background-position: right 10px center;
     background-size: 12px;
+
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-.metric-dropdown:hover,
-.metric-dropdown:focus {
+.metric-dropdown:focus-visible {
     background-color: rgba(42, 74, 138, 0.9);
     border-color: #38bdf8;
 }
 
-/* FIX: Forces nested native dropdown panels to remain visible across all browsers */
 .metric-dropdown option {
-    background-color: #1e293b !important; /* Forces solid dark slate container backplate */
-    color: #ffffff !important;            /* Pure white option items text contrast */
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+
     font-family: 'Nunito', sans-serif;
+
     padding: 8px;
 }
 
-/* --- FIXED: TELEMETRY TREND ARROWS (STACKED & PERFECTLY COLORIZED) --- */
-#temp-trend, #pressure-trend {
+/* Desktop-only hover states */
+@media (hover: hover) and (pointer: fine) {
+    .metric-dropdown:hover {
+        background-color: rgba(42, 74, 138, 0.9);
+        border-color: #38bdf8;
+    }
+}
+
+/* =========================================================
+   TREND INDICATORS
+========================================================= */
+#temp-trend,
+#pressure-trend {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+
     margin-left: 10px;
+
     line-height: 0.9;
     vertical-align: middle;
-    /* Aligns the trend container height gracefully alongside the unit text */
+
     align-self: center;
 }
 
@@ -246,38 +287,51 @@ body::before {
     margin-top: 1px;
 }
 
-/* Direct color matching signatures applied cleanly across classes */
-.trend-up, .trend-up * { color: #ffb088 !important; }     /* Sunset Amber */
-.trend-down, .trend-down * { color: #7dd3fc !important; } /* Arctic Blue */
-.trend-stable, .trend-stable * { color: #b4c9e8 !important; } /* Faded Sky Blue */
+.trend-up,
+.trend-up * {
+    color: #ffb088 !important;
+}
+
+.trend-down,
+.trend-down * {
+    color: #7dd3fc !important;
+}
+
+.trend-stable,
+.trend-stable * {
+    color: #b4c9e8 !important;
+}
 
 .pressure-trend-up,
 .pressure-trend-up * {
-    color: #a8c0d8 !important; /* Cool Steel Blue */
+    color: #a8c0d8 !important;
 }
 
 .pressure-trend-down,
 .pressure-trend-down * {
-    color: #6f8fa8 !important; /* Stormy Blue Grey */
+    color: #6f8fa8 !important;
 }
 
 .pressure-trend-stable,
 .pressure-trend-stable * {
-    color: #8ea3b5 !important; /* Soft Slate Blue */
+    color: #8ea3b5 !important;
 }
 
-/* Main container for core numerical readouts */
+/* =========================================================
+   MAIN METRIC VALUES
+========================================================= */
 .metric-content {
     display: flex;
     flex-direction: column;
     align-items: center;
+
     gap: 8px;
+
     text-align: center;
     width: 100%;
 }
 
 .main-value {
-
     font-size: clamp(1.35rem, 4vw + 0.55rem, 2.5rem);
 
     display: flex;
@@ -285,44 +339,60 @@ body::before {
     justify-content: center;
 
     color: #ffffff;
+
     font-weight: 700;
     line-height: 1.1;
 
     margin-bottom: 4px;
 
-    /* Prevents oversized values from wrapping awkwardly */
     white-space: nowrap;
 }
 
-/* Styles for left side header texts */
+.main-value .unit {
+    font-size: 0.52em;
+    font-weight: 600;
+}
+
+/* =========================================================
+   TOP HEADER TEXT
+========================================================= */
 #date {
     font-size: 1.1rem;
-    color: #a5c2eb;
+    color: #c3d7f3;
 }
 
 #fullDay {
     font-size: 1.5rem;
     font-weight: bold;
+
     color: #ffffff;
 }
 
-/* Styles for right side real-time engine clock */
 #realTime {
     font-size: 2rem;
     font-weight: 750;
+
     color: #38bdf8;
+
     text-align: right;
 }
 
-/* Fallback styles for interface error tracking block */
+/* =========================================================
+   ERROR STATES
+========================================================= */
 .error-msg {
     width: 100%;
+
     margin-top: 15px;
+
     text-align: center;
+
     color: #f87171;
 }
 
-/* Extreme temperature trackers colored explicitly by weather conditions */
+/* =========================================================
+   TEMPERATURE EXTREMES
+========================================================= */
 #min-temp {
     color: #7dd3fc;
     font-weight: 600;
@@ -333,68 +403,83 @@ body::before {
     font-weight: 600;
 }
 
-.main-value .unit {
-    font-size: 0.52em;
-    font-weight: 600;
-}
-
 .unit {
-    color: #94b3e0;
+    color: #b4c9e8;
     font-weight: 600;
 }
 
-/* Extremes range alignment grid */
 .extremes-side {
     display: flex;
-    gap: 10px; /* Tighter gap for mobile safety */
+
+    gap: 10px;
+
     border-left: none;
     padding-left: 0;
 
-    /* FIX: Dynamically scales from a readable 11px on tiny phones up to 14.4px on desktop */
     font-size: clamp(0.7rem, 2.5vw, 0.9rem);
 
     justify-content: center;
+
     width: 100%;
 }
 
 .extreme-item {
     white-space: nowrap;
+
     display: inline-flex;
     align-items: baseline;
 }
 
 .extreme-item .label {
     font-weight: 600;
-    /* FIX: Scales perfectly in tandem with the values */
+
     font-size: clamp(0.7rem, 2.5vw, 0.95rem);
-    color: #7fa4d6;
+
+    color: #9fc2f5;
+
     margin-right: 4px;
 }
 
-/* Ensure the absolute units within min/max don't scale awkwardly */
 .extreme-item .unit {
     font-size: 0.85em;
     margin-left: 1px;
 }
 
-/* --- PANEL SECTION HEADERS: Technical Telemetry Design --- */
+/* =========================================================
+   PANEL HEADERS
+========================================================= */
 h3 {
     margin-top: 0;
+
     color: #38bdf8;
+
     font-weight: 700;
     font-size: 0.85rem;
+
     text-transform: uppercase;
     letter-spacing: 0.75px;
-    border-bottom: 1px solid rgba(140, 190, 255, 0.15);
+
+    border-bottom: 1px solid rgba(180, 220, 255, 0.22);
+
     padding-bottom: 10px;
 }
 
-/* Dedicated Block Component Sizing Profiles */
-.pressure_block { width: 300px; }
-.temperature_block { width: 500px; }
-.system_health_block { width: 820px; max-width: 100%; }
+/* =========================================================
+   BLOCK SIZING
+========================================================= */
+.pressure_block {
+    width: 300px;
+}
 
-/* Proportional spacing values for primary layout rows */
+.temperature_block {
+    width: 500px;
+}
+
+.system_health_block {
+    width: 820px;
+    max-width: 100%;
+}
+
 .temperature_block,
 .pressure_block {
     flex: 1 1 0;
@@ -405,140 +490,181 @@ h3 {
     flex: 1.3 1 0;
 }
 
-/* System Health Data Matrix */
+/* =========================================================
+   HEALTH GRID
+========================================================= */
 .health-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
+
     gap: 15px;
 }
 
-.temperature { font-size: 1.2rem; font-weight: bold; }
-.pressure { font-size: 2rem; }
+.temperature {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.pressure {
+    font-size: 2rem;
+}
 
 .health-item label {
     display: block;
+
     font-size: 0.8rem;
     font-weight: bold;
-    color: #7fa4d6;
+
+    color: #9fc2f5;
 }
 
 .health-item span {
     font-size: 1.2rem;
     font-weight: bold;
+
     color: #ffffff;
 }
 
-/* --- OPERATIONAL HEALTH NOTIFICATIONS --- */
+/* =========================================================
+   STATUS COLORS
+========================================================= */
 .status-live {
     color: #4ade80;
     text-shadow: none;
 }
 
+/* =========================================================
+   LOGIN
+========================================================= */
 .login-wrapper {
     width: 100%;
     min-height: 100vh;
+
     display: flex;
     align-items: center;
     justify-content: center;
+
     padding: 16px;
+
     box-sizing: border-box;
-    /* Prevent accidental bounce scrolling on mobile pull-down */
+
     overscroll-behavior: none;
 }
 
-/* Card */
 .login-card {
     width: 100%;
-    /* 380px can sometimes feel slightly tight on small phones like the iPhone SE.
-       400px allows a bit more horizontal balance on slightly wider modern phones. */
     max-width: 400px;
-    padding: 24px 20px; /* Enhanced internal padding for a more premium look */
+
+    padding: 24px 20px;
+
     box-sizing: border-box;
 }
 
-/* Form */
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 16px; /* Slightly widened gap for better thumb separation */
+
+    gap: 16px;
+
     margin-top: 16px;
 }
 
-/* Inputs */
 .login-form input {
     width: 100%;
     box-sizing: border-box;
-    padding: 14px 16px; /* Enhanced height matching the 44px mobile touch target standard */
+
+    padding: 14px 16px;
+
     border-radius: 8px;
+
     border: 1px solid rgba(140, 190, 255, 0.4);
+
     background: rgba(30, 58, 138, 0.7);
+
     color: #ffffff;
+
     font-size: 16px;
     font-family: inherit;
-    /* Removes native iOS inner shadows and default safari styling override issues */
+
     -webkit-appearance: none;
     appearance: none;
 }
 
-/* Clear Focus State for accessibility and mobile navigation interaction */
 .login-form input:focus {
     outline: none;
+
     border-color: rgba(140, 190, 255, 0.9);
+
     box-shadow: 0 0 0 3px rgba(140, 190, 255, 0.15);
 }
 
-/* Button */
 .login-form button {
     width: 100%;
-    padding: 14px; /* Perfectly balances the height of the input fields */
+
+    padding: 14px;
+
     border-radius: 8px;
+
     font-size: 16px;
     font-weight: 600;
+
     border: none;
+
     cursor: pointer;
-    /* Eliminates delayed tap response execution lag on mobile browser taps */
+
     touch-action: manipulation;
-    transition: background-color 0.2s ease, opacity 0.2s ease;
+
+    transition:
+        background-color 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.08s ease,
+        opacity 0.08s ease;
+
+    -webkit-tap-highlight-color: transparent;
+
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-/* Mobile Pressed/Active State Feedback */
 .login-form button:active {
-    transform: scale(0.98); /* Instant physical press feedback under a user's thumb */
+    transform: scale(0.98);
     opacity: 0.9;
 }
 
-/* --- RESPONSIVE LAYOUT MATRIX WRAPPERS --- */
-
-/* Tablet & Smaller Desktop Reflow Boundaries */
+/* =========================================================
+   RESPONSIVE
+========================================================= */
 @media (max-width: 850px) {
-    .pressure_block, .temperature_block, .system_health_block {
+    .pressure_block,
+    .temperature_block,
+    .system_health_block {
         width: 100%;
     }
-        .chart_block canvas,
+
+    .chart_block canvas,
     .chart_block .chart-container {
         height: 200px;
     }
 }
 
-/* Desktop Expansion Reflow Grids */
 @media (min-width: 600px) {
     .health-grid {
         grid-template-columns: repeat(4, 1fr);
     }
 }
 
-/* Mobile Small Form Factor Overrides */
 @media (max-width: 480px) {
-    /* FIXED: Cleaned up structural conflicts that forced alignment shift breaking layouts on mobile screens */
     .metric-content {
         display: flex;
         flex-direction: column;
         align-items: center;
+
         text-align: center;
     }
-        .chart_block canvas,
+
+    .chart_block canvas,
     .chart_block .chart-container {
-         height: 140px;
+        height: 140px;
     }
 
     .chart_block {
@@ -555,3 +681,16 @@ h3 {
         text-align: center;
     }
 }
+
+/* Ultra small phones */
+@media (max-width: 380px) {
+    .main-value {
+        font-size: 1.2rem;
+    }
+
+    .chart_block h3 {
+        font-size: 0.72rem;
+        letter-spacing: 0.5px;
+    }
+}
+

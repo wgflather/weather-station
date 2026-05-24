@@ -295,6 +295,7 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                         bodyColor: '#e2e8f0',
                         titleFont: { size: 12, weight: '600' },
                         bodyFont: { size: 14, weight: '700' },
+                        events: ['mousemove', 'mouseout', 'touchstart', 'touchmove', 'touchend'],
                         callbacks: {
                             title: (items) => {
                                 if (!items.length) return '';
@@ -305,6 +306,10 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                                 return ` ${context.parsed.y.toFixed(1)}${tooltipSuffix}`;
                             }
                         }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false
                     },
                     /* --- INJECT FLAGS TO CANVAS HOOKS --- */
                     minMaxLabels: {

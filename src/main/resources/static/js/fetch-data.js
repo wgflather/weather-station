@@ -182,6 +182,11 @@ function initEventListeners() {
             // Data exists! Instantly swap the UI canvas with our cache data.
             // No network calls made, background scheduler keeps handling updates.
             renderWeatherChart(activeData, selectedMetric);
+
+            chart.canvas.addEventListener('touchend', () => {
+                chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                chart.update();
+            });
         }
     });
 }
