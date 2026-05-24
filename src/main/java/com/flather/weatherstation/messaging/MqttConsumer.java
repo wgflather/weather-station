@@ -2,6 +2,7 @@ package com.flather.weatherstation.messaging;
 
 import com.flather.weatherstation.config.MqttProperties;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.exception.DataQualityFailureException;
 import com.flather.weatherstation.service.WeatherService;
 import java.util.HashSet;
@@ -66,9 +67,7 @@ public class MqttConsumer {
     }
 
     String hostUri =
-            properties.getProtocol() + "://" +
-            properties.getHost() + ":" +
-            properties.getPort();
+        properties.getProtocol() + "://" + properties.getHost() + ":" + properties.getPort();
 
     client = new MqttClient(hostUri, properties.getClientId(), new MemoryPersistence());
 
@@ -121,9 +120,9 @@ public class MqttConsumer {
       WeatherRecordCreatedDto dto =
           mapper.readValue(message.getPayload(), WeatherRecordCreatedDto.class);
 
-      service.saveWeatherRecord(dto);
+      WeatherRecordResponseDto savedDto = service.saveWeatherRecord(dto);
 
-      log.info("Saved record from [{}]: {}", normalizedTopic, dto);
+      log.info("Saved record from [{}]: {}", normalizedTopic, savedDto);
 
     } catch (DataQualityFailureException e) {
       log.warn("Rejected record: {}", e.getMessage());
@@ -166,7 +165,7 @@ public class MqttConsumer {
     options.setConnectionTimeout(30);
     options.setKeepAliveInterval(60);
 
-    if("ssl".equals(properties.getProtocol())){
+    if ("ssl".equals(properties.getProtocol())) {
       options.setSocketFactory(SSLSocketFactory.getDefault());
       options.setUserName(properties.getUsername());
       options.setPassword(properties.getPassword().toCharArray());

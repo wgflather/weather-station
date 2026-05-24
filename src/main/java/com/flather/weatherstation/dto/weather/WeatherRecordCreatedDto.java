@@ -1,6 +1,5 @@
 package com.flather.weatherstation.dto.weather;
 
-import java.time.Instant;
 import lombok.*;
 
 @RequiredArgsConstructor
@@ -10,9 +9,9 @@ import lombok.*;
 @ToString
 public class WeatherRecordCreatedDto {
 
+  private String deviceId;
+
   private double temperature;
 
   private double pressure;
-
-  private Instant measuredAt;
 }

@@ -1,1 +1,0 @@
-CREATE INDEX idx_measured_at ON weather_records(measured_at);

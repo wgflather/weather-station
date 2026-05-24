@@ -20,6 +20,10 @@ public class WeatherRecord {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  @Column(name = "device_id")
+  @NotNull
+  private String deviceId;
+
   private Double temperature;
 
   private Double pressure;
@@ -28,11 +32,7 @@ public class WeatherRecord {
   @Enumerated(EnumType.STRING)
   private DataQuality dataQuality;
 
-  @NotNull
+  @CreationTimestamp
   @Column(name = "measured_at")
   private Instant measuredAt;
-
-  @CreationTimestamp
-  @Column(name = "saved_at")
-  private Instant savedAt;
 }
