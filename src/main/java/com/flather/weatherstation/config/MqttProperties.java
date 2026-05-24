@@ -13,6 +13,7 @@ public class MqttProperties {
   private String host;
   private String port;
   private String clientId;
+  private String protocol;
   private String username;
   private String password;
 }

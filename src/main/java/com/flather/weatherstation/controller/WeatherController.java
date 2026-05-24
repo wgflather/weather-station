@@ -2,12 +2,10 @@ package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
-import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.service.AnalyticsService;
 import com.flather.weatherstation.service.DashboardService;
 import com.flather.weatherstation.service.WeatherService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +38,6 @@ public class WeatherController {
   public ResponseEntity<ChartDto> getChart(
       @RequestParam(value = "metric", defaultValue = "temperature") String metric,
       @RequestParam(required = false, value = "since") String since) {
-      return ResponseEntity.ok(analyticsService.returnChart(metric, since));
+    return ResponseEntity.ok(analyticsService.returnChart(metric, since));
   }
 }

@@ -64,7 +64,12 @@ public class MqttConsumer {
       log.debug("MQTT already connected");
       return;
     }
-    String hostUri = "ssl://" + properties.getHost() + ":" + properties.getPort();
+
+    String hostUri =
+            properties.getProtocol() + "://" +
+            properties.getHost() + ":" +
+            properties.getPort();
+
     client = new MqttClient(hostUri, properties.getClientId(), new MemoryPersistence());
 
     client.setCallback(buildCallback());
@@ -155,13 +160,18 @@ public class MqttConsumer {
 
   private MqttConnectOptions buildOptions() {
     MqttConnectOptions options = new MqttConnectOptions();
-    options.setUserName(properties.getUsername());
-    options.setPassword(properties.getPassword().toCharArray());
+
     options.setAutomaticReconnect(true);
     options.setCleanSession(false);
     options.setConnectionTimeout(30);
     options.setKeepAliveInterval(60);
-    options.setSocketFactory(SSLSocketFactory.getDefault());
+
+    if("ssl".equals(properties.getProtocol())){
+      options.setSocketFactory(SSLSocketFactory.getDefault());
+      options.setUserName(properties.getUsername());
+      options.setPassword(properties.getPassword().toCharArray());
+    }
+
     return options;
   }
 

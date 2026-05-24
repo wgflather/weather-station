@@ -30,8 +30,7 @@ public class WeatherService {
 
     boolean isAnomaly = qualityValidator.detectDataAnomaly(weatherRecordDto);
 
-    boolean isSpike =
-        qualityValidator.detectDataSpike(weatherRecordDto, repository.findMedian());
+    boolean isSpike = qualityValidator.detectDataSpike(weatherRecordDto, repository.findMedian());
 
     DataQuality quality = qualityValidator.determineDataQualityStatus(isAnomaly, isSpike);
 
