@@ -9,15 +9,13 @@ function getDynamicYBounds(points) {
     }
 
     const values = points.map(p => p.y);
+
     return {
         suggestedMin: Math.min(...values) - 1,
         suggestedMax: Math.max(...values) + 1
     };
 }
 
-/* =========================================================
-   FIND MIN/MAX POINTS
-========================================================= */
 /* =========================================================
    FIND MIN/MAX POINTS WITH DISTANCE PROTECTION
 ========================================================= */
@@ -34,57 +32,108 @@ function getMinMaxPoints(points) {
         if (point.y > points[maxIndex].y) maxIndex = index;
     });
 
-    // Calculate proximity thresholds
     const indexDistance = Math.abs(maxIndex - minIndex);
     const valueDelta = Math.abs(points[maxIndex].y - points[minIndex].y);
 
-    // Conflict condition: They are neighboring elements OR values are practically identical
     const isTooClose = indexDistance <= 1 || valueDelta < 0.2;
 
     return { minIndex, maxIndex, isTooClose };
 }
 
 /* =========================================================
-   MIN / MAX LABEL CANVAS PLUGIN
-========================================================= */
-/* =========================================================
-   MIN / MAX LABEL CANVAS PLUGIN (COLLISION PROOF)
+   MIN / MAX / NOW LABELS PLUGIN
 ========================================================= */
 const minMaxLabelsPlugin = {
     id: 'minMaxLabels',
+
     afterDatasetsDraw(chart, args, pluginOptions) {
         const { ctx } = chart;
         const meta = chart.getDatasetMeta(0);
 
         if (!meta.data || !meta.data.length) return;
 
-        const { minIndex, maxIndex, isTooClose, isTemp } = pluginOptions;
+        const {
+            minIndex,
+            maxIndex,
+            isTooClose,
+            isTemp,
+            latestIndex
+        } = pluginOptions;
 
-        // Skip rendering entirely if the indices are broken or point to the same index
-        if (minIndex === -1 || maxIndex === -1 || minIndex === maxIndex) return;
+        if (
+            minIndex === -1 ||
+            maxIndex === -1 ||
+            minIndex === maxIndex
+        ) {
+            return;
+        }
 
         const maxPoint = meta.data[maxIndex];
         const minPoint = meta.data[minIndex];
+        const latestPoint = meta.data[latestIndex];
 
         ctx.save();
-        ctx.font = '700 11px Nunito'; // Boosted weight for readability
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';  // Makes vertical offsets easier to manage cleanly
 
-        /* --- HIGH LABEL ('H') --- */
+        ctx.font = '700 11px Nunito';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        /* =================================================
+           HIGH LABEL
+        ================================================= */
         if (maxPoint) {
             ctx.fillStyle = isTemp ? '#ffb199' : '#bae6fd';
-            // Always keep high label above the data point node line
-            ctx.fillText('H', maxPoint.x, maxPoint.y - 14);
+
+            let yOffset = -14;
+
+            // Prevent collision with NOW label
+            if (latestIndex === maxIndex) {
+                yOffset = -14;
+            }
+
+            ctx.fillText('H', maxPoint.x, maxPoint.y + yOffset);
         }
 
-        /* --- LOW LABEL ('L') --- */
+        /* =================================================
+           LOW LABEL
+        ================================================= */
         if (minPoint) {
             ctx.fillStyle = isTemp ? '#7dd3fc' : '#38bdf8';
 
-            // FIX: If points are overlapping or close, push 'L' below the line
-            const yOffset = isTooClose ? 16 : -14;
+            let yOffset = isTooClose ? 16 : -14;
+
+            // Prevent collision with NOW label
+            if (latestIndex === minIndex) {
+                yOffset = 18;
+            }
+
             ctx.fillText('L', minPoint.x, minPoint.y + yOffset);
+        }
+
+        /* =================================================
+           NOW LABEL
+        ================================================= */
+        if (latestPoint) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 10px Nunito';
+
+            let nowOffset = -28;
+
+            // Stack above H
+            if (latestIndex === maxIndex) {
+                nowOffset = -42;
+            }
+
+            // Stack around L
+            if (latestIndex === minIndex) {
+                nowOffset = isTooClose ? 34 : -28;
+            }
+
+            ctx.fillText(
+                'Now',
+                latestPoint.x,
+                latestPoint.y + nowOffset
+            );
         }
 
         ctx.restore();
@@ -99,10 +148,14 @@ Chart.register(minMaxLabelsPlugin);
 /* =========================================================
    MAIN CHART RENDER ENGINE
 ========================================================= */
-export function renderWeatherChart(backendData, metric = 'temperature') {
+export function renderWeatherChart(
+    backendData,
+    metric = 'temperature'
+) {
     try {
+
         /* =================================================
-           MAP RAW DATA FROM DB
+           MAP RAW DATA
         ================================================= */
         const chartPoints = (backendData || []).map(item => ({
             x: new Date(item.hour),
@@ -110,101 +163,162 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
         }));
 
         /* =================================================
-           CALCULATE DYNAMIC TIMELINE RANGE (X-AXIS)
+           FIXED DAY RANGE (00:00 → 23:59)
         ================================================= */
-        let startRange = new Date();
-        let endRange = new Date();
-        endRange.setHours(endRange.getHours() + 3); // Default 4 hour buffer
+        const today = new Date();
 
-        if (chartPoints.length > 0) {
-            // Anchor start exactly to the first data point
-            startRange = new Date(chartPoints[0].x);
+        const startRange = new Date(today);
+        startRange.setHours(0, 0, 0, 0);
 
-            // Anchor end to the last data point + 4 hours spare space buffer
-            const lastDataPointTime = new Date(chartPoints[chartPoints.length - 1].x);
-            endRange = new Date(lastDataPointTime);
-            endRange.setHours(endRange.getHours() + 2);
-            startRange.setMinutes(startRange.getMinutes() - 2);
-        }
+        const endRange = new Date(today);
+        endRange.setHours(23, 59, 59, 999);
 
         /* =================================================
-           CALCULATE BOUNDS AND DATA EXTREMES (Y-AXIS / LABELS)
+           BOUNDS + EXTREMES
         ================================================= */
         const yBounds = getDynamicYBounds(chartPoints);
-        const { minIndex, maxIndex, isTooClose } = getMinMaxPoints(chartPoints);
+
+        const {
+            minIndex,
+            maxIndex,
+            isTooClose
+        } = getMinMaxPoints(chartPoints);
 
         /* =================================================
-           CONTEXTUAL CONFIGURATION DRIVER
+           CONTEXT DRIVER
         ================================================= */
         const isTemp = metric === 'temperature';
-        
-        // Metadata Strings
-        const datasetLabel = isTemp ? 'Temperature' : 'Pressure';
-        const tooltipSuffix = isTemp ? '°C' : ' hPa';
-        const yAxisAxisSuffix = isTemp ? '°' : '';
 
-        // Color Palettes
-        const lineStrokeColor = isTemp ? '#ff8a65' : '#7dd3fc';
-        const shadowGlowColor = isTemp ? 'rgba(255, 140, 100, 0.30)' : 'rgba(125, 211, 252, 0.30)';
-        const maxCircleNode = isTemp ? '#ffb199' : '#bae6fd';
-        const minCircleNode = isTemp ? '#7dd3fc' : '#38bdf8';
-        const innerBorderNode = isTemp ? '#ffe5dc' : '#dff4ff';
+        const datasetLabel = isTemp
+            ? 'Temperature'
+            : 'Pressure';
+
+        const tooltipSuffix = isTemp
+            ? '°C'
+            : ' hPa';
+
+        const yAxisSuffix = isTemp
+            ? '°'
+            : '';
 
         /* =================================================
-           LIFECYCLE FIX: DESTROY PREVIOUS ENGINE CONTEXT
+           COLOR PALETTE
+        ================================================= */
+        const lineStrokeColor = isTemp
+            ? '#ff8a65'
+            : '#7dd3fc';
+
+        const shadowGlowColor = isTemp
+            ? 'rgba(255, 140, 100, 0.30)'
+            : 'rgba(125, 211, 252, 0.30)';
+
+        const maxCircleNode = isTemp
+            ? '#ffb199'
+            : '#bae6fd';
+
+        const minCircleNode = isTemp
+            ? '#7dd3fc'
+            : '#38bdf8';
+
+        const innerBorderNode = isTemp
+            ? '#ffe5dc'
+            : '#dff4ff';
+
+        /* =================================================
+           DESTROY PREVIOUS INSTANCE
         ================================================= */
         if (weatherChartInstance !== null) {
             weatherChartInstance.destroy();
         }
 
         const canvasElement = document.getElementById('weatherChart');
+
         if (!canvasElement) {
-            console.error("Target canvas with ID 'weatherChart' not found in DOM.");
+            console.error(
+                "Canvas with ID 'weatherChart' not found."
+            );
             return;
         }
+
         const ctx = canvasElement.getContext('2d');
 
         /* =================================================
-           AREA BACKGROUND GRADIENT CREATION
+           AREA GRADIENT
         ================================================= */
-        const gradientFill = ctx.createLinearGradient(0, 0, 0, 350);
+        const gradientFill = ctx.createLinearGradient(
+            0,
+            0,
+            0,
+            350
+        );
+
         if (isTemp) {
-            gradientFill.addColorStop(0, 'rgba(255, 138, 101, 0.30)');
-            gradientFill.addColorStop(0.45, 'rgba(255, 138, 101, 0.08)');
+            gradientFill.addColorStop(
+                0,
+                'rgba(255, 138, 101, 0.30)'
+            );
+
+            gradientFill.addColorStop(
+                0.45,
+                'rgba(255, 138, 101, 0.08)'
+            );
         } else {
-            gradientFill.addColorStop(0, 'rgba(125, 211, 252, 0.25)');
-            gradientFill.addColorStop(0.45, 'rgba(125, 211, 252, 0.06)');
+            gradientFill.addColorStop(
+                0,
+                'rgba(125, 211, 252, 0.25)'
+            );
+
+            gradientFill.addColorStop(
+                0.45,
+                'rgba(125, 211, 252, 0.06)'
+            );
         }
-        gradientFill.addColorStop(1, 'rgba(255, 255, 255, 0.00)');
+
+        gradientFill.addColorStop(
+            1,
+            'rgba(255,255,255,0)'
+        );
 
         /* =================================================
-           INITIALIZE INSTANCE CONTEXT
+           CREATE CHART
         ================================================= */
         weatherChartInstance = new Chart(ctx, {
             type: 'line',
+
             data: {
                 datasets: [{
                     label: datasetLabel,
                     data: chartPoints,
+
                     borderColor: lineStrokeColor,
                     backgroundColor: gradientFill,
+
                     fill: true,
+
                     tension: 0.53,
+                    cubicInterpolationMode: 'monotone',
+
                     borderWidth: 2.8,
+
                     borderCapStyle: 'round',
                     borderJoinStyle: 'round',
 
-                    /* --- POINT MATRIX CONFIGURATION --- */
+                    /* =========================================
+                       POINTS
+                    ========================================= */
                     pointRadius: (context) => {
                         const index = context.dataIndex;
                         const lastIndex = chartPoints.length - 1;
 
-                        if (index === lastIndex) return 6; // Current reading node
+                        if (index === lastIndex) return 6;
                         if (index === maxIndex) return 3.5;
                         if (index === minIndex) return 3.5;
+
                         return 0;
                     },
+
                     pointHoverRadius: 6,
+
                     pointBackgroundColor: (context) => {
                         const index = context.dataIndex;
                         const lastIndex = chartPoints.length - 1;
@@ -212,29 +326,49 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                         if (index === lastIndex) return '#ffffff';
                         if (index === maxIndex) return maxCircleNode;
                         if (index === minIndex) return minCircleNode;
+
                         return lineStrokeColor;
                     },
+
                     pointBorderColor: (context) => {
                         const index = context.dataIndex;
                         const lastIndex = chartPoints.length - 1;
 
-                        if (index === lastIndex) return lineStrokeColor;
-                        if (index === maxIndex) return innerBorderNode;
-                        if (index === minIndex) return innerBorderNode;
+                        if (index === lastIndex) {
+                            return lineStrokeColor;
+                        }
+
+                        if (index === maxIndex) {
+                            return innerBorderNode;
+                        }
+
+                        if (index === minIndex) {
+                            return innerBorderNode;
+                        }
+
                         return '#ffd0c2';
                     },
+
                     pointBorderWidth: (context) => {
-                        return (context.dataIndex === chartPoints.length - 1) ? 3 : 2;
+                        return (
+                            context.dataIndex ===
+                            chartPoints.length - 1
+                        )
+                            ? 3
+                            : 2;
                     }
                 }]
             },
+
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+
                 interaction: {
                     intersect: false,
                     mode: 'index'
                 },
+
                 animations: {
                     tension: {
                         duration: 1200,
@@ -243,100 +377,263 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                         to: 0.42
                     }
                 },
+
                 scales: {
-                    /* --- X AXIS DIMENSIONS --- */
+
+                    /* =========================================
+                       X AXIS
+                    ========================================= */
                     x: {
                         type: 'time',
+
                         time: {
                             unit: 'hour',
-                            displayFormats: { hour: 'H' },
+                            displayFormats: {
+                                hour: 'H'
+                            },
                             tooltipFormat: 'HH:mm'
                         },
+
                         min: startRange,
                         max: endRange,
+
                         ticks: {
                             autoSkip: true,
                             maxTicksLimit: 8,
+
                             color: '#94a3b8',
-                            font: { size: 11 }
+
+                            font: {
+                                size: 11
+                            }
                         },
+
                         grid: {
                             color: 'rgba(255,255,255,0.045)',
                             drawBorder: false
                         },
-                        border: { display: false }
+
+                        border: {
+                            display: false
+                        }
                     },
-                    /* --- Y AXIS DIMENSIONS --- */
+
+                    /* =========================================
+                       Y AXIS
+                    ========================================= */
                     y: {
                         suggestedMin: yBounds.suggestedMin,
                         suggestedMax: yBounds.suggestedMax,
+
                         ticks: {
-                            stepSize: isTemp ? 1 : 4, 
-                            callback: (val) => `${val}${yAxisAxisSuffix}`,
+                            stepSize: isTemp ? 1 : 4,
+
+                            callback: (val) =>
+                                `${val}${yAxisSuffix}`,
+
                             color: '#94a3b8',
-                            font: { size: 11 }
+
+                            font: {
+                                size: 11
+                            }
                         },
+
                         grid: {
                             color: 'rgba(255,255,255,0.045)',
                             drawBorder: false
                         },
-                        border: { display: false }
+
+                        border: {
+                            display: false
+                        }
                     }
                 },
+
                 plugins: {
-                    legend: { display: false },
+
+                    legend: {
+                        display: false
+                    },
+
                     tooltip: {
-                        backgroundColor: 'rgba(12, 20, 42, 0.94)',
-                        borderColor: 'rgba(255,255,255,0.10)',
+                        backgroundColor:
+                            'rgba(12, 20, 42, 0.94)',
+
+                        borderColor:
+                            'rgba(255,255,255,0.10)',
+
                         borderWidth: 1,
+
                         padding: 12,
+
                         displayColors: false,
+
                         titleColor: '#ffffff',
                         bodyColor: '#e2e8f0',
-                        titleFont: { size: 12, weight: '600' },
-                        bodyFont: { size: 14, weight: '700' },
-                        events: ['mousemove', 'mouseout', 'touchstart', 'touchmove', 'touchend'],
+
+                        titleFont: {
+                            size: 12,
+                            weight: '600'
+                        },
+
+                        bodyFont: {
+                            size: 14,
+                            weight: '700'
+                        },
+
                         callbacks: {
+
                             title: (items) => {
                                 if (!items.length) return '';
-                                const date = new Date(items[0].parsed.x);
-                                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                                const date = new Date(
+                                    items[0].parsed.x
+                                );
+
+                                return date.toLocaleTimeString(
+                                    [],
+                                    {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    }
+                                );
                             },
+
                             label: (context) => {
                                 return ` ${context.parsed.y.toFixed(1)}${tooltipSuffix}`;
                             }
                         }
                     },
-                    interaction: {
-                        mode: 'nearest',
-                        intersect: false
-                    },
-                    /* --- INJECT FLAGS TO CANVAS HOOKS --- */
+
                     minMaxLabels: {
                         minIndex,
                         maxIndex,
                         isTooClose,
-                        isTemp
+                        isTemp,
+                        latestIndex:
+                            chartPoints.length - 1
                     }
                 }
             },
-            plugins: [{
-                id: 'lineGlow',
-                beforeDatasetDraw(chart) {
-                    const { ctx } = chart;
-                    ctx.save();
-                    ctx.shadowColor = shadowGlowColor;
-                    ctx.shadowBlur = 12;
-                    ctx.shadowOffsetX = 0;
-                    ctx.shadowOffsetY = 0;
+
+            plugins: [
+
+                /* =============================================
+                   FUTURE AREA OVERLAY
+                ============================================= */
+                {
+                    id: 'futureAreaOverlay',
+
+                    beforeDatasetsDraw(chart) {
+
+                        if (!chartPoints.length) return;
+
+                        const {
+                            ctx,
+                            chartArea,
+                            scales
+                        } = chart;
+
+                        const latestPoint =
+                            chartPoints[
+                                chartPoints.length - 1
+                            ];
+
+                        const latestX =
+                            scales.x.getPixelForValue(
+                                latestPoint.x
+                            );
+
+                        ctx.save();
+
+                        /* =====================================
+                           GREY FUTURE REGION
+                        ===================================== */
+                        ctx.fillStyle =
+                            'rgba(255,255,255,0.045)';
+
+                        ctx.fillRect(
+                            latestX,
+                            chartArea.top,
+                            chartArea.right - latestX,
+                            chartArea.bottom - chartArea.top
+                        );
+
+                        /* =====================================
+                           NOW DIVIDER
+                        ===================================== */
+                        ctx.beginPath();
+
+                        ctx.moveTo(
+                            latestX,
+                            chartArea.top
+                        );
+
+                        ctx.lineTo(
+                            latestX,
+                            chartArea.bottom
+                        );
+
+                        ctx.strokeStyle =
+                            'rgba(255,255,255,0.10)';
+
+                        ctx.lineWidth = 1;
+
+                        ctx.setLineDash([4, 4]);
+
+                        ctx.stroke();
+
+                        /* =====================================
+                           NOW LABEL
+                        ===================================== */
+                        ctx.fillStyle =
+                            'rgba(255,255,255,0.45)';
+
+                        ctx.font =
+                            '600 10px Nunito';
+
+                        ctx.fillText(
+                            'NOW',
+                            latestX + 8,
+                            chartArea.top + 14
+                        );
+
+                        ctx.restore();
+                    }
                 },
-                afterDatasetDraw(chart) {
-                    chart.ctx.restore();
+
+                /* =============================================
+                   LINE GLOW
+                ============================================= */
+                {
+                    id: 'lineGlow',
+
+                    beforeDatasetDraw(chart) {
+                        const { ctx } = chart;
+
+                        ctx.save();
+
+                        ctx.shadowColor =
+                            shadowGlowColor;
+
+                        ctx.shadowBlur = 12;
+
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 0;
+                    },
+
+                    afterDatasetDraw(chart) {
+                        chart.ctx.restore();
+                    }
                 }
-            }]
+            ]
         });
 
     } catch (error) {
-        console.error('Error rendering chart timeline state:', error);
+
+        console.error(
+            'Error rendering weather chart:',
+            error
+        );
     }
 }
