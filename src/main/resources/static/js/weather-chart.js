@@ -583,21 +583,6 @@ export function renderWeatherChart(
 
                         ctx.stroke();
 
-                        /* =====================================
-                           NOW LABEL
-                        ===================================== */
-                        ctx.fillStyle =
-                            'rgba(255,255,255,0.45)';
-
-                        ctx.font =
-                            '600 10px Nunito';
-
-                        ctx.fillText(
-                            'NOW',
-                            latestX + 8,
-                            chartArea.top + 14
-                        );
-
                         ctx.restore();
                     }
                 },
