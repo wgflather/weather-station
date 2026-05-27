@@ -5,6 +5,7 @@ import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.model.constant.TrendDirection;
+import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
 import java.util.*;
@@ -18,6 +19,10 @@ public class AnalyticsService {
   private final WeatherReportRepository repository;
   private final ZoneId zoneId;
 
+  private DateRangeHelper.DateRange today() {
+    return DateRangeHelper.getDateRange(zoneId);
+  }
+
   public AnalyticsService(
       WeatherReportRepository repository, TimezoneProperties timezoneProperties) {
     this.repository = repository;
@@ -25,7 +30,8 @@ public class AnalyticsService {
   }
 
   public long findTodayRecordsCount() {
-    return repository.findRecordsToday();
+    var range = today();
+    return repository.findRecordsBetween(range.startTime(), range.endTime());
   }
 
   public Optional<ZonedDateTime> findLastRecordTime() {
@@ -37,7 +43,9 @@ public class AnalyticsService {
   }
 
   public TemperatureDto getTemperature() {
-    return repository.getTemperature();
+    var range = today();
+
+    return repository.getTemperature(range.startTime(), range.endTime());
   }
 
   public PressureDto getPressure() {
@@ -45,11 +53,12 @@ public class AnalyticsService {
   }
 
   public List<HourlyChartAvgDto> getTemperatureChartData(Instant since) {
-    return dataPointToDto(repository.findTodayChartTemperature(since));
+    return dataPointToDto(repository.findChartTemperature(since));
   }
 
   public List<HourlyChartAvgDto> getPressureChartData(Instant since) {
-    return dataPointToDto(repository.findTodayChartPressure(since));
+    var range = today();
+    return dataPointToDto(repository.findChartPressure(since));
   }
 
   private List<HourlyChartAvgDto> dataPointToDto(List<DataPoint> dataPoints) {
