@@ -1,5 +1,6 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.dto.projection.MedianProjection;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
@@ -9,17 +10,9 @@ import com.flather.weatherstation.model.constant.DataQuality;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
 import java.util.Optional;
 import java.util.function.ToDoubleFunction;
-
-import jakarta.persistence.criteria.CriteriaBuilder;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.springframework.stereotype.Service;
@@ -33,15 +26,12 @@ public class WeatherService {
   private final DataQualityValidator qualityValidator;
   private final WeatherRecordMapper mapper;
   private final TimezoneProperties timezoneProperties;
+  private final SensorStateCache sensorStateCache;
 
-  private final Deque<WeatherRecordResponseDto> recentMeasurements = new ArrayDeque<>();
-
-  @Setter
-  @Getter
-  private volatile Instant lastSavedMeasurement;
-
-  private MedianProjection estimateMedian(){
-    if(recentMeasurements.isEmpty()){ return null; }
+  private MedianProjection estimateMedian() {
+    if (sensorStateCache.getSpikeReferenceWindow().isEmpty()) {
+      return null;
+    }
 
     Median median = new Median();
 
@@ -53,10 +43,7 @@ public class WeatherService {
 
   private double medianOf(ToDoubleFunction<WeatherRecordResponseDto> values, Median median) {
     return median.evaluate(
-            recentMeasurements.stream()
-                    .mapToDouble(values)
-                    .toArray()
-    );
+        sensorStateCache.getSpikeReferenceWindow().stream().mapToDouble(values).toArray());
   }
 
   @Transactional
@@ -66,30 +53,46 @@ public class WeatherService {
 
     boolean isAnomaly = qualityValidator.detectDataAnomaly(weatherRecordDto);
 
-    boolean isSpike = qualityValidator.detectDataSpike(weatherRecordDto, lastSavedMeasurement, estimateMedian());
+    MedianProjection medianProjection = estimateMedian();
+
+    boolean isSpike =
+        qualityValidator.detectDataSpike(
+            weatherRecordDto, sensorStateCache.getLastSavedMeasurementAt(), medianProjection);
 
     DataQuality quality = qualityValidator.determineDataQualityStatus(isAnomaly, isSpike);
+
+    int consecutiveSpikes = sensorStateCache.getConsecutiveSpikes();
+
+    if (quality == DataQuality.SPIKE) {
+
+      consecutiveSpikes++;
+      sensorStateCache.setConsecutiveSpikes(consecutiveSpikes);
+
+      if (consecutiveSpikes >= SensorStateCache.SPIKE_REFERENCE_SIZE) {
+
+        // sustained change → accept as new reality
+        quality = DataQuality.OK;
+      }
+    } else {
+      sensorStateCache.setConsecutiveSpikes(0);
+    }
 
     record.setDataQuality(quality);
 
     WeatherRecordResponseDto savedRecord = mapper.weatherEntityToDto(repository.save(record));
 
-      if(quality == DataQuality.OK){
-        recentMeasurements.addLast(savedRecord);
+    if (quality == DataQuality.OK) {
 
-        Instant cutoff = savedRecord.getMeasuredAtTimeZoned().toInstant().minus(1, ChronoUnit.HOURS);
+      if (consecutiveSpikes >= SensorStateCache.SPIKE_REFERENCE_SIZE) {
 
-        while (!recentMeasurements.isEmpty()
-                && recentMeasurements.peekFirst()
-                .getMeasuredAtTimeZoned().toInstant()
-                .isBefore(cutoff)) {
-
-          recentMeasurements.removeFirst();
-        }
-
+        // establish a fresh baseline around the new conditions
+        sensorStateCache.forceBaselineReset(savedRecord);
+        sensorStateCache.setConsecutiveSpikes(0);
       }
+      sensorStateCache.updateCachedMeasurements(savedRecord);
+    }
 
-    setLastSavedMeasurement(savedRecord.getMeasuredAtTimeZoned().toInstant());
+    sensorStateCache.setLastSavedMeasurementAt(savedRecord.getMeasuredAtTimeZoned().toInstant());
 
     return savedRecord;
   }
@@ -97,7 +100,7 @@ public class WeatherService {
   @Transactional(readOnly = true)
   public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord() {
 
-    ZoneId zoneId = ZoneId.of(timezoneProperties.getZoneId());
+    ZoneId zoneId = timezoneProperties.getZoneId();
 
     LocalDate currentDate = LocalDate.now(zoneId);
 

@@ -1,15 +1,19 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
+import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.model.constant.TrendDirection;
 import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
 import java.util.*;
+import java.util.function.ToDoubleFunction;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
+import org.apache.commons.math3.util.Precision;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,18 +21,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AnalyticsService {
   private final WeatherReportRepository repository;
-  private final WeatherService weatherService;
   private final ZoneId zoneId;
+  private final SensorStateCache sensorStateCache;
+
+  public AnalyticsService(
+      WeatherReportRepository repository,
+      TimezoneProperties timezoneProperties,
+      SensorStateCache sensorStateCache) {
+    this.repository = repository;
+    this.zoneId = timezoneProperties.getZoneId();
+    this.sensorStateCache = sensorStateCache;
+  }
 
   private DateRangeHelper.DateRange today() {
     return DateRangeHelper.getDateRange(zoneId);
-  }
-
-  public AnalyticsService(
-      WeatherReportRepository repository, TimezoneProperties timezoneProperties, WeatherService weatherService) {
-    this.repository = repository;
-    zoneId = ZoneId.of(timezoneProperties.getZoneId());
-    this.weatherService = weatherService;
   }
 
   public long findTodayRecordsCount() {
@@ -37,8 +43,8 @@ public class AnalyticsService {
   }
 
   public ZonedDateTime findLastRecordTime() {
-    if(weatherService.getLastSavedMeasurement() != null) {
-      return weatherService.getLastSavedMeasurement().atZone(zoneId);
+    if (sensorStateCache.getLastSavedMeasurementAt() != null) {
+      return sensorStateCache.getLastSavedMeasurementAt().atZone(zoneId);
     }
 
     return null;
@@ -48,14 +54,27 @@ public class AnalyticsService {
     return Duration.between(lastRecord, Instant.now().atZone(zoneId)).toMinutes();
   }
 
-  public TemperatureDto getTemperature() {
-    var range = today();
+  private double averageOfFiveLastReadings(ToDoubleFunction<WeatherRecordResponseDto> extractor) {
 
-    return repository.getTemperature(range.startTime(), range.endTime());
+    double avg =
+        sensorStateCache.getMetricsWindow().reversed().stream()
+            .limit(5)
+            .mapToDouble(extractor)
+            .average()
+            .orElseThrow(() -> new IllegalStateException("No readings available"));
+
+    return Precision.round(avg, 1);
+  }
+
+  public TemperatureDto getTemperature() {
+    return new TemperatureDto(
+        averageOfFiveLastReadings(WeatherRecordResponseDto::getTemperature),
+        sensorStateCache.getTodayMinTemp(),
+        sensorStateCache.getTodayMaxTemp());
   }
 
   public PressureDto getPressure() {
-    return repository.getPressure();
+    return new PressureDto(averageOfFiveLastReadings(WeatherRecordResponseDto::getPressure));
   }
 
   public List<HourlyChartAvgDto> getTemperatureChartData(Instant since) {

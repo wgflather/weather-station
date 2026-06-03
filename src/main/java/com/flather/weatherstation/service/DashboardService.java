@@ -5,7 +5,6 @@ import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
 import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
 import com.flather.weatherstation.model.constant.DataStatus;
 import java.time.ZonedDateTime;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

@@ -3,7 +3,7 @@ package com.flather.weatherstation.repository;
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
-import com.flather.weatherstation.dto.projection.MedianProjection;
+import com.flather.weatherstation.dto.projection.ExtremesProjection;
 import com.flather.weatherstation.model.entity.WeatherRecord;
 import java.time.Instant;
 import java.util.List;
@@ -72,6 +72,21 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
   @Query(
       value =
           """
+                      SELECT
+                          MIN(temperature) AS minTemp,
+                          MAX(temperature) AS maxTemp
+                      FROM weather_records
+                      WHERE data_quality = 'OK'
+                        AND measured_at >= :startTime
+                        AND measured_at < :endTime
+  """,
+      nativeQuery = true)
+  ExtremesProjection temperatureExtremes(
+      @Param("startTime") Instant startTime, @Param("endTime") Instant endTime);
+
+  @Query(
+      value =
+          """
                   SELECT
                       date_bin('5 minutes', measured_at, current_date) AS time,
                       ROUND(AVG(temperature)::numeric, 1)::double precision AS value
@@ -95,6 +110,8 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   """,
       nativeQuery = true)
   long findRecordsBetween(@Param("startTime") Instant startTime, @Param("endTime") Instant endTime);
+
+  List<WeatherRecord> findByMeasuredAtAfterOrderByMeasuredAtAsc(Instant after);
 
   @Query(
       value =
@@ -140,5 +157,4 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   """,
       nativeQuery = true)
   List<DataPoint> getLastHourPressure();
-
 }

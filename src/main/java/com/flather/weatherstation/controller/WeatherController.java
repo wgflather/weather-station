@@ -7,12 +7,11 @@ import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.service.AnalyticsService;
 import com.flather.weatherstation.service.DashboardService;
 import com.flather.weatherstation.service.WeatherService;
+import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.net.URI;
 
 @RestController
 @RequiredArgsConstructor
@@ -33,7 +32,8 @@ public class WeatherController {
   }
 
   @PostMapping(BASE_PATH)
-  public ResponseEntity<WeatherRecordResponseDto> createNewWeatherRecord(@RequestBody WeatherRecordCreatedDto dto){
+  public ResponseEntity<WeatherRecordResponseDto> createNewWeatherRecord(
+      @RequestBody WeatherRecordCreatedDto dto) {
     return ResponseEntity.created(URI.create("api/weather")).body(service.saveWeatherRecord(dto));
   }
 
