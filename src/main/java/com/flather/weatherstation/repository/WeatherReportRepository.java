@@ -87,16 +87,6 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
   @Query(
       value =
           """
-                  SELECT MAX(measured_at)
-                  FROM weather_records
-                  WHERE data_quality = 'OK'
-                  """,
-      nativeQuery = true)
-  Instant findMaxMeasuredAt();
-
-  @Query(
-      value =
-          """
                   SELECT COUNT(*)
                   FROM weather_records
                   WHERE data_quality = 'OK'
@@ -151,20 +141,4 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
       nativeQuery = true)
   List<DataPoint> getLastHourPressure();
 
-  @Query(
-          value =
-                  """
-                  WITH last_five AS (
-                      SELECT temperature, pressure
-                      FROM weather_records
-                      ORDER BY measured_at DESC
-                      LIMIT 5
-                  )
-                  SELECT
-                      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY temperature) AS median_temp,
-                      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pressure) AS median_pressure
-                  FROM last_five;
-                  """,
-          nativeQuery = true)
-  MedianProjection findMedian();
 }

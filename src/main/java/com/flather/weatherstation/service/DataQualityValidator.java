@@ -3,10 +3,15 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.config.WeatherValidationProperties;
 import com.flather.weatherstation.dto.projection.MedianProjection;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
+import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.model.constant.DataQuality;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
 
 @Slf4j
 @Service
@@ -14,6 +19,8 @@ import org.springframework.stereotype.Service;
 public class DataQualityValidator {
 
   private final WeatherValidationProperties properties;
+
+
 
   public boolean detectDataAnomaly(WeatherRecordCreatedDto anomalyDto) {
     boolean isAnomaly = false; // Anomaly represents unrealistic data connected to sensor failures
@@ -36,8 +43,14 @@ public class DataQualityValidator {
   }
 
   public boolean detectDataSpike(
-      WeatherRecordCreatedDto weatherRecordDto, MedianProjection median) {
-    if (median == null || median.pressure() == null || median.temp() == null) return false;
+          WeatherRecordCreatedDto weatherRecordDto, Instant lastSavedRecord, MedianProjection median) {
+
+    if (median == null || lastSavedRecord == null) return false;
+
+    long elapsed = Duration.between(lastSavedRecord, Instant.now()).toMinutes();
+
+    if(elapsed >= 10) return false;
+
     double newTemp = weatherRecordDto.getTemperature();
     double newPressure = weatherRecordDto.getPressure();
 

@@ -24,8 +24,8 @@ public class DashboardService {
   }
 
   public SystemHealthDashboardDto getSystemHealth() {
-    Optional<ZonedDateTime> lastUpdate = analyticsService.findLastRecordTime();
-    if (lastUpdate.isEmpty()) {
+    ZonedDateTime lastUpdate = analyticsService.findLastRecordTime();
+    if (lastUpdate == null) {
       return SystemHealthDashboardDto.builder()
           .status(DataStatus.EMPTY)
           .lagMinutes(0)
@@ -34,13 +34,12 @@ public class DashboardService {
           .build();
     }
 
-    ZonedDateTime last = lastUpdate.get();
     long todayRecordsCount = analyticsService.findTodayRecordsCount();
-    long lagMinutes = analyticsService.getLagMinutes(last);
+    long lagMinutes = analyticsService.getLagMinutes(lastUpdate);
     DataStatus dataStatus = DataStatus.fromLag(lagMinutes);
 
     return SystemHealthDashboardDto.builder()
-        .lastMeasuredAt(last)
+        .lastMeasuredAt(lastUpdate)
         .recordsToday(todayRecordsCount)
         .status(dataStatus)
         .lagMinutes(lagMinutes)

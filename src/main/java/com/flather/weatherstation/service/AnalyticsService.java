@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AnalyticsService {
   private final WeatherReportRepository repository;
+  private final WeatherService weatherService;
   private final ZoneId zoneId;
 
   private DateRangeHelper.DateRange today() {
@@ -24,9 +25,10 @@ public class AnalyticsService {
   }
 
   public AnalyticsService(
-      WeatherReportRepository repository, TimezoneProperties timezoneProperties) {
+      WeatherReportRepository repository, TimezoneProperties timezoneProperties, WeatherService weatherService) {
     this.repository = repository;
     zoneId = ZoneId.of(timezoneProperties.getZoneId());
+    this.weatherService = weatherService;
   }
 
   public long findTodayRecordsCount() {
@@ -34,8 +36,12 @@ public class AnalyticsService {
     return repository.findRecordsBetween(range.startTime(), range.endTime());
   }
 
-  public Optional<ZonedDateTime> findLastRecordTime() {
-    return Optional.ofNullable(repository.findMaxMeasuredAt()).map(t -> t.atZone(zoneId));
+  public ZonedDateTime findLastRecordTime() {
+    if(weatherService.getLastSavedMeasurement() != null) {
+      return weatherService.getLastSavedMeasurement().atZone(zoneId);
+    }
+
+    return null;
   }
 
   public long getLagMinutes(ZonedDateTime lastRecord) {
