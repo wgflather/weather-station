@@ -14,4 +14,6 @@ public class WeatherRecordCreatedDto {
   private double temperature;
 
   private double pressure;
+
+  private double WIFI_RSSI;
 }

@@ -10,7 +10,7 @@ RUN git clone https://${GIT_TOKEN}@github.com/wgflather/weather-station.git /src
 
 WORKDIR /src
 
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package -Dmaven.test.skip=true
 
 
 FROM amazoncorretto:25-alpine-jdk
