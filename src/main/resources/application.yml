@@ -22,8 +22,8 @@ weather:
     temp-maximum: 60
     pressure-minimal: 940
     pressure-maximum: 1060
-    temp-spike-limit: 2.0
-    pressure-spike-limit: 0.5
+    temp-spike-limit: 3.0
+    pressure-spike-limit: 1.5
 
 timezone:
   zone-id: Europe/Kiev
