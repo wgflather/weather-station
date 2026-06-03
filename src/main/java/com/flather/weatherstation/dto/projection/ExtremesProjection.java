@@ -1,3 +1,3 @@
 package com.flather.weatherstation.dto.projection;
 
-public record ExtremesProjection(double min, double max) {}
+public record ExtremesProjection(Double min, Double max) {}
