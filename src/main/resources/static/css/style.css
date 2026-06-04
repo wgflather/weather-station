@@ -272,6 +272,8 @@ body::before {
     vertical-align: middle;
 
     align-self: center;
+
+    gap: 2px;
 }
 
 .trend-arrow {

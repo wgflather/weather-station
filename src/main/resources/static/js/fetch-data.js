@@ -82,13 +82,13 @@ function updateTemperatureTrend(direction, changeValue) {
         el.classList.add('trend-up');
         el.innerHTML = `
             <span class="trend-arrow">↑</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
         `;
     } else if (direction === 'DOWN') {
         el.classList.add('trend-down');
         el.innerHTML = `
             <span class="trend-arrow">↓</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
         `;
     } else {
         el.classList.add('trend-stable');
@@ -105,13 +105,13 @@ function updatePressureTrend(direction, changeValue) {
         el.classList.add('pressure-trend-up');
         el.innerHTML = `
             <span class="trend-arrow">↑</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
         `;
     } else if (direction === 'DOWN') {
         el.classList.add('pressure-trend-down');
         el.innerHTML = `
             <span class="trend-arrow">↓</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
         `;
     } else {
         el.classList.add('pressure-trend-stable');
@@ -125,8 +125,8 @@ function renderMetrics(weather) {
     document.getElementById("max-temp").textContent = weather?.temperature?.max ?? "--";
     document.getElementById("avg-pressure").textContent = weather?.pressure?.avgPressure ?? "--";
 
-    updateTemperatureTrend(weather?.temperatureTrend?.direction, weather?.temperatureTrend?.changeValue);
-    updatePressureTrend(weather?.pressureTrend?.direction, weather?.pressureTrend?.changeValue);
+    updateTemperatureTrend(weather?.temperature?.trendResult?.direction, weather?.temperature?.trendResult?.changeValue);
+    updatePressureTrend(weather?.pressure?.trendResult?.direction, weather?.pressure?.trendResult?.changeValue);
 }
 
 function renderSystemHealth(systemHealth) {
