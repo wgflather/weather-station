@@ -12,6 +12,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
 @Slf4j
 @Component
 public class SensorStateCache {
@@ -44,19 +45,19 @@ public class SensorStateCache {
   void loadCacheSnapshot(
       List<WeatherRecordResponseDto> dtos, ExtremesProjection extremesProjection) {
 
-    log.info("[CACHE_INIT] Loading cache snapshot: {} records, min={}, max={}",
-            dtos.size(),
-            extremesProjection.min(),
-            extremesProjection.max()
-    );
+    log.info(
+        "[CACHE_INIT] Loading cache snapshot: {} records, min={}, max={}",
+        dtos.size(),
+        extremesProjection.min(),
+        extremesProjection.max());
 
     metricsWindow.addAll(dtos);
     spikeReferenceWindow.addAll(metricsWindow.stream().limit(5).toList());
     todayMaxTemp = extremesProjection.max();
     todayMinTemp = extremesProjection.min();
 
-    log.info("[CACHE_INIT] Cache initialized successfully. metricsWindowSize={}",
-            metricsWindow.size());
+    log.info(
+        "[CACHE_INIT] Cache initialized successfully. metricsWindowSize={}", metricsWindow.size());
   }
 
   public synchronized void resetDailyTemperatureExtremes() {
@@ -65,11 +66,11 @@ public class SensorStateCache {
   }
 
   public synchronized void updateCachedMeasurements(WeatherRecordResponseDto savedRecord) {
-    log.debug("[CACHE_UPDATE] New measurement received: temp={}, pressure={}, time={}",
-            savedRecord.getTemperature(),
-            savedRecord.getPressure(),
-            savedRecord.getMeasuredAtTimeZoned()
-    );
+    log.debug(
+        "[CACHE_UPDATE] New measurement received: temp={}, pressure={}, time={}",
+        savedRecord.getTemperature(),
+        savedRecord.getPressure(),
+        savedRecord.getMeasuredAtTimeZoned());
     updateMetricsWindow(savedRecord);
     updateSpikeReferenceWindow(savedRecord);
     checkNewExtremes(savedRecord);
@@ -125,11 +126,11 @@ public class SensorStateCache {
   }
 
   public synchronized void forceBaselineReset(WeatherRecordResponseDto newReality) {
-    log.info("[BASELINE_RESET] Spike reference window reset. New baseline temp={}, pressure={}, time={}",
-            newReality.getTemperature(),
-            newReality.getPressure(),
-            newReality.getMeasuredAtTimeZoned()
-    );
+    log.info(
+        "[BASELINE_RESET] Spike reference window reset. New baseline temp={}, pressure={}, time={}",
+        newReality.getTemperature(),
+        newReality.getPressure(),
+        newReality.getMeasuredAtTimeZoned());
     spikeReferenceWindow.clear();
 
     spikeReferenceWindow.addLast(newReality);

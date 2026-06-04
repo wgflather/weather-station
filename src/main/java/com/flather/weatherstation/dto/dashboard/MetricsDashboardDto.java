@@ -13,8 +13,6 @@ import lombok.RequiredArgsConstructor;
 public class MetricsDashboardDto {
   private TemperatureDto temperature;
   private PressureDto pressure;
-  private TrendResult temperatureTrend;
-  private TrendResult pressureTrend;
 
   public static MetricsDashboardDto empty() {
     return MetricsDashboardDto.builder().build();

@@ -66,15 +66,29 @@ public class AnalyticsService {
     return Precision.round(avg, 1);
   }
 
+  private List<DataPoint> extractDataPoints(
+      ToDoubleFunction<WeatherRecordResponseDto> valueExtractor) {
+
+    return sensorStateCache.getMetricsWindow().stream()
+        .map(
+            record ->
+                new DataPoint(
+                    record.getMeasuredAtTimeZoned().toInstant(),
+                    valueExtractor.applyAsDouble(record)))
+        .toList();
+  }
+
   public TemperatureDto getTemperature() {
     return new TemperatureDto(
         averageOfFiveLastReadings(WeatherRecordResponseDto::getTemperature),
+        getTempTrend(),
         sensorStateCache.getTodayMinTemp(),
         sensorStateCache.getTodayMaxTemp());
   }
 
   public PressureDto getPressure() {
-    return new PressureDto(averageOfFiveLastReadings(WeatherRecordResponseDto::getPressure));
+    return new PressureDto(
+        averageOfFiveLastReadings(WeatherRecordResponseDto::getPressure), getPressureTrend());
   }
 
   public List<HourlyChartAvgDto> getTemperatureChartData(Instant since) {
@@ -82,7 +96,6 @@ public class AnalyticsService {
   }
 
   public List<HourlyChartAvgDto> getPressureChartData(Instant since) {
-    var range = today();
     return dataPointToDto(repository.findChartPressure(since));
   }
 
@@ -124,11 +137,11 @@ public class AnalyticsService {
   }
 
   public TrendResult getTempTrend() {
-    return calculateTrend(repository.getLastHourTemperature());
+    return calculateTrend(extractDataPoints(WeatherRecordResponseDto::getTemperature));
   }
 
   public TrendResult getPressureTrend() {
-    return calculateTrend(repository.getLastHourPressure());
+    return calculateTrend(extractDataPoints(WeatherRecordResponseDto::getPressure));
   }
 
   public TrendResult calculateTrend(List<DataPoint> dataPoints) {
