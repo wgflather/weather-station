@@ -20,17 +20,27 @@ public class DataQualityValidator {
   public boolean detectDataAnomaly(WeatherRecordCreatedDto anomalyDto) {
     boolean isAnomaly = false; // Anomaly represents unrealistic data connected to sensor failures
 
-    if (anomalyDto.getTemperature() < properties.getTempMinimal()
-        || anomalyDto.getTemperature() > properties.getTempMaximum()) {
+    if (anomalyDto.getTemperature() == null || anomalyDto.getTemperature() < properties.getTempMinimal()
+            || anomalyDto.getTemperature() > properties.getTempMaximum()) {
       log.warn(
-          "[DATA_ANOMALY][TEMP] Temperature is unrealistic: {} ℃", anomalyDto.getTemperature());
+              "[DATA_ANOMALY][TEMP] Temperature is unrealistic: {} ℃",
+              anomalyDto.getTemperature());
       isAnomaly = true;
     }
 
     if (anomalyDto.getPressure() < properties.getPressureMinimal()
-        || anomalyDto.getPressure() > properties.getPressureMaximum()) {
+            || anomalyDto.getPressure() > properties.getPressureMaximum()) {
       log.warn(
-          "[DATA_ANOMALY][PRESSURE] Pressure is unrealistic: {} hPa", anomalyDto.getPressure());
+              "[DATA_ANOMALY][PRESSURE] Pressure is unrealistic: {} hPa",
+              anomalyDto.getPressure());
+      isAnomaly = true;
+    }
+
+    if (anomalyDto.getHumidity() == null || anomalyDto.getHumidity()  < properties.getHumidityMinimal()
+            || anomalyDto.getHumidity() > properties.getHumidityMaximum()) {
+      log.warn(
+              "[DATA_ANOMALY][HUMIDITY] Humidity is unrealistic: {} %",
+              anomalyDto.getHumidity());
       isAnomaly = true;
     }
 
@@ -38,7 +48,9 @@ public class DataQualityValidator {
   }
 
   public boolean detectDataSpike(
-      WeatherRecordCreatedDto weatherRecordDto, Instant lastSavedRecord, MedianProjection median) {
+          WeatherRecordCreatedDto weatherRecordDto,
+          Instant lastSavedRecord,
+          MedianProjection median) {
 
     if (median == null || lastSavedRecord == null) return false;
 
@@ -48,22 +60,31 @@ public class DataQualityValidator {
 
     double newTemp = weatherRecordDto.getTemperature();
     double newPressure = weatherRecordDto.getPressure();
+    double newHumidity = weatherRecordDto.getHumidity();
 
     boolean isSpike = false; // Spike represents a sharp jump in data values
 
     if (Math.abs(newTemp - median.temp()) > properties.getTempSpikeLimit()) {
       log.warn(
-          "[DATA_SPIKE][TEMP] Last 5 temp reads median: {} ℃ Current temp read: {} ℃",
-          median.temp(),
-          weatherRecordDto.getTemperature());
+              "[DATA_SPIKE][TEMP] Last 5 temp reads median: {} ℃ Current temp read: {} ℃",
+              median.temp(),
+              weatherRecordDto.getTemperature());
       isSpike = true;
     }
 
     if (Math.abs(newPressure - median.pressure()) > properties.getPressureSpikeLimit()) {
       log.warn(
-          "[DATA_SPIKE][PRESSURE] Last 5 pressure reads median: {} hPa Current pressure read: {} hPa",
-          median.pressure(),
-          weatherRecordDto.getPressure());
+              "[DATA_SPIKE][PRESSURE] Last 5 pressure reads median: {} hPa Current pressure read: {} hPa",
+              median.pressure(),
+              weatherRecordDto.getPressure());
+      isSpike = true;
+    }
+
+    if (Math.abs(newHumidity - median.humidity()) > properties.getHumiditySpikeLimit()) {
+      log.warn(
+              "[DATA_SPIKE][HUMIDITY] Last 5 humidity reads median: {} % Current humidity read: {} %",
+              median.humidity(),
+              weatherRecordDto.getHumidity());
       isSpike = true;
     }
 

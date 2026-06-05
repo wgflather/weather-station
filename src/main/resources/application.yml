@@ -22,6 +22,9 @@ weather:
     temp-maximum: 60
     pressure-minimal: 940
     pressure-maximum: 1060
+    humidity-minimal: 0
+    humidity-maximum: 100
+    humidity-spike-limit: 15
     temp-spike-limit: 3.0
     pressure-spike-limit: 1.5
 

@@ -10,10 +10,12 @@ import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.ToDoubleFunction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.math3.exception.NullArgumentException;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,13 +39,15 @@ public class WeatherService {
 
     double pressureMedian = medianOf(WeatherRecordResponseDto::getPressure, median);
     double tempMedian = medianOf(WeatherRecordResponseDto::getTemperature, median);
+    double humMedian = medianOf(WeatherRecordResponseDto::getHumidity, median);
 
-    return new MedianProjection(tempMedian, pressureMedian);
+    return new MedianProjection(tempMedian, pressureMedian, humMedian);
   }
 
-  private double medianOf(ToDoubleFunction<WeatherRecordResponseDto> values, Median median) {
-    return median.evaluate(
-        sensorStateCache.getSpikeReferenceWindow().stream().mapToDouble(values).toArray());
+  private Double medianOf(ToDoubleFunction<WeatherRecordResponseDto> values, Median median) {
+      return median.evaluate(
+              sensorStateCache.getSpikeReferenceWindow().stream().filter(Objects::nonNull).mapToDouble(values).toArray()
+      );
   }
 
   @Transactional

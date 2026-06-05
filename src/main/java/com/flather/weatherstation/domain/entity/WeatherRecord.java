@@ -28,6 +28,8 @@ public class WeatherRecord {
 
   private Double pressure;
 
+  private Double humidity;
+
   @Column(name = "data_quality")
   @Enumerated(EnumType.STRING)
   private DataQuality dataQuality;

@@ -92,12 +92,31 @@ public class AnalyticsService {
         averageOfFiveLastReadings(WeatherRecordResponseDto::getPressure), getPressureTrend());
   }
 
+  public HumidityDto getHumidity(){
+    return new HumidityDto(averageOfFiveLastReadings(WeatherRecordResponseDto::getHumidity));
+  }
+
   public List<HourlyChartAvgDto> getTemperatureChartData(Instant since) {
     return dataPointToDto(repository.findChartTemperature(since));
   }
 
   public List<HourlyChartAvgDto> getPressureChartData(Instant since) {
     return dataPointToDto(repository.findChartPressure(since));
+  }
+
+  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric){
+    switch (metric){
+      case TEMPERATURE -> {
+        return dataPointToDto(repository.findChartTemperature(since));
+      }
+      case PRESSURE -> {
+        return dataPointToDto(repository.findChartPressure(since));
+      }
+      case HUMIDITY -> {
+        return dataPointToDto(repository.findChartHumidity(since));
+      }
+      default -> throw new IllegalArgumentException("Unknown Metric");
+    }
   }
 
   private List<HourlyChartAvgDto> dataPointToDto(List<DataPoint> dataPoints) {
@@ -114,11 +133,7 @@ public class AnalyticsService {
             ? LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant()
             : OffsetDateTime.parse(since).toInstant();
 
-    List<HourlyChartAvgDto> dtos = switch (metric){
-      case TEMPERATURE -> getTemperatureChartData(sinceInstant);
-      case PRESSURE -> getPressureChartData(sinceInstant);
-      default -> throw new IllegalArgumentException("Unknown Metric");
-    };
+    List<HourlyChartAvgDto> dtos = getMetricChart(sinceInstant, metric);
 
 
     Instant nextBucketExpectedAt = null;

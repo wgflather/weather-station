@@ -11,9 +11,11 @@ public class WeatherRecordCreatedDto {
 
   private String deviceId;
 
-  private double temperature;
+  private Double temperature;
 
   private double pressure;
+
+  private Double humidity;
 
   private double WIFI_RSSI;
 }

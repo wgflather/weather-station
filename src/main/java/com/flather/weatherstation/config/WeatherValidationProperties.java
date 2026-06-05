@@ -14,6 +14,9 @@ public class WeatherValidationProperties {
   private int tempMaximum;
   private int pressureMinimal;
   private int pressureMaximum;
+  private int humidityMinimal;
+  private int humidityMaximum;
+  private int humiditySpikeLimit;
   private double tempSpikeLimit;
   private double pressureSpikeLimit;
 }

@@ -10,9 +10,11 @@ import lombok.*;
 @ToString
 public class WeatherRecordResponseDto {
 
-  private double temperature;
+  private Double temperature;
 
   private double pressure;
+
+  private Double humidity;
 
   private ZonedDateTime measuredAtTimeZoned;
 }
