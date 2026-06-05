@@ -3,7 +3,7 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.config.WeatherValidationProperties;
 import com.flather.weatherstation.dto.projection.MedianProjection;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
-import com.flather.weatherstation.model.constant.DataQuality;
+import com.flather.weatherstation.domain.constant.DataQuality;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;

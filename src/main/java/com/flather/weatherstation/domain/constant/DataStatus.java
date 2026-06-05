@@ -1,4 +1,4 @@
-package com.flather.weatherstation.model.constant;
+package com.flather.weatherstation.domain.constant;
 
 import lombok.Getter;
 

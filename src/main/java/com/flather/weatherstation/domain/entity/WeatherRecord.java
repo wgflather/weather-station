@@ -1,6 +1,6 @@
-package com.flather.weatherstation.model.entity;
+package com.flather.weatherstation.domain.entity;
 
-import com.flather.weatherstation.model.constant.DataQuality;
+import com.flather.weatherstation.domain.constant.DataQuality;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;

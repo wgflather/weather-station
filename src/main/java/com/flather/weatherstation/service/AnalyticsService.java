@@ -2,11 +2,12 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
-import com.flather.weatherstation.model.constant.TrendDirection;
+import com.flather.weatherstation.domain.constant.TrendDirection;
 import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
@@ -107,21 +108,18 @@ public class AnalyticsService {
         .toList();
   }
 
-  public ChartDto returnChart(String metric, String since) {
+  public ChartDto returnChart(Metric metric, String since) {
     Instant sinceInstant =
         (since == null)
             ? LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant()
             : OffsetDateTime.parse(since).toInstant();
 
-    List<HourlyChartAvgDto> dtos;
+    List<HourlyChartAvgDto> dtos = switch (metric){
+      case TEMPERATURE -> getTemperatureChartData(sinceInstant);
+      case PRESSURE -> getPressureChartData(sinceInstant);
+      default -> throw new IllegalArgumentException("Unknown Metric");
+    };
 
-    if ("temperature".equals(metric)) {
-      dtos = getTemperatureChartData(sinceInstant);
-    } else if ("pressure".equals(metric)) {
-      dtos = getPressureChartData(sinceInstant);
-    } else {
-      throw new IllegalArgumentException("Unknown metric");
-    }
 
     Instant nextBucketExpectedAt = null;
 
@@ -129,7 +127,7 @@ public class AnalyticsService {
       nextBucketExpectedAt = getNextExpectedBucketEpochMillis(dtos.getLast().hour());
     }
 
-    return new ChartDto(metric, dtos, nextBucketExpectedAt);
+    return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt);
   }
 
   private Instant getNextExpectedBucketEpochMillis(ZonedDateTime zonedDateTime) {

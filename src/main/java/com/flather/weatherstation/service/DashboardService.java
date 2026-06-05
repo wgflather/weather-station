@@ -3,7 +3,7 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
 import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
-import com.flather.weatherstation.model.constant.DataStatus;
+import com.flather.weatherstation.domain.constant.DataStatus;
 import java.time.ZonedDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

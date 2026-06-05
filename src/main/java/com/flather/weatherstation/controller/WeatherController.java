@@ -1,5 +1,6 @@
 package com.flather.weatherstation.controller;
 
+import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
@@ -44,7 +45,7 @@ public class WeatherController {
 
   @GetMapping(BASE_PATH + "/chart")
   public ResponseEntity<ChartDto> getChart(
-      @RequestParam(value = "metric", defaultValue = "temperature") String metric,
+      @RequestParam(value = "metric", defaultValue = "temperature") Metric metric,
       @RequestParam(required = false, value = "since") String since) {
     return ResponseEntity.ok(analyticsService.returnChart(metric, since));
   }

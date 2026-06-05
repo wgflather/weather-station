@@ -4,7 +4,7 @@ import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
-import com.flather.weatherstation.model.entity.WeatherRecord;
+import com.flather.weatherstation.domain.entity.WeatherRecord;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

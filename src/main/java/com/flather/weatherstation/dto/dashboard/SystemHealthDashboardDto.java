@@ -1,6 +1,6 @@
 package com.flather.weatherstation.dto.dashboard;
 
-import com.flather.weatherstation.model.constant.DataStatus;
+import com.flather.weatherstation.domain.constant.DataStatus;
 import java.time.ZonedDateTime;
 import lombok.*;
 

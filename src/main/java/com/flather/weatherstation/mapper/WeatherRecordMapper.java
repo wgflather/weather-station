@@ -2,7 +2,7 @@ package com.flather.weatherstation.mapper;
 
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
-import com.flather.weatherstation.model.entity.WeatherRecord;
+import com.flather.weatherstation.domain.entity.WeatherRecord;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
