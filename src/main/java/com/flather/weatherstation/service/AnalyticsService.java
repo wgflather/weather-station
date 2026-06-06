@@ -7,6 +7,7 @@ import com.flather.weatherstation.domain.constant.TrendDirection;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
+import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
@@ -94,6 +95,10 @@ public class AnalyticsService {
 
   public HumidityDto getHumidity() {
     return new HumidityDto(averageOfFiveLastReadings(WeatherRecordResponseDto::getHumidity));
+  }
+
+  public SurfaceWetnessDto getSurfaceWetness(){
+    return new SurfaceWetnessDto(sensorStateCache.getMetricsWindow().getLast().getSurfaceWetness());
   }
 
   public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric) {

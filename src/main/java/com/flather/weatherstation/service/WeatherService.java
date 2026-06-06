@@ -98,6 +98,7 @@ public class WeatherService {
         validateIfOk(
             Metric.HUMIDITY, anomalyAndMissingValidationResult, weatherRecordDto.getHumidity());
 
+
     updateCache(tempQuality, Metric.TEMPERATURE, record.getTemperature());
 
     record.setTemperatureDataQuality(tempQuality);
@@ -109,6 +110,8 @@ public class WeatherService {
     updateCache(humidityQuality, Metric.HUMIDITY, record.getHumidity());
 
     record.setHumidityDataQuality(humidityQuality);
+
+    record.setSurfaceWetnessDataQuality(anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
 
     // ============================
     // persist

@@ -9,6 +9,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.OptionalDouble;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -63,10 +65,18 @@ public class DataQualityValidator {
         properties.getHumidityMaximum(),
         dataQualityMap);
 
+    validateMetric(
+            Metric.SURFACE_WETNESS,
+            anomalyDto.getSurfaceWetness() == null ? null : anomalyDto.getSurfaceWetness().doubleValue(),
+            properties.getSurfaceWetnessMinimal(),
+            properties.getSurfaceWetnessMaximum(),
+            dataQualityMap);
+
     return new ValidationResult(
         dataQualityMap.get(Metric.TEMPERATURE),
         dataQualityMap.get(Metric.PRESSURE),
-        dataQualityMap.get(Metric.HUMIDITY));
+        dataQualityMap.get(Metric.HUMIDITY),
+            dataQualityMap.get(Metric.SURFACE_WETNESS));
   }
 
   private double getSpikeLimit(Metric metric) {

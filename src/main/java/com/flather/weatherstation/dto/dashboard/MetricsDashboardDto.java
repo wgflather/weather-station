@@ -14,6 +14,7 @@ public class MetricsDashboardDto {
   private TemperatureDto temperature;
   private PressureDto pressure;
   private HumidityDto humidity;
+  private SurfaceWetnessDto surfaceWetnessDto;
 
   public static MetricsDashboardDto empty() {
     return MetricsDashboardDto.builder().build();

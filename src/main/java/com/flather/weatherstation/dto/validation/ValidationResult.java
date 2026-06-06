@@ -2,15 +2,16 @@ package com.flather.weatherstation.dto.validation;
 
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
+import com.flather.weatherstation.dto.analytics.SurfaceWetnessDto;
 
 public record ValidationResult(
-    DataQuality temperature, DataQuality pressure, DataQuality humidity) {
+        DataQuality temperature, DataQuality pressure, DataQuality humidity, DataQuality surfaceWetness) {
   public DataQuality getByMetric(Metric metric) {
     return switch (metric) {
       case TEMPERATURE -> temperature;
       case PRESSURE -> pressure;
       case HUMIDITY -> humidity;
-      default -> throw new IllegalArgumentException("Unknown Metric");
+      case SURFACE_WETNESS -> surfaceWetness;
     };
   }
 }

@@ -25,11 +25,14 @@ public class WeatherRecord {
   @NotNull
   private String deviceId;
 
-  @Nullable private Double temperature;
+  private Double temperature;
 
   private Double pressure;
 
   private Double humidity;
+
+  private Long surfaceWetness;
+
 
   @Column(name = "humidity_data_quality")
   @Enumerated(EnumType.STRING)
@@ -42,6 +45,10 @@ public class WeatherRecord {
   @Column(name = "temperature_data_quality")
   @Enumerated(EnumType.STRING)
   private DataQuality temperatureDataQuality;
+
+  @Column(name = "surface_wetness_data_quality")
+  @Enumerated(EnumType.STRING)
+  private DataQuality surfaceWetnessDataQuality;
 
   @CreationTimestamp
   @Column(name = "measured_at")

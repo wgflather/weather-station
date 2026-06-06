@@ -81,7 +81,7 @@ public class SensorStateCache {
 
     metricsWindow.addAll(dtos);
 
-    if (!dtos.isEmpty()) {
+    if (dtos.size() >= 5) {
       dtos.subList(0, dtos.size() - SPIKE_REFERENCE_SIZE).forEach(this::addSpikes);
     }
 

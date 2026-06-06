@@ -17,5 +17,7 @@ public class WeatherRecordCreatedDto {
 
   private Double humidity;
 
+  private Long surfaceWetness;
+
   private double WIFI_RSSI;
 }
