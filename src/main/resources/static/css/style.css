@@ -36,7 +36,7 @@ body::before {
 .today_data_block,
 .weather_block, .pressure_block, .temperature_block,
 .min_max_block, .system_health_block, .chart_block,
-.humidity_block {
+.humidity_block, .wetness_block {
     position: relative;
     overflow: hidden;
     background: rgba(42, 74, 138, 0.75);
@@ -456,15 +456,7 @@ h3 {
     justify-content: space-between;
     gap: 12px;
     width: 100%;
-    margin-top: 1px;
-}
-
-.progress-labels-stacked {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 4px; /* Space between Comfortable and Dew point */
+    margin-top: 10px;
 }
 
 .progress-track {
@@ -487,36 +479,97 @@ h3 {
     color: #9fc2f5;
     white-space: nowrap;
     text-align: right;
-    line-height: 1; /* Added */
 }
 
 .humidity-dew-line {
     display: flex;
     align-items: baseline;
-    justify-content: flex-end; /* Changed to flex-end to align with progress-label */
-    gap: 4px;
-    margin-top: 0; /* Removed previous 8px margin */
-    font-size: 0.65rem; /* Reduced from 0.72rem */
-    color: #7aa8d4;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 8px;
+    font-size: 0.72rem;
+    color: #7aa8d4;        /* muted blue — clearly secondary, not competing with 67.1% */
     font-weight: 600;
-    line-height: 1; /* Added */
 }
 
 .humidity-dew-line .dew-label {
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    font-size: 0.55rem; /* Reduced from 0.65rem */
-    color: #5a8ab0;
+    font-size: 0.65rem;
+    color: #5a8ab0;        /* even more muted for the label */
 }
 
 .humidity-dew-line .dew-value {
-    color: #a8cbea;
+    color: #a8cbea;        /* slightly brighter than label, still subordinate */
     font-weight: 700;
 }
 
 /* =========================================================
-   CHART BLOCK
+   SURFACE WETNESS CARD
 ========================================================= */
+.wetness_block {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* Status badge — pill with leading dot */
+.wetness-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 20px;
+    padding: 5px 14px 5px 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border: 1px solid currentColor;
+    width: fit-content;
+}
+
+.wetness-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+/* State colours */
+.wetness-dry     { color: #4ade80; }   /* green  */
+.wetness-damp    { color: #facc15; }   /* yellow */
+.wetness-wet     { color: #38bdf8; }   /* sky    */
+.wetness-soaked  { color: #818cf8; }   /* indigo */
+
+/* Percentage + label row below the badge */
+.wetness-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.wetness-pct {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #9fc2f5;
+}
+
+.wetness-track {
+    width: 100%;
+    height: 6px;
+    background-color: rgba(140, 190, 255, 0.15);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.wetness-bar {
+    height: 100%;
+    border-radius: 3px;
+    background-color: #4ade80;   /* updated by JS to match state colour */
+    transition: width 0.4s ease, background-color 0.3s ease;
+}
 .chart_block {
     width: 100%;
     max-width: 820px;
@@ -613,13 +666,30 @@ h3 {
     flex-wrap: nowrap;
 }
 
+/* row-metric: 3-card row — wraps wetness below on narrow screens */
+.dashboard-row.row-metric {
+    flex-wrap: wrap;   /* allows wetness to drop to next row */
+}
+
+.dashboard-row.row-metric .pressure_block,
+.dashboard-row.row-metric .humidity_block {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.dashboard-row.row-metric .wetness_block {
+    flex: 1 1 0;       /* equal width on desktop */
+    min-width: 160px;  /* floor before it wraps */
+}
+
 /* =========================================================
    RESPONSIVE LAYOUTS
 ========================================================= */
 @media (max-width: 850px) {
     .temperature_block,
     .pressure_block,
-    .humidity_block {
+    .humidity_block,
+    .wetness_block {
         flex: 1 1 0;
         min-width: 0;
         min-height: 120px;
@@ -639,6 +709,17 @@ h3 {
     .dashboard-row {
         gap: 10px;
         flex-wrap: nowrap;
+    }
+
+    /* wetness drops to its own full-width row below pressure+humidity */
+    .dashboard-row.row-metric {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .dashboard-row.row-metric .wetness_block {
+        flex: 1 1 100%;   /* full width on its own row */
+        min-width: 0;
     }
 
     .temperature_block,

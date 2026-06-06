@@ -98,20 +98,18 @@ function updateTemperatureTrend(direction, changeValue) {
 function classifyPressureTrend(direction, changePerHour) {
     const abs = Math.abs(changePerHour ?? 0);
 
-    if (abs < 0.5) {
-        return { cssClass: 'pressure-stable',       arrow: '→', label: 'Stable'           };
-    }
+    if (abs < 0.5) return { cssClass: 'pressure-stable',       arrow: '→', label: 'Stable'          };
 
     if (direction === 'UP') {
-        if (abs < 1.5) return { cssClass: 'pressure-rising-slow',  arrow: '↑', label: 'Slowly rising'  };
-        if (abs < 3.0) return { cssClass: 'pressure-rising',       arrow: '↑', label: 'Rising'          };
-                       return { cssClass: 'pressure-rising-fast',  arrow: '↑', label: 'Rapidly rising'  };
+        if (abs < 1.5) return { cssClass: 'pressure-rising-slow',  arrow: '↑', label: 'Slowly rising' };
+        if (abs < 3.0) return { cssClass: 'pressure-rising',       arrow: '↑', label: 'Rising'         };
+                       return { cssClass: 'pressure-rising-fast',  arrow: '↑', label: 'Rapidly rising' };
     }
 
     if (direction === 'DOWN') {
-        if (abs < 1.5) return { cssClass: 'pressure-falling-slow', arrow: '↓', label: 'Slowly falling'  };
-        if (abs < 3.0) return { cssClass: 'pressure-falling',      arrow: '↓', label: 'Falling'          };
-                       return { cssClass: 'pressure-falling-fast', arrow: '↓', label: 'Rapidly falling'  };
+        if (abs < 1.5) return { cssClass: 'pressure-falling-slow', arrow: '↓', label: 'Slowly falling' };
+        if (abs < 3.0) return { cssClass: 'pressure-falling',      arrow: '↓', label: 'Falling'         };
+                       return { cssClass: 'pressure-falling-fast', arrow: '↓', label: 'Rapidly falling' };
     }
 
     return { cssClass: 'pressure-stable', arrow: '→', label: 'Stable' };
@@ -185,50 +183,114 @@ function updateDewPointSpreadGauge(temp, humidity) {
     }
 }
 
-function renderMetrics(weather, humidityDto) {
-    const avgTemp = weather?.temperature?.avgTemp;
-    const humidity = humidityDto?.humidity;
+/* =========================================================
+   SURFACE WETNESS
+   HW-028 rain sensor: raw ADC 0–4095 (12-bit),
+   HIGH value = dry, LOW value = wet  →  invert to get wetness %
+========================================================= */
+const ADC_MAX = 4095;
 
-    document.getElementById("avg-temp").textContent     = avgTemp ?? "--";
-    document.getElementById("min-temp").textContent     = weather?.temperature?.min ?? "--";
-    document.getElementById("max-temp").textContent     = weather?.temperature?.max ?? "--";
-    document.getElementById("avg-pressure").textContent = weather?.pressure?.avgPressure ?? "--";
+function rawToWetnessPct(raw) {
+    if (raw == null) return null;
+    const clamped = Math.min(ADC_MAX, Math.max(0, raw));
+    return ((ADC_MAX - clamped) / ADC_MAX) * 100;
+}
 
-    if (humidity != null) {
-        document.getElementById("humidity-val").textContent      = humidity;
-        document.getElementById("humidity-progress").style.width = `${humidity}%`;
+function classifyWetness(pct) {
+    if (pct < 10)  return { cssClass: 'wetness-dry',    label: 'Dry',    barColor: '#4ade80' };
+    if (pct < 40)  return { cssClass: 'wetness-damp',   label: 'Damp',   barColor: '#facc15' };
+    if (pct < 70)  return { cssClass: 'wetness-wet',    label: 'Wet',    barColor: '#38bdf8' };
+                   return { cssClass: 'wetness-soaked', label: 'Soaked', barColor: '#818cf8' };
+}
+
+function updateSurfaceWetness(raw) {
+    const badgeEl  = document.getElementById('wetness-badge');
+    const textEl   = document.getElementById('wetness-status-text');
+    const pctEl    = document.getElementById('wetness-pct');
+    const barEl    = document.getElementById('wetness-bar');
+
+    if (!badgeEl) return;
+
+    const pct = rawToWetnessPct(raw);
+    if (pct === null) {
+        textEl.textContent = '--';
+        pctEl.textContent  = 'Wetness --';
+        barEl.style.width  = '0%';
+        return;
+    }
+
+    const { cssClass, label, barColor } = classifyWetness(pct);
+
+    // Update badge state class
+    badgeEl.className = `wetness-status-badge ${cssClass}`;
+    textEl.textContent = label;
+
+    // Update percentage label and bar
+    pctEl.textContent          = `Wetness ${pct.toFixed(0)}%`;
+    barEl.style.width          = `${pct.toFixed(1)}%`;
+    barEl.style.backgroundColor = barColor;
+}
+
+// ==========================================
+// MAIN RENDER
+// ==========================================
+
+function renderMetrics(dto) {
+    const temp     = dto?.temperature;
+    const pressure = dto?.pressure;
+    const hum      = dto?.humidity;
+    const wetness  = dto?.surfaceWetnessDto;
+
+    // --- Temperature card ---
+    document.getElementById("avg-temp").textContent = temp?.avgTemp ?? "--";
+    document.getElementById("min-temp").textContent = temp?.min     ?? "--";
+    document.getElementById("max-temp").textContent = temp?.max     ?? "--";
+
+    updateTemperatureTrend(
+        temp?.trendResult?.direction,
+        temp?.trendResult?.changeValue
+    );
+
+    // --- Pressure card ---
+    document.getElementById("avg-pressure").textContent = pressure?.avgPressure ?? "--";
+
+    updatePressureTrend(
+        pressure?.trendResult?.direction,
+        pressure?.trendResult?.changeValue
+    );
+
+    // --- Humidity card ---
+    const humVal = hum?.humidity;
+    if (humVal != null) {
+        document.getElementById("humidity-val").textContent = humVal;
 
         let desc = "Comfortable";
-        if (humidity > 70) desc = "Humid";
-        if (humidity < 35) desc = "Dry";
+        if (humVal > 70) desc = "Humid";
+        if (humVal < 35) desc = "Dry";
         document.getElementById("humidity-desc").textContent = desc;
     }
 
-    // Dew point in humidity card — calculated from same values, shown as secondary info
+    // Dew point — derived from temp + humidity, shown as secondary info in humidity card
     const dewEl = document.getElementById("humidity-dew-val");
     if (dewEl) {
-        const td = calculateDewPoint(avgTemp, humidity);
+        const td = calculateDewPoint(temp?.avgTemp, humVal);
         dewEl.textContent = td !== null ? `${td.toFixed(1)}°C` : "--°C";
     }
 
-    updateDewPointSpreadGauge(avgTemp, humidity);
-    updateTemperatureTrend(
-        weather?.temperature?.trendResult?.direction,
-        weather?.temperature?.trendResult?.changeValue
-    );
-    updatePressureTrend(
-        weather?.pressure?.trendResult?.direction,
-        weather?.pressure?.trendResult?.changeValue
-    );
+    // Dew point spread gauge in temperature card
+    updateDewPointSpreadGauge(temp?.avgTemp, humVal);
+
+    // --- Surface wetness card ---
+    updateSurfaceWetness(wetness?.surfaceWetness);
 }
 
 async function updateDashboard() {
     try {
-        const data       = await fetchDashboard();
-        state.metrics    = data.metricsDashboardDto;
+        const data = await fetchDashboard();
+        state.metrics      = data.metricsDashboardDto;
         state.systemHealth = data.systemHealthDashboardDto;
 
-        renderMetrics(state.metrics, data.metricsDashboardDto.humidity);
+        renderMetrics(state.metrics);
         renderSystemHealth(state.systemHealth);
     } catch (error) {
         console.error(error);

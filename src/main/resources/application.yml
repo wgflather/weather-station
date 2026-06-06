@@ -27,6 +27,8 @@ weather:
     humidity-spike-limit: 15
     temp-spike-limit: 3.0
     pressure-spike-limit: 1.5
+    surface-wetness-minimal: 0
+    surface-wetness-maximum: 4095
 
 timezone:
   zone-id: Europe/Kiev
