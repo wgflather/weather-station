@@ -6,10 +6,13 @@ CREATE TABLE weather_records (
                                  temperature DOUBLE PRECISION,
                                  pressure DOUBLE PRECISION,
                                  humidity DOUBLE PRECISION,
+                                 surface_wetness BIGINT,
+
 
                                  temperature_data_quality VARCHAR(25),
                                  pressure_data_quality VARCHAR(25),
                                  humidity_data_quality VARCHAR(25),
+                                 surface_wetness_data_quality VARCHAR(25),
 
                                  measured_at TIMESTAMPTZ NOT NULL
 );
