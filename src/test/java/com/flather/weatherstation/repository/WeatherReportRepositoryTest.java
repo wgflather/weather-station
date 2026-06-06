@@ -5,9 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.flather.weatherstation.controller.WeatherController;
-import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
+import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.service.WeatherService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

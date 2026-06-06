@@ -7,8 +7,6 @@ import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-
-import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -25,20 +23,22 @@ public class SensorStateCache {
 
   // Spike detection reference — small, can be reset aggressively
   // represents "current conditions" not "recent history"
-  @Getter private final Map<Metric, Deque<Double>> metricsSpikeWindow = Map.of(
+  @Getter
+  private final Map<Metric, Deque<Double>> metricsSpikeWindow =
+      Map.of(
           Metric.TEMPERATURE, new ArrayDeque<>(),
           Metric.PRESSURE, new ArrayDeque<>(),
-          Metric.HUMIDITY, new ArrayDeque<>()
-        );
+          Metric.HUMIDITY, new ArrayDeque<>());
 
   private static final int METRICS_WINDOW_MINUTES = 60;
   public static final int SPIKE_REFERENCE_SIZE = 5;
 
-  private final Map<Metric, Integer> consecutiveSpikes = new EnumMap<>(Map.of(
-          Metric.TEMPERATURE, 0,
-          Metric.PRESSURE, 0,
-          Metric.HUMIDITY, 0
-  ));
+  private final Map<Metric, Integer> consecutiveSpikes =
+      new EnumMap<>(
+          Map.of(
+              Metric.TEMPERATURE, 0,
+              Metric.PRESSURE, 0,
+              Metric.HUMIDITY, 0));
 
   @Getter @Setter private volatile Double todayMaxTemp;
 
@@ -55,9 +55,7 @@ public class SensorStateCache {
   public synchronized List<Double> getSpikeWindowSnapshot(Metric metric) {
     Deque<Double> values = metricsSpikeWindow.get(metric);
 
-    return values == null
-            ? List.of()
-            : List.copyOf(values);
+    return values == null ? List.of() : List.copyOf(values);
   }
 
   private void addSpikeIfPresent(Metric metric, Double value) {
@@ -83,8 +81,9 @@ public class SensorStateCache {
 
     metricsWindow.addAll(dtos);
 
-    dtos.subList(0, dtos.size() - SPIKE_REFERENCE_SIZE)
-            .forEach(this::addSpikes);
+    if (!dtos.isEmpty()) {
+      dtos.subList(0, dtos.size() - SPIKE_REFERENCE_SIZE).forEach(this::addSpikes);
+    }
 
     todayMaxTemp = extremesProjection.max();
     todayMinTemp = extremesProjection.min();
@@ -107,9 +106,9 @@ public class SensorStateCache {
         savedRecord.getMeasuredAtTimeZoned());
 
     updateMetricsWindow(savedRecord);
-    if(savedRecord.getTemperature() != null) {
+    if (savedRecord.getTemperature() != null) {
       checkNewExtremes(savedRecord);
-    }else {
+    } else {
       log.debug("[EXTREMES_CHECK] Skipping extremes check, temperature is null");
     }
   }
@@ -195,7 +194,8 @@ public class SensorStateCache {
   public synchronized void forceBaselineReset(Metric metricToReset, double newReality) {
     log.info(
         "[BASELINE_RESET] Spike reference window reset for {}. New baseline = {}",
-            metricToReset, newReality);
+        metricToReset,
+        newReality);
 
     metricsSpikeWindow.get(metricToReset).clear();
 

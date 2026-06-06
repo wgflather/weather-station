@@ -1,10 +1,8 @@
 package com.flather.weatherstation.repository;
 
-import com.flather.weatherstation.dto.analytics.PressureDto;
-import com.flather.weatherstation.dto.analytics.TemperatureDto;
+import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
-import com.flather.weatherstation.domain.entity.WeatherRecord;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,8 +16,6 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
 
   Optional<WeatherRecord> findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(
       Instant start, Instant end);
-
-
 
   @Query(
       value =
@@ -37,7 +33,6 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
       nativeQuery = true)
   ExtremesProjection temperatureExtremes(
       @Param("startTime") Instant startTime, @Param("endTime") Instant endTime);
-
 
   @Query(
       value =
@@ -71,8 +66,8 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
   List<DataPoint> findChartTemperature(@Param("since") Instant since);
 
   @Query(
-          value =
-                  """
+      value =
+          """
                           SELECT
                               date_bin('10 minutes', measured_at, :since) AS bucket,
                               ROUND(AVG(humidity)::numeric, 1)::double precision AS value
@@ -82,7 +77,7 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                           GROUP BY bucket
                           ORDER BY bucket ASC
                           """,
-          nativeQuery = true)
+      nativeQuery = true)
   List<DataPoint> findChartHumidity(@Param("since") Instant since);
 
   @Query(
@@ -99,5 +94,4 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   """,
       nativeQuery = true)
   List<DataPoint> findChartPressure(@Param("since") Instant since);
-
 }

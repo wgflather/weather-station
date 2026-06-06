@@ -3,18 +3,16 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.domain.constant.Metric;
-import com.flather.weatherstation.domain.entity.WeatherRecord;
+import com.flather.weatherstation.domain.constant.TrendDirection;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
-import com.flather.weatherstation.domain.constant.TrendDirection;
 import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.ToDoubleFunction;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.commons.math3.util.Precision;
 import org.springframework.stereotype.Service;
@@ -57,10 +55,10 @@ public class AnalyticsService {
     return Duration.between(lastRecord, Instant.now().atZone(zoneId)).toMinutes();
   }
 
-  private Double averageOfFiveLastReadings(
-          Function<WeatherRecordResponseDto, Double> extractor) {
+  private Double averageOfFiveLastReadings(Function<WeatherRecordResponseDto, Double> extractor) {
 
-    OptionalDouble avg = sensorStateCache.getMetricsWindow().reversed().stream()
+    OptionalDouble avg =
+        sensorStateCache.getMetricsWindow().reversed().stream()
             .map(extractor)
             .filter(Objects::nonNull)
             .limit(5)
@@ -69,15 +67,16 @@ public class AnalyticsService {
 
     return avg.isPresent() ? Precision.round(avg.getAsDouble(), 1) : null;
   }
+
   private List<DataPoint> extractDataPoints(
-          Function<WeatherRecordResponseDto, Double> valueExtractor) {
+      Function<WeatherRecordResponseDto, Double> valueExtractor) {
 
     return sensorStateCache.getMetricsWindow().stream()
-            .map(record -> new DataPoint(
-                    record.getMeasuredAtTimeZoned().toInstant(),
-                    valueExtractor.apply(record)
-            ))
-            .toList();
+        .map(
+            record ->
+                new DataPoint(
+                    record.getMeasuredAtTimeZoned().toInstant(), valueExtractor.apply(record)))
+        .toList();
   }
 
   public TemperatureDto getTemperature() {
@@ -93,12 +92,12 @@ public class AnalyticsService {
         averageOfFiveLastReadings(WeatherRecordResponseDto::getPressure), getPressureTrend());
   }
 
-  public HumidityDto getHumidity(){
+  public HumidityDto getHumidity() {
     return new HumidityDto(averageOfFiveLastReadings(WeatherRecordResponseDto::getHumidity));
   }
 
-  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric){
-    switch (metric){
+  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric) {
+    switch (metric) {
       case TEMPERATURE -> {
         return dataPointToDto(repository.findChartTemperature(since));
       }
@@ -128,7 +127,6 @@ public class AnalyticsService {
 
     List<HourlyChartAvgDto> dtos = getMetricChart(sinceInstant, metric);
 
-
     Instant nextBucketExpectedAt = null;
 
     if (!dtos.isEmpty()) {
@@ -155,15 +153,12 @@ public class AnalyticsService {
       return new TrendResult(0.0, TrendDirection.STABLE);
     }
 
-    List<DataPoint> filteredPoints = dataPoints.stream()
-            .filter(dataPoint -> dataPoint.value() != null)
-            .toList();
+    List<DataPoint> filteredPoints =
+        dataPoints.stream().filter(dataPoint -> dataPoint.value() != null).toList();
 
     if (filteredPoints.size() < 2) {
       return new TrendResult(0.0, TrendDirection.STABLE);
     }
-
-
 
     Instant firstDataTime = filteredPoints.getFirst().hour();
 

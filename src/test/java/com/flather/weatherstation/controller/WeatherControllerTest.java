@@ -7,6 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flather.weatherstation.domain.constant.DataStatus;
+import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
@@ -16,8 +18,6 @@ import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.mapper.WeatherRecordMapperImpl;
-import com.flather.weatherstation.domain.constant.DataStatus;
-import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.service.AnalyticsService;
 import com.flather.weatherstation.service.DashboardService;
 import com.flather.weatherstation.service.WeatherService;

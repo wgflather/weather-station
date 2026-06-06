@@ -1,17 +1,14 @@
 package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.config.WeatherValidationProperties;
-import com.flather.weatherstation.domain.constant.DataStatus;
+import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
-import com.flather.weatherstation.dto.projection.MedianProjection;
 import com.flather.weatherstation.dto.validation.ValidationResult;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
-import com.flather.weatherstation.domain.constant.DataQuality;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,11 +21,7 @@ public class DataQualityValidator {
   private final WeatherValidationProperties properties;
 
   private void validateMetric(
-          Metric metric,
-          Double value,
-          double min,
-          double max,
-          Map<Metric, DataQuality> result) {
+      Metric metric, Double value, double min, double max, Map<Metric, DataQuality> result) {
 
     if (value == null) {
       log.warn(ValidationLogMessages.missing(metric));
@@ -50,29 +43,30 @@ public class DataQualityValidator {
     Map<Metric, DataQuality> dataQualityMap = new HashMap<>();
 
     validateMetric(
-            Metric.TEMPERATURE,
-            anomalyDto.getTemperature(),
-            properties.getTempMinimal(),
-            properties.getTempMaximum(),
-            dataQualityMap);
+        Metric.TEMPERATURE,
+        anomalyDto.getTemperature(),
+        properties.getTempMinimal(),
+        properties.getTempMaximum(),
+        dataQualityMap);
 
     validateMetric(
-            Metric.PRESSURE,
-            anomalyDto.getPressure(),
-            properties.getPressureMinimal(),
-            properties.getPressureMaximum(),
-            dataQualityMap);
+        Metric.PRESSURE,
+        anomalyDto.getPressure(),
+        properties.getPressureMinimal(),
+        properties.getPressureMaximum(),
+        dataQualityMap);
 
     validateMetric(
-            Metric.HUMIDITY,
-            anomalyDto.getHumidity(),
-            properties.getHumidityMinimal(),
-            properties.getHumidityMaximum(),
-            dataQualityMap);
+        Metric.HUMIDITY,
+        anomalyDto.getHumidity(),
+        properties.getHumidityMinimal(),
+        properties.getHumidityMaximum(),
+        dataQualityMap);
 
-    return new ValidationResult(dataQualityMap.get(Metric.TEMPERATURE),
-            dataQualityMap.get(Metric.PRESSURE),
-            dataQualityMap.get(Metric.HUMIDITY));
+    return new ValidationResult(
+        dataQualityMap.get(Metric.TEMPERATURE),
+        dataQualityMap.get(Metric.PRESSURE),
+        dataQualityMap.get(Metric.HUMIDITY));
   }
 
   private double getSpikeLimit(Metric metric) {
@@ -85,19 +79,13 @@ public class DataQualityValidator {
   }
 
   public boolean detectDataSpike(
-          Metric metric,
-          Double currentValue,
-          Double medianValue,
-          Instant lastSavedRecord) {
+      Metric metric, Double currentValue, Double medianValue, Instant lastSavedRecord) {
 
-    if (currentValue == null
-            || medianValue == null
-            || lastSavedRecord == null) {
+    if (currentValue == null || medianValue == null || lastSavedRecord == null) {
       return false;
     }
 
-    long elapsed =
-            Duration.between(lastSavedRecord, Instant.now()).toMinutes();
+    long elapsed = Duration.between(lastSavedRecord, Instant.now()).toMinutes();
 
     if (elapsed >= 10) {
       return false;
@@ -107,11 +95,7 @@ public class DataQualityValidator {
 
     if (Math.abs(currentValue - medianValue) > spikeLimit) {
 
-      log.warn(
-              ValidationLogMessages.spike(
-                      metric,
-                      medianValue,
-                      currentValue));
+      log.warn(ValidationLogMessages.spike(metric, medianValue, currentValue));
 
       return true;
     }
@@ -125,35 +109,21 @@ public class DataQualityValidator {
 
     public static String missing(Metric metric) {
       return String.format(
-              "[DATA_MISSING][%s] %s is missing",
-              metric.getName().toUpperCase(),
-              metric.getName());
+          "[DATA_MISSING][%s] %s is missing", metric.getName().toUpperCase(), metric.getName());
     }
 
-    public static String anomaly(
-            Metric metric,
-            double value) {
+    public static String anomaly(Metric metric, double value) {
 
       return String.format(
-              "[DATA_ANOMALY][%s] %s is unrealistic: %.2f %s",
-              metric.getName().toUpperCase(),
-              metric.getName(),
-              value,
-              metric.getUnit());
+          "[DATA_ANOMALY][%s] %s is unrealistic: %.2f %s",
+          metric.getName().toUpperCase(), metric.getName(), value, metric.getUnit());
     }
 
-    public static String spike(
-            Metric metric,
-            double median,
-            double currentValue) {
+    public static String spike(Metric metric, double median, double currentValue) {
 
       return String.format(
-              "[DATA_SPIKE][%s] Last 5 reads median: %.2f %s Current read: %.2f %s",
-              metric.getName().toUpperCase(),
-              median,
-              metric.getUnit(),
-              currentValue,
-              metric.getUnit());
+          "[DATA_SPIKE][%s] Last 5 reads median: %.2f %s Current read: %.2f %s",
+          metric.getName().toUpperCase(), median, metric.getUnit(), currentValue, metric.getUnit());
     }
   }
 }

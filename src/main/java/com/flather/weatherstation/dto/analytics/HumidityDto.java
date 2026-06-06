@@ -1,3 +1,3 @@
 package com.flather.weatherstation.dto.analytics;
 
-public record HumidityDto(Double  humidity) {}
+public record HumidityDto(Double humidity) {}

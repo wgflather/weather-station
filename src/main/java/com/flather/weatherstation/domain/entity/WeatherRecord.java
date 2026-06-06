@@ -25,8 +25,7 @@ public class WeatherRecord {
   @NotNull
   private String deviceId;
 
-  @Nullable
-  private Double temperature;
+  @Nullable private Double temperature;
 
   private Double pressure;
 
