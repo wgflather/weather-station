@@ -7,8 +7,9 @@ const state = {
     currentMetric: 'temperature',
 
     charts: {
-        temperature: null, // initially null
-        pressure: null
+        temperature: null,
+        pressure:    null,
+        humidity:    null,
     }
 };
 
@@ -22,40 +23,30 @@ const scheduler = new FetchScheduler(
         }
 
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Chart fetch failed for ${metric}`);
-        }
-
+        if (!response.ok) throw new Error(`Chart fetch failed for ${metric}`);
         return await response.json();
     },
 
     (newChartPoints, metric) => {
-        // Enforce fallback initialization: Convert null to empty array if needed
-        if (!state.charts[metric]) {
-            state.charts[metric] = [];
-        }
+        if (!state.charts[metric]) state.charts[metric] = [];
 
-        // Safe Merge Logic (Retains historical incremental items)
         if (state.charts[metric].length === 0) {
             state.charts[metric] = newChartPoints;
         } else {
-            const existingHours = new Set(state.charts[metric].map(point => point.hour));
-            const uniqueDeltas = newChartPoints.filter(point => !existingHours.has(point.hour));
-            
+            const existingHours = new Set(state.charts[metric].map(p => p.hour));
+            const uniqueDeltas  = newChartPoints.filter(p => !existingHours.has(p.hour));
             state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
         }
 
-        // Only flash update the canvas if this metric is currently being looked at
         if (metric === state.currentMetric) {
             renderWeatherChart(state.charts[metric], metric);
         }
     },
 
-    20000 
+    20000
 );
 
 function startChart(metric) {
-    // Dynamic runtime callback closure ensures scheduler consistently reads current array length
     scheduler.start(metric, (m) => state.charts[m]);
 }
 
@@ -96,42 +87,157 @@ function updateTemperatureTrend(direction, changeValue) {
     }
 }
 
+/* =========================================================
+   PRESSURE TREND STATE CLASSIFICATION
+   Thresholds based on standard meteorological convention:
+     < 0.5 hPa/h  → stable
+     0.5–1.5      → slowly rising/falling
+     1.5–3.0      → rising/falling
+     > 3.0        → rapidly rising/falling
+========================================================= */
+function classifyPressureTrend(direction, changePerHour) {
+    const abs = Math.abs(changePerHour ?? 0);
+
+    if (abs < 0.5) {
+        return { cssClass: 'pressure-stable',       arrow: '→', label: 'Stable'           };
+    }
+
+    if (direction === 'UP') {
+        if (abs < 1.5) return { cssClass: 'pressure-rising-slow',  arrow: '↑', label: 'Slowly rising'  };
+        if (abs < 3.0) return { cssClass: 'pressure-rising',       arrow: '↑', label: 'Rising'          };
+                       return { cssClass: 'pressure-rising-fast',  arrow: '↑', label: 'Rapidly rising'  };
+    }
+
+    if (direction === 'DOWN') {
+        if (abs < 1.5) return { cssClass: 'pressure-falling-slow', arrow: '↓', label: 'Slowly falling'  };
+        if (abs < 3.0) return { cssClass: 'pressure-falling',      arrow: '↓', label: 'Falling'          };
+                       return { cssClass: 'pressure-falling-fast', arrow: '↓', label: 'Rapidly falling'  };
+    }
+
+    return { cssClass: 'pressure-stable', arrow: '→', label: 'Stable' };
+}
+
 function updatePressureTrend(direction, changeValue) {
     const el = document.getElementById('pressure-trend');
     if (!el) return;
-    el.className = '';
 
-    if (direction === 'UP') {
-        el.classList.add('pressure-trend-up');
-        el.innerHTML = `
-            <span class="trend-arrow">↑</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
-        `;
-    } else if (direction === 'DOWN') {
-        el.classList.add('pressure-trend-down');
-        el.innerHTML = `
-            <span class="trend-arrow">↓</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
-        `;
+    const { cssClass, arrow, label } = classifyPressureTrend(direction, changeValue);
+    const absVal = Math.abs(changeValue ?? 0).toFixed(1);
+
+    el.className = cssClass;
+    el.innerHTML = `
+        <span class="pressure-trend-indicator">
+            <span class="trend-arrow">${arrow}</span>
+            <span class="trend-val">${absVal}/h</span>
+        </span>
+        <span class="pressure-trend-label">${label}</span>
+    `;
+}
+
+// ==========================================
+// METEOROLOGICAL CALCULATIONS
+// ==========================================
+
+function calculateDewPoint(temp, humidity) {
+    if (temp == null || humidity == null) return null;
+    const a     = 17.625;
+    const b     = 243.04;
+    const alpha = Math.log(humidity / 100) + (a * temp) / (b + temp);
+    return (b * alpha) / (a - alpha);
+}
+
+function updateDewPointSpreadGauge(temp, humidity) {
+    const tdVal = calculateDewPoint(temp, humidity);
+
+    const spreadValEl = document.getElementById("dew-spread-val");
+    const dewTEl      = document.getElementById("dew-t");
+    const dewTdEl     = document.getElementById("dew-td");
+    const badgeEl     = document.getElementById("dew-status");
+    const pinEl       = document.getElementById("gauge-pin");
+
+    if (tdVal === null) {
+        if (spreadValEl) spreadValEl.textContent = "--°";
+        return;
+    }
+
+    const spread  = temp - tdVal;
+    const percent = Math.min(100, Math.max(0, (spread / 10) * 100));
+
+    spreadValEl.textContent = `${spread.toFixed(1)}°`;
+    dewTEl.textContent      = temp.toFixed(1);
+    dewTdEl.textContent     = tdVal.toFixed(1);
+    pinEl.style.left        = `${percent}%`;
+    pinEl.setAttribute('data-spread', `${spread.toFixed(1)}°`);
+
+    badgeEl.className = "dew-status-badge";
+    if (spread <= 2) {
+        badgeEl.textContent = "Danger";
+        badgeEl.classList.add("trend-up");
+    } else if (spread <= 4) {
+        badgeEl.textContent = "High Risk";
+        badgeEl.classList.add("trend-up");
+    } else if (spread <= 6.5) {
+        badgeEl.textContent = "Caution";
+        badgeEl.classList.add("trend-stable");
     } else {
-        el.classList.add('pressure-trend-stable');
-        el.innerHTML = `<span class="trend-arrow">→</span>`;
+        badgeEl.textContent = "Safe";
+        badgeEl.classList.add("trend-stable");
     }
 }
 
-function renderMetrics(weather) {
-    document.getElementById("avg-temp").textContent = weather?.temperature?.avgTemp ?? "--";
-    document.getElementById("min-temp").textContent = weather?.temperature?.min ?? "--";
-    document.getElementById("max-temp").textContent = weather?.temperature?.max ?? "--";
+function renderMetrics(weather, humidityDto) {
+    const avgTemp = weather?.temperature?.avgTemp;
+    const humidity = humidityDto?.humidity;
+
+    document.getElementById("avg-temp").textContent     = avgTemp ?? "--";
+    document.getElementById("min-temp").textContent     = weather?.temperature?.min ?? "--";
+    document.getElementById("max-temp").textContent     = weather?.temperature?.max ?? "--";
     document.getElementById("avg-pressure").textContent = weather?.pressure?.avgPressure ?? "--";
 
-    updateTemperatureTrend(weather?.temperature?.trendResult?.direction, weather?.temperature?.trendResult?.changeValue);
-    updatePressureTrend(weather?.pressure?.trendResult?.direction, weather?.pressure?.trendResult?.changeValue);
+    if (humidity != null) {
+        document.getElementById("humidity-val").textContent      = humidity;
+        document.getElementById("humidity-progress").style.width = `${humidity}%`;
+
+        let desc = "Comfortable";
+        if (humidity > 70) desc = "Humid";
+        if (humidity < 35) desc = "Dry";
+        document.getElementById("humidity-desc").textContent = desc;
+    }
+
+    // Dew point in humidity card — calculated from same values, shown as secondary info
+    const dewEl = document.getElementById("humidity-dew-val");
+    if (dewEl) {
+        const td = calculateDewPoint(avgTemp, humidity);
+        dewEl.textContent = td !== null ? `${td.toFixed(1)}°C` : "--°C";
+    }
+
+    updateDewPointSpreadGauge(avgTemp, humidity);
+    updateTemperatureTrend(
+        weather?.temperature?.trendResult?.direction,
+        weather?.temperature?.trendResult?.changeValue
+    );
+    updatePressureTrend(
+        weather?.pressure?.trendResult?.direction,
+        weather?.pressure?.trendResult?.changeValue
+    );
+}
+
+async function updateDashboard() {
+    try {
+        const data       = await fetchDashboard();
+        state.metrics    = data.metricsDashboardDto;
+        state.systemHealth = data.systemHealthDashboardDto;
+
+        renderMetrics(state.metrics, data.metricsDashboardDto.humidity);
+        renderSystemHealth(state.systemHealth);
+    } catch (error) {
+        console.error(error);
+    }
 }
 
 function renderSystemHealth(systemHealth) {
-    document.getElementById("status").textContent = systemHealth.status;
-    document.getElementById("lag").textContent = systemHealth.lagMinutes + ' min';
+    document.getElementById("status").textContent       = systemHealth.status;
+    document.getElementById("lag").textContent          = systemHealth.lagMinutes + ' min';
     document.getElementById("todayRecords").textContent = systemHealth.recordsToday;
 
     const lastUpdate = document.getElementById("lastUpdate");
@@ -143,50 +249,23 @@ function renderSystemHealth(systemHealth) {
     document.getElementById("status").style.color = colors[systemHealth.status] || 'black';
 }
 
-async function updateDashboard() {
-    try {
-        const data = await fetchDashboard();
-        state.metrics = data.metricsDashboardDto;
-        state.systemHealth = data.systemHealthDashboardDto;
-
-        renderMetrics(state.metrics);
-        renderSystemHealth(state.systemHealth);
-    } catch (error) {
-        console.error(error);
-    }
-}
-
 function initEventListeners() {
     const selector = document.getElementById('metric-selector');
     if (!selector) return;
 
-    // 1. Establish the baseline default metric from the HTML select element
     state.currentMetric = selector.value;
-
-    // 2. Only start the default metric immediately on boot
     startChart(state.currentMetric);
 
     selector.addEventListener('change', (event) => {
         const selectedMetric = event.target.value;
-        state.currentMetric = selectedMetric;
+        state.currentMetric  = selectedMetric;
+        const activeData     = state.charts[selectedMetric];
 
-        const activeData = state.charts[selectedMetric];
-        
-        // 3. Lazy-loading conditional boundary
         if (activeData === null) {
-            // This metric has never been loaded. Fetch it fully right now
-            // and activate its standalone background scheduling loop automatically.
-            renderWeatherChart([], selectedMetric); // Show a clean canvas loading state
+            renderWeatherChart([], selectedMetric);
             startChart(selectedMetric);
         } else {
-            // Data exists! Instantly swap the UI canvas with our cache data.
-            // No network calls made, background scheduler keeps handling updates.
             renderWeatherChart(activeData, selectedMetric);
-
-            chart.canvas.addEventListener('touchend', () => {
-                chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-                chart.update();
-            });
         }
     });
 }
@@ -201,7 +280,6 @@ function startPolling(fn, interval) {
     loop();
     return () => stopped = true;
 }
-
 
 // Kickstart system
 initEventListeners();

@@ -10,18 +10,14 @@ html {
 body {
     font-family: 'Nunito', sans-serif;
     color: #f1f5f9;
-
     margin: 0;
     padding: 20px;
-
     display: flex;
     flex-direction: column;
     align-items: center;
-
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-
     background: transparent;
     position: relative;
 }
@@ -30,101 +26,492 @@ body::before {
     content: "";
     position: fixed;
     inset: 0;
-
     z-index: -1;
-
-    background: linear-gradient(
-        180deg,
-        #21376e 0%,
-        #1e3e7a 50%,
-        #3b629b 100%
-    );
+    background: linear-gradient(180deg, #21376e 0%, #1e3e7a 50%, #3b629b 100%);
 }
 
 /* =========================================================
-   SAFARI LIQUID GLASS CHROME TINTING ENGINE
+   DASHBOARD LAYOUT & PANELS
 ========================================================= */
-.safari-top-anchor,
-.safari-bottom-anchor {
-    position: fixed;
-    left: 0;
-
-    width: 100%;
-    height: 6px;
-
-    z-index: 9999;
-    pointer-events: none;
-}
-
-.safari-top-anchor {
-    top: 0;
-    background-color: #21376e;
-}
-
-.safari-bottom-anchor {
-    bottom: 0;
-    background-color: #3b629b;
-}
-
-.today_data_block {
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-/* =========================================================
-   DASHBOARD LAYOUT
-========================================================= */
-.dashboard-row {
-    display: flex;
-    flex-wrap: nowrap;
-    justify-content: center;
-
-    gap: 20px;
-
-    width: 100%;
-    max-width: 820px;
-
-    margin: 0 auto 20px auto;
-}
-
-/* =========================================================
-   PANEL SYSTEM
-========================================================= */
-.weather_block,
-.pressure_block,
-.temperature_block,
-.min_max_block,
-.system_health_block,
-.chart_block,
-.today_data_block {
+.today_data_block,
+.weather_block, .pressure_block, .temperature_block,
+.min_max_block, .system_health_block, .chart_block,
+.humidity_block {
     position: relative;
     overflow: hidden;
-
     background: rgba(42, 74, 138, 0.75);
-
-    backdrop-filter: none;
-
     border: 1px solid rgba(170, 210, 255, 0.34);
     border-radius: 14px;
-
     padding: 20px;
-
-    box-shadow: none;
-
     box-sizing: border-box;
     width: 100%;
 }
 
+.dashboard-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 15px;
+    width: 100%;
+    max-width: 820px;
+    margin: 0 auto 20px auto;
+}
+
 .today_data_block {
-    width: 820px;
-    max-width: 100%;
+    max-width: 820px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 auto 20px auto;
+}
 
-    padding: 15px;
+.pressure_block,
+.humidity_block {
+    flex: 1 1 0;
+    min-width: 0;
+}
 
+.date-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.temperature_block, .pressure_block, .humidity_block {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+#date { font-size: 1.1rem; color: #c3d7f3; }
+#fullDay { font-size: 1.5rem; font-weight: bold; color: #ffffff; }
+#realTime { font-size: 2rem; font-weight: 750; color: #38bdf8; text-align: right; }
+
+/* Card Headers & Icons */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 24px;
+    border-bottom: 1px solid rgba(180, 220, 255, 0.22);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+
+h3 {
+    margin: 0;
+    color: #38bdf8;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.75px;
+    border-bottom: none;
+    padding-bottom: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.info-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid rgba(140, 190, 255, 0.4);
+    color: #9fc2f5;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: monospace;
+    cursor: help;
+}
+
+/* =========================================================
+   STRUCTURAL ALIGNMENT
+========================================================= */
+.unified-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+}
+
+.temp-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 0;
+    padding-right: 20px;
+}
+
+.metric-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* anchor to top so values align across cards of different heights */
+    gap: 8px;
+    text-align: center;
+    width: 100%;
+    align-items: center;
+    flex-grow: 1;
+    padding-top: 8px;
+}
+
+.align-left {
+    align-items: flex-start;
+    text-align: left;
+}
+
+.main-value {
+    font-size: 2rem;
+    display: flex;
+    align-items: center;  /* center trend vertically with the number, not baseline */
+    color: #ffffff;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 4px;
+    white-space: nowrap;
+}
+
+.main-value .unit {
+    font-size: 0.52em;
+    font-weight: 600;
+    color: #b4c9e8;
+    margin-left: 2px;
+}
+
+/* =========================================================
+   TREND — temperature (vertical: arrow centered above value)
+========================================================= */
+#temp-trend {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    margin-left: 10px;
+    line-height: 1;
+}
+
+/* Shared size tokens — used by both temp and pressure trends */
+.trend-arrow { font-size: 0.9rem;  font-weight: 700; line-height: 1; }
+.trend-val   { font-size: 0.75rem; font-weight: 700; line-height: 1; }
+
+/* Temperature trend colors */
+.trend-up,     .trend-up *     { color: #ffb088 !important; }
+.trend-down,   .trend-down *   { color: #7dd3fc !important; }
+.trend-stable, .trend-stable * { color: #b4c9e8 !important; }
+
+/* =========================================================
+   PRESSURE TREND — row below main value: [↑ 0.3/h]  Slowly rising
+========================================================= */
+#pressure-trend {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.pressure-trend-indicator {
+    display: inline-flex;
+    flex-direction: row;  /* arrow and value side by side — single line, aligns with label */
+    align-items: baseline;
+    gap: 3px;
+    font-weight: 700;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.pressure-trend-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Pressure main-value wraps: number+unit on first line, trend on second */
+.pressure_block .main-value {
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    gap: 0;
+    margin-bottom: 0;
+}
+
+/* number and unit must never break apart — only #pressure-trend wraps */
+.pressure_block .main-value > span:not(#pressure-trend),
+.pressure_block .main-value > #avg-pressure,
+.pressure_block .main-value > .unit {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* trend gets its own line inside the wrapping flex */
+.pressure_block #pressure-trend {
+    flex-basis: 100%;
+    margin-top: 6px;
+}
+.pressure-rising-fast  .pressure-trend-indicator,
+.pressure-rising-fast  .pressure-trend-label  { color: #fca5a5; }
+
+.pressure-rising       .pressure-trend-indicator,
+.pressure-rising       .pressure-trend-label  { color: #fcd34d; }
+
+.pressure-rising-slow  .pressure-trend-indicator,
+.pressure-rising-slow  .pressure-trend-label  { color: #d1fae5; }
+
+.pressure-stable       .pressure-trend-indicator,
+.pressure-stable       .pressure-trend-label  { color: #cbd5e1; }
+
+.pressure-falling-slow .pressure-trend-indicator,
+.pressure-falling-slow .pressure-trend-label  { color: #bae6fd; }
+
+.pressure-falling      .pressure-trend-indicator,
+.pressure-falling      .pressure-trend-label  { color: #7dd3fc; }
+
+.pressure-falling-fast .pressure-trend-indicator,
+.pressure-falling-fast .pressure-trend-label  { color: #60a5fa; }
+
+/* =========================================================
+   EXTREMES (MIN / MAX)
+========================================================= */
+.extremes-side {
+    display: flex;
+    gap: 12px;
+    font-size: clamp(0.7rem, 2.5vw, 0.9rem);
+    justify-content: flex-start;
+    margin-top: 5px;
+}
+
+.extreme-item {
+    display: inline-flex;
+    align-items: baseline;
+}
+
+.extreme-item .label {
+    font-weight: 600;
+    color: #9fc2f5;
+    margin-right: 4px;
+}
+
+#min-temp { color: #7dd3fc; font-weight: 600; }
+#max-temp { color: #ffb088; font-weight: 600; }
+
+/* =========================================================
+   DEW POINT SECTION & GAUGE
+========================================================= */
+.dew-point-section {
+    flex: 1 1 auto;           /* grows to fill available space, shrinks freely */
+    min-width: 120px;         /* floor — below this the layout would break */
+    max-width: 380px;         /* ceiling on large screens */
+    border-left: 1px solid rgba(180, 220, 255, 0.25); /* divider always present */
+    padding-left: 20px;
+    margin-left: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dew-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    flex-wrap: wrap;
+    margin-bottom: 0;
+}
+
+.dew-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0; /* allows children to truncate */
+}
+
+.dew-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #9fc2f5;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dew-values {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 0.9em;
+}
+
+.dew-main {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #facc15;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dew-sub {
+    font-size: 0.75rem;
+    color: #9fc2f5;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.dew-status-badge {
+    border: 1px solid #ffb088;
+    color: #ffb088;
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   DEW POINT GAUGE
+========================================================= */
+.gauge-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+    padding-bottom: 10px; /* keeps marker dot (7px radius) inside panel's overflow:hidden */
+}
+
+.gauge-track {
+    position: relative;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #f87171 0%, #fbbf24 35%, #4ade80 70%, #2dd4bf 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.gauge-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    border: 3px solid #38bdf8;
+    left: 40%;
+    transition: left 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.gauge-marker:hover::after {
+    content: attr(data-spread);
+    position: absolute;
+    bottom: 160%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e3e7a;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1px solid #38bdf8;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    z-index: 10;
+}
+
+.gauge-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: #b4c9e8;
+    font-weight: 600;
+}
+
+/* =========================================================
+   HUMIDITY PROGRESS
+========================================================= */
+.humidity_block {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.progress-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin-top: 1px;
+}
+
+.progress-labels-stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px; /* Space between Comfortable and Dew point */
+}
+
+.progress-track {
+    flex: 1;
+    height: 8px;
+    background-color: rgba(140, 190, 255, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: #38bdf8;
+    transition: width 0.4s ease;
+}
+
+.progress-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #9fc2f5;
+    white-space: nowrap;
+    text-align: right;
+    line-height: 1; /* Added */
+}
+
+.humidity-dew-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end; /* Changed to flex-end to align with progress-label */
+    gap: 4px;
+    margin-top: 0; /* Removed previous 8px margin */
+    font-size: 0.65rem; /* Reduced from 0.72rem */
+    color: #7aa8d4;
+    font-weight: 600;
+    line-height: 1; /* Added */
+}
+
+.humidity-dew-line .dew-label {
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-size: 0.55rem; /* Reduced from 0.65rem */
+    color: #5a8ab0;
+}
+
+.humidity-dew-line .dew-value {
+    color: #a8cbea;
+    font-weight: 700;
 }
 
 /* =========================================================
@@ -133,105 +520,55 @@ body::before {
 .chart_block {
     width: 100%;
     max-width: 820px;
-
     margin: 0 auto 20px auto;
-
     box-sizing: border-box;
-    height: auto;
 }
 
-.chart_block .chart-header {
+.chart-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-
-    margin-left: 0;
-    margin-bottom: 12px;
-
     border-bottom: 1px solid rgba(180, 220, 255, 0.22);
-
     padding-bottom: 10px;
-
-    width: 100% !important;
+    margin-bottom: 15px;
 }
 
-.chart_block canvas,
-.chart_block .chart-container {
+.chart_block canvas, .chart_block .chart-container {
     width: 100% !important;
     height: 320px;
-
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
 }
 
-.chart-header h3 {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.chart_block h3 {
-    margin: 0;
-
-    font-size: clamp(0.78rem, 1vw + 0.55rem, 1rem);
-
-    line-height: 1.2;
-}
-
-/* =========================================================
-   METRIC SELECTOR
-========================================================= */
 .metric-selector {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 8px;
 }
 
 .selector-label {
     font-size: 0.8rem;
     font-weight: 700;
-
     color: #9fc2f5;
-
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .metric-dropdown {
     -webkit-appearance: none;
-    -moz-appearance: none;
     appearance: none;
-
     padding: 6px 32px 6px 12px;
-
     font-family: 'Nunito', sans-serif;
     font-weight: 600;
     font-size: 0.85rem;
-
     color: #ffffff;
-
     background-color: rgba(30, 58, 138, 0.7);
-
     border: 1px solid rgba(140, 190, 255, 0.4);
     border-radius: 6px;
-
     cursor: pointer;
     outline: none;
-
-    transition:
-        background-color 0.18s ease,
-        border-color 0.18s ease,
-        transform 0.08s ease,
-        opacity 0.08s ease;
-
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2338bdf8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-
     background-repeat: no-repeat;
     background-position: right 10px center;
     background-size: 12px;
-
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-    -webkit-user-select: none;
 }
 
 .metric-dropdown:focus-visible {
@@ -242,457 +579,161 @@ body::before {
 .metric-dropdown option {
     background-color: #1e293b !important;
     color: #ffffff !important;
-
-    font-family: 'Nunito', sans-serif;
-
-    padding: 8px;
-}
-
-/* Desktop-only hover states */
-@media (hover: hover) and (pointer: fine) {
-    .metric-dropdown:hover {
-        background-color: rgba(42, 74, 138, 0.9);
-        border-color: #38bdf8;
-    }
 }
 
 /* =========================================================
-   TREND INDICATORS
+   SYSTEM HEALTH
 ========================================================= */
-#temp-trend,
-#pressure-trend {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-
-    margin-left: 10px;
-
-    line-height: 0.9;
-    vertical-align: middle;
-
-    align-self: center;
-
-    gap: 2px;
-}
-
-.trend-arrow {
-    display: block;
-    font-size: 0.55em;
-    font-weight: 700;
-}
-
-.trend-val {
-    display: block;
-    font-size: 0.35em;
-    font-weight: 700;
-    margin-top: 1px;
-}
-
-.trend-up,
-.trend-up * {
-    color: #ffb088 !important;
-}
-
-.trend-down,
-.trend-down * {
-    color: #7dd3fc !important;
-}
-
-.trend-stable,
-.trend-stable * {
-    color: #b4c9e8 !important;
-}
-
-.pressure-trend-up,
-.pressure-trend-up * {
-    color: #a8c0d8 !important;
-}
-
-.pressure-trend-down,
-.pressure-trend-down * {
-    color: #6f8fa8 !important;
-}
-
-.pressure-trend-stable,
-.pressure-trend-stable * {
-    color: #8ea3b5 !important;
-}
-
-/* =========================================================
-   MAIN METRIC VALUES
-========================================================= */
-.metric-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    gap: 8px;
-
-    text-align: center;
-    width: 100%;
-}
-
-.main-value {
-    font-size: clamp(1.35rem, 4vw + 0.55rem, 2.5rem);
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: #ffffff;
-
-    font-weight: 700;
-    line-height: 1.1;
-
-    margin-bottom: 4px;
-
-    white-space: nowrap;
-}
-
-.main-value .unit {
-    font-size: 0.52em;
-    font-weight: 600;
-}
-
-/* =========================================================
-   TOP HEADER TEXT
-========================================================= */
-#date {
-    font-size: 1.1rem;
-    color: #c3d7f3;
-}
-
-#fullDay {
-    font-size: 1.5rem;
-    font-weight: bold;
-
-    color: #ffffff;
-}
-
-#realTime {
-    font-size: 2rem;
-    font-weight: 750;
-
-    color: #38bdf8;
-
-    text-align: right;
-}
-
-/* =========================================================
-   ERROR STATES
-========================================================= */
-.error-msg {
-    width: 100%;
-
-    margin-top: 15px;
-
-    text-align: center;
-
-    color: #f87171;
-}
-
-/* =========================================================
-   TEMPERATURE EXTREMES
-========================================================= */
-#min-temp {
-    color: #7dd3fc;
-    font-weight: 600;
-}
-
-#max-temp {
-    color: #ffb088;
-    font-weight: 600;
-}
-
-.unit {
-    color: #b4c9e8;
-    font-weight: 600;
-}
-
-.extremes-side {
-    display: flex;
-
-    gap: 10px;
-
-    border-left: none;
-    padding-left: 0;
-
-    font-size: clamp(0.7rem, 2.5vw, 0.9rem);
-
-    justify-content: center;
-
-    width: 100%;
-}
-
-.extreme-item {
-    white-space: nowrap;
-
-    display: inline-flex;
-    align-items: baseline;
-}
-
-.extreme-item .label {
-    font-weight: 600;
-
-    font-size: clamp(0.7rem, 2.5vw, 0.95rem);
-
-    color: #9fc2f5;
-
-    margin-right: 4px;
-}
-
-.extreme-item .unit {
-    font-size: 0.85em;
-    margin-left: 1px;
-}
-
-/* =========================================================
-   PANEL HEADERS
-========================================================= */
-h3 {
-    margin-top: 0;
-
-    color: #38bdf8;
-
-    font-weight: 700;
-    font-size: 0.85rem;
-
-    text-transform: uppercase;
-    letter-spacing: 0.75px;
-
-    border-bottom: 1px solid rgba(180, 220, 255, 0.22);
-
-    padding-bottom: 10px;
-}
-
-/* =========================================================
-   BLOCK SIZING
-========================================================= */
-.pressure_block {
-    width: 300px;
-}
-
-.temperature_block {
-    width: 500px;
-}
-
 .system_health_block {
     width: 820px;
     max-width: 100%;
 }
 
-.temperature_block,
-.pressure_block {
-    flex: 1 1 0;
-    min-width: 0;
-}
-
-.temperature_block {
-    flex: 1.3 1 0;
-}
-
-/* =========================================================
-   HEALTH GRID
-========================================================= */
 .health-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-
+    grid-template-columns: repeat(4, 1fr);
     gap: 15px;
-}
-
-.temperature {
-    font-size: 1.2rem;
-    font-weight: bold;
-}
-
-.pressure {
-    font-size: 2rem;
+    margin-top: 15px;
 }
 
 .health-item label {
     display: block;
-
     font-size: 0.8rem;
     font-weight: bold;
-
     color: #9fc2f5;
 }
 
 .health-item span {
     font-size: 1.2rem;
     font-weight: bold;
-
     color: #ffffff;
 }
 
-/* =========================================================
-   STATUS COLORS
-========================================================= */
-.status-live {
-    color: #4ade80;
-    text-shadow: none;
+.dashboard-row.row-split {
+    flex-wrap: nowrap;
 }
 
 /* =========================================================
-   LOGIN
-========================================================= */
-.login-wrapper {
-    width: 100%;
-    min-height: 100vh;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    padding: 16px;
-
-    box-sizing: border-box;
-
-    overscroll-behavior: none;
-}
-
-.login-card {
-    width: 100%;
-    max-width: 400px;
-
-    padding: 24px 20px;
-
-    box-sizing: border-box;
-}
-
-.login-form {
-    display: flex;
-    flex-direction: column;
-
-    gap: 16px;
-
-    margin-top: 16px;
-}
-
-.login-form input {
-    width: 100%;
-    box-sizing: border-box;
-
-    padding: 14px 16px;
-
-    border-radius: 8px;
-
-    border: 1px solid rgba(140, 190, 255, 0.4);
-
-    background: rgba(30, 58, 138, 0.7);
-
-    color: #ffffff;
-
-    font-size: 16px;
-    font-family: inherit;
-
-    -webkit-appearance: none;
-    appearance: none;
-}
-
-.login-form input:focus {
-    outline: none;
-
-    border-color: rgba(140, 190, 255, 0.9);
-
-    box-shadow: 0 0 0 3px rgba(140, 190, 255, 0.15);
-}
-
-.login-form button {
-    width: 100%;
-
-    padding: 14px;
-
-    border-radius: 8px;
-
-    font-size: 16px;
-    font-weight: 600;
-
-    border: none;
-
-    cursor: pointer;
-
-    touch-action: manipulation;
-
-    transition:
-        background-color 0.18s ease,
-        border-color 0.18s ease,
-        transform 0.08s ease,
-        opacity 0.08s ease;
-
-    -webkit-tap-highlight-color: transparent;
-
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-.login-form button:active {
-    transform: scale(0.98);
-    opacity: 0.9;
-}
-
-/* =========================================================
-   RESPONSIVE
+   RESPONSIVE LAYOUTS
 ========================================================= */
 @media (max-width: 850px) {
-    .pressure_block,
     .temperature_block,
-    .system_health_block {
-        width: 100%;
+    .pressure_block,
+    .humidity_block {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 
-    .chart_block canvas,
-    .chart_block .chart-container {
-        height: 200px;
+    .dashboard-row {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 15px;
     }
 }
 
-@media (min-width: 600px) {
+@media (max-width: 600px) {
+    .dashboard-row {
+        gap: 10px;
+        flex-wrap: nowrap;
+    }
+
+    .temperature_block,
+    .pressure_block,
+    .humidity_block {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    /* tighten the dew section on small screens */
+    .dew-point-section {
+        padding-left: 12px;
+        min-width: 100px;
+    }
+
+    .temp-section {
+        padding-right: 12px;
+        align-items: center; /* keep centered at smaller sizes */
+    }
+
+    /* hide the badge to save horizontal space */
+    .dew-status-badge {
+        display: none;
+    }
+
+    /* unified value size across all three cards at this width */
+    .main-value {
+        font-size: 1.6rem;
+    }
+
+    /* temp trend smaller so it doesn't compete with the value — pressure trend unchanged */
+    #temp-trend .trend-arrow { font-size: 0.7rem; }
+    #temp-trend .trend-val   { font-size: 0.6rem; }
+
+    .dew-main {
+        font-size: 1.2rem;
+    }
+
     .health-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .health-item span {
+        font-size: 1rem;
     }
 }
 
 @media (max-width: 480px) {
     .metric-content {
-        display: flex;
-        flex-direction: column;
         align-items: center;
-
         text-align: center;
     }
 
-    .chart_block canvas,
-    .chart_block .chart-container {
+    .dashboard-row {
+        flex-wrap: wrap;
+    }
+
+    .chart_block canvas, .chart_block .chart-container {
         height: 140px;
     }
 
-    .chart_block {
-        padding: 14px;
+    .main-value {
+        font-size: 1.4rem;
+        justify-content: center;
     }
 
-    .main-value {
-        justify-content: center;
-        padding-left: 0;
-    }
+    /* temp trend even smaller at narrowest screens */
+    #temp-trend .trend-arrow { font-size: 0.6rem; }
+    #temp-trend .trend-val   { font-size: 0.55rem; }
 
     .extremes-side {
         justify-content: center;
-        text-align: center;
+    }
+
+    /* on very small screens, allow dew section to go narrower */
+    .dew-point-section {
+        min-width: 80px;
+        padding-left: 10px;
+    }
+
+    .temp-section {
+        padding-right: 10px;
+        align-items: center;
+    }
+
+    /* hide gauge labels to reduce noise */
+    .gauge-labels {
+        display: none;
     }
 }
 
-/* Ultra small phones */
-@media (max-width: 380px) {
-    .main-value {
-        font-size: 1.2rem;
-    }
-
-    .chart_block h3 {
-        font-size: 0.72rem;
-        letter-spacing: 0.5px;
+@media (max-width: 400px) {
+    .dew-values {
+        flex-direction: column;
+        gap: 2px;
     }
 }
-

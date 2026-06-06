@@ -56,8 +56,6 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                       ROUND(AVG(temperature)::numeric, 1)::double precision AS value
                   FROM weather_records
                   WHERE temperature_data_quality = 'OK'
-                    AND pressure_data_quality = 'OK'
-                    AND humidity_data_quality = 'OK'
                     AND measured_at >= :since
                   GROUP BY bucket
                   ORDER BY bucket ASC

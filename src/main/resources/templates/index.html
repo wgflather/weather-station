@@ -7,13 +7,8 @@
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-
-
 </head>
 <body th:with="d=${dashboard}">
-
-<div class="safari-top-anchor"></div>
-<div class="safari-bottom-anchor"></div>
 
 <div class="today_data_block">
     <div class="date-group">
@@ -21,42 +16,102 @@
         <div id="fullDay"></div>
     </div>
     <div id="realTime"></div>
+</div>
 
+<div class="dashboard-row row-full">
+    <div class="temperature_block unified-card">
+        <div class="card-header">
+            <h3>Temperature</h3>
+            <span class="info-icon">i</span>
+        </div>
+        <div class="unified-content">
+            <div class="temp-section">
+                <div class="main-value">
+                    <span id="avg-temp">--</span><span class="unit">°C</span>
+                    <div id="temp-trend"></div>
+                </div>
+                <div class="extremes-side">
+                    <div class="extreme-item">
+                        <span class="label">Min:</span>
+                        <span id="min-temp">--</span><span class="unit">°C</span>
+                    </div>
+                    <div class="extreme-item">
+                        <span class="label">Max:</span>
+                        <span id="max-temp">--</span><span class="unit">°C</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dew-point-section">
+                <div class="dew-header">
+                    <div class="dew-title-group">
+                        <span class="dew-title">Dew Point Spread</span>
+                        <div class="dew-values">
+                            <span class="dew-main" id="dew-spread-val">--°</span>
+                            <span class="dew-sub">T: <span id="dew-t">--</span>° · Td: <span id="dew-td">--</span>°</span>
+                        </div>
+                    </div>
+                    <div class="dew-status-badge" id="dew-status">Caution</div>
+                </div>
+                <div class="gauge-container">
+                    <div class="gauge-track">
+                        <div class="gauge-marker" id="gauge-pin" data-spread="--°"></div>
+                    </div>
+                    <div class="gauge-labels">
+                        <span>0°</span>
+                        <span>2°</span>
+                        <span>4°</span>
+                        <span>6.5°</span>
+                        <span>10°+</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="dashboard-row">
-
-    <!-- Weather block -->
-<div class="temperature_block">
-    <h3>Temperature</h3>
-    <div class="metric-content">
-        <div class="main-value">
-            <span id="avg-temp"></span><span class="unit">°C</span><span id="temp-trend"></span>
+    <div class="pressure_block unified-card">
+        <div class="card-header">
+            <h3>Pressure</h3>
+            <span class="info-icon">i</span>
         </div>
-
-        <div class="extremes-side">
-            <div class="extreme-item">
-                <span class="label">Min:</span>
-                <span id="min-temp">24.3</span><span class="unit">°C</span>
+        <div class="metric-content">
+            <div class="main-value">
+                <span id="avg-pressure"></span><span class="unit">hPa</span>
+                <div id="pressure-trend"></div>
             </div>
-            <div class="extreme-item">
-                <span class="label">Max:</span>
-                <span id="max-temp">26.2</span><span class="unit">°C</span>
+        </div>
+    </div>
+
+    <div class="humidity_block unified-card">
+        <div class="card-header">
+            <h3>Humidity</h3>
+            <span class="info-icon">i</span>
+        </div>
+        <div class="metric-content">
+            <div class="main-value">
+                <span id="humidity-val">67.1</span><span class="unit">%</span>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-track">
+                    <div class="progress-bar" id="humidity-progress" style="width: 67.1%;"></div>
+                </div>
+
+                <div class="progress-labels-stacked">
+                    <span class="progress-label" id="humidity-desc">Comfortable</span>
+
+                    <div class="humidity-dew-line">
+                        <span class="dew-label">Dew point</span>
+                        <span class="dew-value" id="humidity-dew-val">18.2°C</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-    <div class="pressure_block">
-        <h3>Pressure</h3>
-            <div class="main-value">
-             <span id="avg-pressure"></span><span class="unit">hPa</span><span id="pressure-trend"></span>
-            </div>
-        </div>
-    </div>
-
-
-<!-- Chart -->
 <div class="chart_block">
     <div class="chart-header">
         <h3>24-Hour Trend</h3>
@@ -65,6 +120,7 @@
             <select id="metric-selector" class="metric-dropdown">
                 <option value="temperature">Temperature</option>
                 <option value="pressure">Pressure</option>
+                <option value="humidity">Humidity</option>
             </select>
         </div>
     </div>
@@ -73,7 +129,6 @@
     </div>
 </div>
 
-<!-- System health -->
 <div class="system_health_block">
     <h3>System Health</h3>
     <div class="health-grid">
@@ -81,23 +136,21 @@
             <label>Status</label>
             <span id="status"></span>
         </div>
-
         <div class="health-item">
             <label>Lag</label>
             <span id="lag"></span>
         </div>
-
         <div class="health-item">
             <label>Today Records</label>
             <span id="todayRecords"></span>
         </div>
-
         <div class="health-item">
             <label>Last Update</label>
             <span id="lastUpdate"></span>
         </div>
     </div>
 </div>
+
 <script th:src="@{/js/realtime-script.js}"></script>
 <script type="module" th:src="@{/js/fetch-data.js}"></script>
 </body>
