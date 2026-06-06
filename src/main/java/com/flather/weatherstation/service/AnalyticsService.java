@@ -3,6 +3,7 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.TimezoneProperties;
 import com.flather.weatherstation.domain.constant.Metric;
+import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
@@ -12,6 +13,7 @@ import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.ToDoubleFunction;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.commons.math3.util.Precision;
@@ -55,28 +57,27 @@ public class AnalyticsService {
     return Duration.between(lastRecord, Instant.now().atZone(zoneId)).toMinutes();
   }
 
-  private double averageOfFiveLastReadings(ToDoubleFunction<WeatherRecordResponseDto> extractor) {
+  private Double averageOfFiveLastReadings(
+          Function<WeatherRecordResponseDto, Double> extractor) {
 
-    double avg =
-        sensorStateCache.getMetricsWindow().reversed().stream()
+    OptionalDouble avg = sensorStateCache.getMetricsWindow().reversed().stream()
+            .map(extractor)
+            .filter(Objects::nonNull)
             .limit(5)
-            .mapToDouble(extractor)
-            .average()
-            .orElseThrow(() -> new IllegalStateException("No readings available"));
+            .mapToDouble(Double::doubleValue)
+            .average();
 
-    return Precision.round(avg, 1);
+    return avg.isPresent() ? Precision.round(avg.getAsDouble(), 1) : null;
   }
-
   private List<DataPoint> extractDataPoints(
-      ToDoubleFunction<WeatherRecordResponseDto> valueExtractor) {
+          Function<WeatherRecordResponseDto, Double> valueExtractor) {
 
     return sensorStateCache.getMetricsWindow().stream()
-        .map(
-            record ->
-                new DataPoint(
+            .map(record -> new DataPoint(
                     record.getMeasuredAtTimeZoned().toInstant(),
-                    valueExtractor.applyAsDouble(record)))
-        .toList();
+                    valueExtractor.apply(record)
+            ))
+            .toList();
   }
 
   public TemperatureDto getTemperature() {
@@ -94,14 +95,6 @@ public class AnalyticsService {
 
   public HumidityDto getHumidity(){
     return new HumidityDto(averageOfFiveLastReadings(WeatherRecordResponseDto::getHumidity));
-  }
-
-  public List<HourlyChartAvgDto> getTemperatureChartData(Instant since) {
-    return dataPointToDto(repository.findChartTemperature(since));
-  }
-
-  public List<HourlyChartAvgDto> getPressureChartData(Instant since) {
-    return dataPointToDto(repository.findChartPressure(since));
   }
 
   public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric){
@@ -158,15 +151,25 @@ public class AnalyticsService {
   }
 
   public TrendResult calculateTrend(List<DataPoint> dataPoints) {
-    if (dataPoints == null || dataPoints.size() < 2) {
+    if (dataPoints.isEmpty()) {
       return new TrendResult(0.0, TrendDirection.STABLE);
     }
 
-    Instant firstDataTime = dataPoints.getFirst().hour();
+    List<DataPoint> filteredPoints = dataPoints.stream()
+            .filter(dataPoint -> dataPoint.value() != null)
+            .toList();
+
+    if (filteredPoints.size() < 2) {
+      return new TrendResult(0.0, TrendDirection.STABLE);
+    }
+
+
+
+    Instant firstDataTime = filteredPoints.getFirst().hour();
 
     SimpleRegression regression = new SimpleRegression();
 
-    for (DataPoint point : dataPoints) {
+    for (DataPoint point : filteredPoints) {
       double x = Duration.between(firstDataTime, point.hour()).toMillis() / 1000.0;
 
       double y = point.value();

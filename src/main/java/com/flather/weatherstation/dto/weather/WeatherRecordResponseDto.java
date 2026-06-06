@@ -12,7 +12,7 @@ public class WeatherRecordResponseDto {
 
   private Double temperature;
 
-  private double pressure;
+  private Double pressure;
 
   private Double humidity;
 

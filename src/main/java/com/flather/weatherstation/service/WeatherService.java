@@ -2,7 +2,9 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.projection.MedianProjection;
+import com.flather.weatherstation.dto.validation.ValidationResult;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
@@ -30,24 +32,59 @@ public class WeatherService {
   private final TimezoneProperties timezoneProperties;
   private final SensorStateCache sensorStateCache;
 
-  private MedianProjection estimateMedian() {
-    if (sensorStateCache.getSpikeReferenceWindow().isEmpty()) {
-      return null;
-    }
-
-    Median median = new Median();
-
-    double pressureMedian = medianOf(WeatherRecordResponseDto::getPressure, median);
-    double tempMedian = medianOf(WeatherRecordResponseDto::getTemperature, median);
-    double humMedian = medianOf(WeatherRecordResponseDto::getHumidity, median);
-
-    return new MedianProjection(tempMedian, pressureMedian, humMedian);
+  private Double medianOf(Metric metric, Median median) {
+      return median.evaluate(
+              sensorStateCache.getSpikeWindowSnapshot(metric).stream().mapToDouble(Double::doubleValue).toArray());
   }
 
-  private Double medianOf(ToDoubleFunction<WeatherRecordResponseDto> values, Median median) {
-      return median.evaluate(
-              sensorStateCache.getSpikeReferenceWindow().stream().filter(Objects::nonNull).mapToDouble(values).toArray()
-      );
+  private DataQuality validateIfOk(
+          Metric metric,
+          ValidationResult validationResult,
+          Double value) {
+
+    DataQuality quality = validationResult.getByMetric(metric);
+
+    if(sensorStateCache.getSpikeWindowSnapshot(metric).isEmpty() && quality.equals(DataQuality.OK)){
+      return  DataQuality.OK;
+    }
+
+    return quality == DataQuality.OK
+            ? validateMetric(metric, validationResult, value)
+            : quality;
+  }
+
+  private void updateCache(DataQuality dataQuality, Metric metric, Double value){
+    if (dataQuality == DataQuality.OK) {
+      sensorStateCache.updateSpikeState(metric, dataQuality, value);
+      sensorStateCache.updateCachedMeasurement(metric, value);
+    }
+
+    if(dataQuality == DataQuality.SPIKE){
+      sensorStateCache.updateSpikeState(metric, dataQuality, value);
+    }
+  }
+
+
+
+  private DataQuality validateMetric(Metric metric, ValidationResult validation,
+                                     double value){
+    boolean spike = false;
+    DataQuality metricToCheck = validation.getByMetric(metric);
+    if (metricToCheck == DataQuality.OK) {
+
+      double median = medianOf(metric, new Median());
+
+      spike = qualityValidator.detectDataSpike(
+              metric,
+              value,
+              median,
+              sensorStateCache.getLastSavedMeasurementAt());
+    }
+    if(spike){
+      return DataQuality.SPIKE;
+    }
+
+    return DataQuality.OK;
   }
 
   @Transactional
@@ -55,48 +92,64 @@ public class WeatherService {
 
     WeatherRecord record = mapper.weatherDtoToEntity(weatherRecordDto);
 
-    boolean isAnomaly = qualityValidator.detectDataAnomaly(weatherRecordDto);
+    ValidationResult anomalyAndMissingValidationResult =
+            qualityValidator.detectDataAnomaly(weatherRecordDto);
 
-    MedianProjection medianProjection = estimateMedian();
+    DataQuality tempQuality = validateIfOk(
+            Metric.TEMPERATURE,
+            anomalyAndMissingValidationResult,
+            weatherRecordDto.getTemperature());
 
-    boolean isSpike =
-        qualityValidator.detectDataSpike(
-            weatherRecordDto, sensorStateCache.getLastSavedMeasurementAt(), medianProjection);
+    DataQuality pressureQuality = validateIfOk(
+            Metric.PRESSURE,
+            anomalyAndMissingValidationResult,
+            weatherRecordDto.getPressure());
 
-    DataQuality quality = qualityValidator.determineDataQualityStatus(isAnomaly, isSpike);
+    DataQuality humidityQuality = validateIfOk(
+            Metric.HUMIDITY,
+            anomalyAndMissingValidationResult,
+            weatherRecordDto.getHumidity());
 
-    int consecutiveSpikes = sensorStateCache.getConsecutiveSpikes();
+    updateCache(
+            tempQuality,
+            Metric.TEMPERATURE,
+            record.getTemperature());
 
-    if (quality == DataQuality.SPIKE) {
+    record.setTemperatureDataQuality(tempQuality);
 
-      consecutiveSpikes++;
-      sensorStateCache.setConsecutiveSpikes(consecutiveSpikes);
+    updateCache(
+            pressureQuality,
+            Metric.PRESSURE,
+            record.getPressure());
 
-      if (consecutiveSpikes >= SensorStateCache.SPIKE_REFERENCE_SIZE) {
+    record.setPressureDataQuality(pressureQuality);
 
-        // sustained change → accept as new reality
-        quality = DataQuality.OK;
-      }
-    } else {
-      sensorStateCache.setConsecutiveSpikes(0);
-    }
+    updateCache(
+            humidityQuality,
+            Metric.HUMIDITY,
+            record.getHumidity());
 
-    record.setDataQuality(quality);
+    record.setHumidityDataQuality(humidityQuality);
 
-    WeatherRecordResponseDto savedRecord = mapper.weatherEntityToDto(repository.save(record));
+// ============================
+// persist
+// ============================
 
-    if (quality == DataQuality.OK) {
+    WeatherRecordResponseDto savedRecord =
+            mapper.weatherEntityToDto(repository.save(record));
 
-      if (consecutiveSpikes >= SensorStateCache.SPIKE_REFERENCE_SIZE) {
+// ============================
+// metadata update
+// ============================
+    sensorStateCache.setLastSavedMeasurementAt(
+            savedRecord.getMeasuredAtTimeZoned().toInstant()
+    );
+// ============================
+// update general metrics cache
+// ============================
+    sensorStateCache.updateCachedMeasurements(savedRecord);
 
-        // establish a fresh baseline around the new conditions
-        sensorStateCache.forceBaselineReset(savedRecord);
-        sensorStateCache.setConsecutiveSpikes(0);
-      }
-      sensorStateCache.updateCachedMeasurements(savedRecord);
-    }
 
-    sensorStateCache.setLastSavedMeasurementAt(savedRecord.getMeasuredAtTimeZoned().toInstant());
 
     return savedRecord;
   }

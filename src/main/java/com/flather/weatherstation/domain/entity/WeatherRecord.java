@@ -1,6 +1,7 @@
 package com.flather.weatherstation.domain.entity;
 
 import com.flather.weatherstation.domain.constant.DataQuality;
+import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -24,15 +25,24 @@ public class WeatherRecord {
   @NotNull
   private String deviceId;
 
+  @Nullable
   private Double temperature;
 
   private Double pressure;
 
   private Double humidity;
 
-  @Column(name = "data_quality")
+  @Column(name = "humidity_data_quality")
   @Enumerated(EnumType.STRING)
-  private DataQuality dataQuality;
+  private DataQuality humidityDataQuality;
+
+  @Column(name = "pressure_data_quality")
+  @Enumerated(EnumType.STRING)
+  private DataQuality pressureDataQuality;
+
+  @Column(name = "temperature_data_quality")
+  @Enumerated(EnumType.STRING)
+  private DataQuality temperatureDataQuality;
 
   @CreationTimestamp
   @Column(name = "measured_at")

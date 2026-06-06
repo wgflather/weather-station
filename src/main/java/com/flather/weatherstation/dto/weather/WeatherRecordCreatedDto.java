@@ -13,7 +13,7 @@ public class WeatherRecordCreatedDto {
 
   private Double temperature;
 
-  private double pressure;
+  private Double pressure;
 
   private Double humidity;
 

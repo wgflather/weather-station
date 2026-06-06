@@ -1,11 +1,17 @@
 package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.config.WeatherValidationProperties;
+import com.flather.weatherstation.domain.constant.DataStatus;
+import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.projection.MedianProjection;
+import com.flather.weatherstation.dto.validation.ValidationResult;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,83 +23,137 @@ public class DataQualityValidator {
 
   private final WeatherValidationProperties properties;
 
-  public boolean detectDataAnomaly(WeatherRecordCreatedDto anomalyDto) {
-    boolean isAnomaly = false; // Anomaly represents unrealistic data connected to sensor failures
+  private void validateMetric(
+          Metric metric,
+          Double value,
+          double min,
+          double max,
+          Map<Metric, DataQuality> result) {
 
-    if (anomalyDto.getTemperature() == null || anomalyDto.getTemperature() < properties.getTempMinimal()
-            || anomalyDto.getTemperature() > properties.getTempMaximum()) {
-      log.warn(
-              "[DATA_ANOMALY][TEMP] Temperature is unrealistic: {} ℃",
-              anomalyDto.getTemperature());
-      isAnomaly = true;
+    if (value == null) {
+      log.warn(ValidationLogMessages.missing(metric));
+      result.put(metric, DataQuality.MISSING);
+      return;
     }
 
-    if (anomalyDto.getPressure() < properties.getPressureMinimal()
-            || anomalyDto.getPressure() > properties.getPressureMaximum()) {
-      log.warn(
-              "[DATA_ANOMALY][PRESSURE] Pressure is unrealistic: {} hPa",
-              anomalyDto.getPressure());
-      isAnomaly = true;
+    if (value < min || value > max) {
+      log.warn(ValidationLogMessages.anomaly(metric, value));
+      result.put(metric, DataQuality.ANOMALY);
+      return;
     }
 
-    if (anomalyDto.getHumidity() == null || anomalyDto.getHumidity()  < properties.getHumidityMinimal()
-            || anomalyDto.getHumidity() > properties.getHumidityMaximum()) {
-      log.warn(
-              "[DATA_ANOMALY][HUMIDITY] Humidity is unrealistic: {} %",
-              anomalyDto.getHumidity());
-      isAnomaly = true;
-    }
+    result.put(metric, DataQuality.OK);
+  }
 
-    return isAnomaly;
+  public ValidationResult detectDataAnomaly(WeatherRecordCreatedDto anomalyDto) {
+
+    Map<Metric, DataQuality> dataQualityMap = new HashMap<>();
+
+    validateMetric(
+            Metric.TEMPERATURE,
+            anomalyDto.getTemperature(),
+            properties.getTempMinimal(),
+            properties.getTempMaximum(),
+            dataQualityMap);
+
+    validateMetric(
+            Metric.PRESSURE,
+            anomalyDto.getPressure(),
+            properties.getPressureMinimal(),
+            properties.getPressureMaximum(),
+            dataQualityMap);
+
+    validateMetric(
+            Metric.HUMIDITY,
+            anomalyDto.getHumidity(),
+            properties.getHumidityMinimal(),
+            properties.getHumidityMaximum(),
+            dataQualityMap);
+
+    return new ValidationResult(dataQualityMap.get(Metric.TEMPERATURE),
+            dataQualityMap.get(Metric.PRESSURE),
+            dataQualityMap.get(Metric.HUMIDITY));
+  }
+
+  private double getSpikeLimit(Metric metric) {
+    return switch (metric) {
+      case TEMPERATURE -> properties.getTempSpikeLimit();
+      case PRESSURE -> properties.getPressureSpikeLimit();
+      case HUMIDITY -> properties.getHumiditySpikeLimit();
+      default -> throw new IllegalArgumentException("Unknown Metric");
+    };
   }
 
   public boolean detectDataSpike(
-          WeatherRecordCreatedDto weatherRecordDto,
-          Instant lastSavedRecord,
-          MedianProjection median) {
+          Metric metric,
+          Double currentValue,
+          Double medianValue,
+          Instant lastSavedRecord) {
 
-    if (median == null || lastSavedRecord == null) return false;
-
-    long elapsed = Duration.between(lastSavedRecord, Instant.now()).toMinutes();
-
-    if (elapsed >= 10) return false;
-
-    double newTemp = weatherRecordDto.getTemperature();
-    double newPressure = weatherRecordDto.getPressure();
-    double newHumidity = weatherRecordDto.getHumidity();
-
-    boolean isSpike = false; // Spike represents a sharp jump in data values
-
-    if (Math.abs(newTemp - median.temp()) > properties.getTempSpikeLimit()) {
-      log.warn(
-              "[DATA_SPIKE][TEMP] Last 5 temp reads median: {} ℃ Current temp read: {} ℃",
-              median.temp(),
-              weatherRecordDto.getTemperature());
-      isSpike = true;
+    if (currentValue == null
+            || medianValue == null
+            || lastSavedRecord == null) {
+      return false;
     }
 
-    if (Math.abs(newPressure - median.pressure()) > properties.getPressureSpikeLimit()) {
-      log.warn(
-              "[DATA_SPIKE][PRESSURE] Last 5 pressure reads median: {} hPa Current pressure read: {} hPa",
-              median.pressure(),
-              weatherRecordDto.getPressure());
-      isSpike = true;
+    long elapsed =
+            Duration.between(lastSavedRecord, Instant.now()).toMinutes();
+
+    if (elapsed >= 10) {
+      return false;
     }
 
-    if (Math.abs(newHumidity - median.humidity()) > properties.getHumiditySpikeLimit()) {
+    double spikeLimit = getSpikeLimit(metric);
+
+    if (Math.abs(currentValue - medianValue) > spikeLimit) {
+
       log.warn(
-              "[DATA_SPIKE][HUMIDITY] Last 5 humidity reads median: {} % Current humidity read: {} %",
-              median.humidity(),
-              weatherRecordDto.getHumidity());
-      isSpike = true;
+              ValidationLogMessages.spike(
+                      metric,
+                      medianValue,
+                      currentValue));
+
+      return true;
     }
 
-    return isSpike;
+    return false;
   }
 
-  public DataQuality determineDataQualityStatus(boolean anomaly, boolean spike) {
-    if (anomaly) return DataQuality.ANOMALY;
-    if (spike) return DataQuality.SPIKE;
-    return DataQuality.OK;
+  public static final class ValidationLogMessages {
+
+    private ValidationLogMessages() {}
+
+    public static String missing(Metric metric) {
+      return String.format(
+              "[DATA_MISSING][%s] %s is missing",
+              metric.getName().toUpperCase(),
+              metric.getName());
+    }
+
+    public static String anomaly(
+            Metric metric,
+            double value) {
+
+      return String.format(
+              "[DATA_ANOMALY][%s] %s is unrealistic: %.2f %s",
+              metric.getName().toUpperCase(),
+              metric.getName(),
+              value,
+              metric.getUnit());
+    }
+
+    public static String spike(
+            Metric metric,
+            double median,
+            double currentValue) {
+
+      return String.format(
+              "[DATA_SPIKE][%s] Last 5 reads median: %.2f %s Current read: %.2f %s",
+              metric.getName().toUpperCase(),
+              median,
+              metric.getUnit(),
+              currentValue,
+              metric.getUnit());
+    }
   }
 }
