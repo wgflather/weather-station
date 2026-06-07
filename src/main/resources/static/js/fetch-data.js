@@ -135,13 +135,14 @@ function updatePressureTrend(direction, changeValue) {
     if (!el) return;
 
     const { cssClass, arrow, label } = classifyPressureTrend(direction, changeValue);
-    const absVal = Math.abs(changeValue ?? 0).toFixed(1);
+    const absVal = Math.abs(changeValue ?? 0);
+    const valStr = absVal > 0 ? `<span class="trend-val">${absVal.toFixed(1)}/h</span>` : '';
 
     el.className = cssClass;
     el.innerHTML = `
         <span class="pressure-trend-indicator">
             <span class="trend-arrow">${arrow}</span>
-            <span class="trend-val">${absVal}/h</span>
+            ${valStr}
         </span>
         <span class="pressure-trend-label">${label}</span>
     `;
