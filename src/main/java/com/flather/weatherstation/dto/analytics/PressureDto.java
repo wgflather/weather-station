@@ -1,3 +1,5 @@
 package com.flather.weatherstation.dto.analytics;
 
-public record PressureDto(Double avgPressure, TrendResult trendResult) {}
+import com.flather.weatherstation.dto.dashboard.MetricDataDetails;
+
+public record PressureDto(Double value, TrendResult trendResult, MetricDataDetails dataDetails) {}

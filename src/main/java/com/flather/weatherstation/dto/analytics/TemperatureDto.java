@@ -1,3 +1,5 @@
 package com.flather.weatherstation.dto.analytics;
 
-public record TemperatureDto(Double avgTemp, TrendResult trendResult, Double min, Double max) {}
+import com.flather.weatherstation.dto.dashboard.MetricDataDetails;
+
+public record TemperatureDto(Double value, TrendResult trendResult, Double min, Double max, MetricDataDetails dataDetails) {}

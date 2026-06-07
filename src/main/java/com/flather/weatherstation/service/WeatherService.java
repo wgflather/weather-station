@@ -39,8 +39,8 @@ public class WeatherService {
 
     DataQuality quality = validationResult.getByMetric(metric);
 
-    if (sensorStateCache.getSpikeWindowSnapshot(metric).isEmpty()
-        && quality.equals(DataQuality.OK)) {
+    if (quality.equals(DataQuality.OK)
+        && sensorStateCache.getLastSavedMeasurement() == null) {
       return DataQuality.OK;
     }
 
@@ -61,20 +61,23 @@ public class WeatherService {
   private DataQuality validateMetric(Metric metric, ValidationResult validation, double value) {
     boolean spike = false;
     DataQuality metricToCheck = validation.getByMetric(metric);
+
     if (metricToCheck == DataQuality.OK) {
 
       double median = medianOf(metric, new Median());
 
       spike =
           qualityValidator.detectDataSpike(
-              metric, value, median, sensorStateCache.getLastSavedMeasurementAt());
+              metric, value, median, sensorStateCache.getLastSavedMeasurement().getMeasuredAt());
     }
+
     if (spike) {
       return DataQuality.SPIKE;
     }
 
     return DataQuality.OK;
   }
+
 
   @Transactional
   public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto) {
@@ -117,18 +120,18 @@ public class WeatherService {
     // persist
     // ============================
 
-    WeatherRecordResponseDto savedRecord = mapper.weatherEntityToDto(repository.save(record));
+    WeatherRecord savedRecord = repository.save(record);
 
     // ============================
     // metadata update
     // ============================
-    sensorStateCache.setLastSavedMeasurementAt(savedRecord.getMeasuredAtTimeZoned().toInstant());
+    sensorStateCache.setLastSavedMeasurement(savedRecord);
     // ============================
     // update general metrics cache
     // ============================
     sensorStateCache.updateCachedMeasurements(savedRecord);
 
-    return savedRecord;
+    return mapper.weatherEntityToDto(savedRecord);
   }
 
   @Transactional(readOnly = true)

@@ -1,3 +1,5 @@
 package com.flather.weatherstation.dto.analytics;
 
-public record HumidityDto(Double humidity) {}
+import com.flather.weatherstation.dto.dashboard.MetricDataDetails;
+
+public record HumidityDto(Double value, MetricDataDetails dataDetails) {}

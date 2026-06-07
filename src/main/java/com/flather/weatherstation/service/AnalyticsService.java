@@ -1,14 +1,18 @@
 package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.SensorStateCache;
+import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.domain.constant.DataQuality;
+import com.flather.weatherstation.domain.constant.DataStatus;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.constant.TrendDirection;
+import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
-import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
+import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
 import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
@@ -25,14 +29,20 @@ public class AnalyticsService {
   private final WeatherReportRepository repository;
   private final ZoneId zoneId;
   private final SensorStateCache sensorStateCache;
+  private final MetricDataDetailsMapper metricDataDetailsMapper;
+  private final HardwareConfig hardwareConfig;
 
   public AnalyticsService(
       WeatherReportRepository repository,
       TimezoneProperties timezoneProperties,
-      SensorStateCache sensorStateCache) {
+      SensorStateCache sensorStateCache,
+      MetricDataDetailsMapper metricDataDetailsMapper,
+      HardwareConfig hardwareConfig) {
     this.repository = repository;
     this.zoneId = timezoneProperties.getZoneId();
     this.sensorStateCache = sensorStateCache;
+    this.metricDataDetailsMapper = metricDataDetailsMapper;
+    this.hardwareConfig = hardwareConfig;
   }
 
   private DateRangeHelper.DateRange today() {
@@ -45,8 +55,8 @@ public class AnalyticsService {
   }
 
   public ZonedDateTime findLastRecordTime() {
-    if (sensorStateCache.getLastSavedMeasurementAt() != null) {
-      return sensorStateCache.getLastSavedMeasurementAt().atZone(zoneId);
+    if (sensorStateCache.getLastSavedMeasurement() != null) {
+      return sensorStateCache.getLastSavedMeasurement().getMeasuredAt().atZone(zoneId);
     }
 
     return null;
@@ -56,11 +66,13 @@ public class AnalyticsService {
     return Duration.between(lastRecord, Instant.now().atZone(zoneId)).toMinutes();
   }
 
-  private Double averageOfFiveLastReadings(Function<WeatherRecordResponseDto, Double> extractor) {
+  private Double averageOfFiveLastReadings(Function<WeatherRecord, Double> valueExtractor,
+                                           Function<WeatherRecord, DataQuality> qualityExtractor) {
 
     OptionalDouble avg =
         sensorStateCache.getMetricsWindow().reversed().stream()
-            .map(extractor)
+                .filter(r -> qualityExtractor.apply(r) == DataQuality.OK)
+            .map(valueExtractor)
             .filter(Objects::nonNull)
             .limit(5)
             .mapToDouble(Double::doubleValue)
@@ -70,35 +82,39 @@ public class AnalyticsService {
   }
 
   private List<DataPoint> extractDataPoints(
-      Function<WeatherRecordResponseDto, Double> valueExtractor) {
+      Function<WeatherRecord, Double> valueExtractor) {
 
     return sensorStateCache.getMetricsWindow().stream()
         .map(
             record ->
                 new DataPoint(
-                    record.getMeasuredAtTimeZoned().toInstant(), valueExtractor.apply(record)))
+                    record.getMeasuredAt(), valueExtractor.apply(record)))
         .toList();
   }
 
   public TemperatureDto getTemperature() {
     return new TemperatureDto(
-        averageOfFiveLastReadings(WeatherRecordResponseDto::getTemperature),
+        averageOfFiveLastReadings(WeatherRecord::getTemperature, WeatherRecord::getTemperatureDataQuality),
         getTempTrend(),
         sensorStateCache.getTodayMinTemp(),
-        sensorStateCache.getTodayMaxTemp());
+        sensorStateCache.getTodayMaxTemp(),
+            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.TEMPERATURE, hardwareConfig));
   }
 
   public PressureDto getPressure() {
     return new PressureDto(
-        averageOfFiveLastReadings(WeatherRecordResponseDto::getPressure), getPressureTrend());
+        averageOfFiveLastReadings(WeatherRecord::getPressure, WeatherRecord::getPressureDataQuality), getPressureTrend(),
+            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.PRESSURE, hardwareConfig));
   }
 
   public HumidityDto getHumidity() {
-    return new HumidityDto(averageOfFiveLastReadings(WeatherRecordResponseDto::getHumidity));
+    return new HumidityDto(averageOfFiveLastReadings(WeatherRecord::getHumidity, WeatherRecord::getHumidityDataQuality),
+            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.HUMIDITY, hardwareConfig));
   }
 
   public SurfaceWetnessDto getSurfaceWetness(){
-    return new SurfaceWetnessDto(sensorStateCache.getMetricsWindow().getLast().getSurfaceWetness());
+    return new SurfaceWetnessDto(sensorStateCache.getMetricsWindow().getLast().getSurfaceWetness(),
+            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.SURFACE_WETNESS, hardwareConfig));
   }
 
   public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric) {
@@ -146,11 +162,11 @@ public class AnalyticsService {
   }
 
   public TrendResult getTempTrend() {
-    return calculateTrend(extractDataPoints(WeatherRecordResponseDto::getTemperature));
+    return calculateTrend(extractDataPoints(WeatherRecord::getTemperature));
   }
 
   public TrendResult getPressureTrend() {
-    return calculateTrend(extractDataPoints(WeatherRecordResponseDto::getPressure));
+    return calculateTrend(extractDataPoints(WeatherRecord::getPressure));
   }
 
   public TrendResult calculateTrend(List<DataPoint> dataPoints) {
