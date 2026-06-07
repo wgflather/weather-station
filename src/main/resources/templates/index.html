@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 </head>
+<div id="global-popup" class="details-popup"></div>
 <body th:with="d=${dashboard}">
 
 <div class="today_data_block">
@@ -19,10 +20,11 @@
 </div>
 
 <div class="dashboard-row row-full">
-    <div class="temperature_block unified-card">
+    <div class="temperature_block unified-card" id="temperature-card">
         <div class="card-header">
             <h3>Temperature</h3>
-            <span class="info-icon">i</span>
+            <span class="status-circle"></span>
+            <div class="details-popup"></div>
         </div>
         <div class="unified-content">
             <div class="temp-section">
@@ -72,10 +74,11 @@
 
 <!-- row-metric: pressure + humidity stay side by side; wetness wraps below on small screens -->
 <div class="dashboard-row row-metric">
-    <div class="pressure_block unified-card">
+    <div class="pressure_block unified-card" id="pressure-card">
         <div class="card-header">
             <h3>Pressure</h3>
-            <span class="info-icon">i</span>
+            <span class="status-circle"></span>
+            <div class="details-popup"></div>
         </div>
         <div class="metric-content">
             <div class="main-value">
@@ -85,10 +88,11 @@
         </div>
     </div>
 
-    <div class="humidity_block unified-card">
+    <div class="humidity_block unified-card" id="humidity-card">
         <div class="card-header">
             <h3>Humidity</h3>
-            <span class="info-icon">i</span>
+            <span class="status-circle"></span>
+            <div class="details-popup"></div>
         </div>
         <div class="metric-content">
             <div class="main-value">
@@ -103,10 +107,11 @@
         </div>
     </div>
 
-    <div class="wetness_block unified-card">
+    <div class="wetness_block unified-card" id="wetness-card">
         <div class="card-header">
             <h3>Surface Wetness</h3>
-            <span class="info-icon">i</span>
+            <span class="status-circle"></span>
+            <div class="details-popup"></div>
         </div>
         <div class="metric-content" style="align-items: flex-start; padding-top: 6px;">
             <div class="wetness-status-badge wetness-dry" id="wetness-badge">

@@ -30,6 +30,13 @@ weather:
     surface-wetness-minimal: 0
     surface-wetness-maximum: 4095
 
+hardware:
+  board: esp32-c6
+  temperature-sensor: DHT22
+  humidity-sensor: DHT22
+  pressure-sensor: BMP180
+  surface-wetness-sensor: HW-028
+
 timezone:
   zone-id: Europe/Kiev
 

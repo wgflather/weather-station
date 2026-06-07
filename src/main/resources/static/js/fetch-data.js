@@ -13,6 +13,21 @@ const state = {
     }
 };
 
+const QUALITY_STYLE = {
+    OK:      { color: '#22c55e', label: 'OK' },        // green
+    SPIKE:   { color: '#f59e0b', label: 'SPIKE' },     // orange
+    ANOMALY: { color: '#ef4444', label: 'ANOMALY' },   // red
+    MISSING: { color: '#111827', label: 'MISSING' }    // near black
+};
+
+function getMetric(dto, key) {
+    return dto?.[key] ?? null;
+}
+
+function getQualityStyle(quality) {
+    return QUALITY_STYLE[quality] ?? QUALITY_STYLE.MISSING;
+}
+
 const scheduler = new FetchScheduler(
     async (metric, existingChart) => {
         let url = `/api/weather/chart?metric=${metric}`;
@@ -231,57 +246,121 @@ function updateSurfaceWetness(raw) {
     barEl.style.backgroundColor = barColor;
 }
 
+function formatArrivedAt(value) {
+    if (!value) return '--';
+
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return '--';
+
+    return date.toLocaleString('en-GB', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+function setStatusCircleColor(circleEl, quality) {
+    if (!circleEl) return;
+
+    const { color } = getQualityStyle(quality);
+
+    circleEl.style.backgroundColor = color;
+    circleEl.style.boxShadow = `0 0 0 2px ${color}33`; // subtle glow
+}
+
+
 // ==========================================
 // MAIN RENDER
 // ==========================================
 
 function renderMetrics(dto) {
-    const temp     = dto?.temperature;
-    const pressure = dto?.pressure;
-    const hum      = dto?.humidity;
-    const wetness  = dto?.surfaceWetnessDto;
+    const temp     = getMetric(dto, "temperature");
+    const pressure = getMetric(dto, "pressure");
+    const hum      = getMetric(dto, "humidity");
+    const wetness  = getMetric(dto, "surfaceWetness");
 
-    // --- Temperature card ---
-    document.getElementById("avg-temp").textContent = temp?.avgTemp ?? "--";
-    document.getElementById("min-temp").textContent = temp?.min     ?? "--";
-    document.getElementById("max-temp").textContent = temp?.max     ?? "--";
+    // =========================
+    // Temperature
+    // =========================
+    document.getElementById("avg-temp").textContent = temp?.value ?? "--";
+    document.getElementById("min-temp").textContent  = temp?.min ?? "--";
+    document.getElementById("max-temp").textContent  = temp?.max ?? "--";
 
     updateTemperatureTrend(
         temp?.trendResult?.direction,
         temp?.trendResult?.changeValue
     );
 
-    // --- Pressure card ---
-    document.getElementById("avg-pressure").textContent = pressure?.avgPressure ?? "--";
+    // =========================
+    // Pressure
+    // =========================
+    document.getElementById("avg-pressure").textContent = pressure?.value ?? "--";
 
     updatePressureTrend(
         pressure?.trendResult?.direction,
         pressure?.trendResult?.changeValue
     );
 
-    // --- Humidity card ---
-    const humVal = hum?.humidity;
+    // =========================
+    // Humidity
+    // =========================
+    const humVal = hum?.value;
+
     if (humVal != null) {
         document.getElementById("humidity-val").textContent = humVal;
 
         let desc = "Comfortable";
         if (humVal > 70) desc = "Humid";
         if (humVal < 35) desc = "Dry";
+
         document.getElementById("humidity-desc").textContent = desc;
     }
 
-    // Dew point — derived from temp + humidity, shown as secondary info in humidity card
+    // Dew point
     const dewEl = document.getElementById("humidity-dew-val");
     if (dewEl) {
-        const td = calculateDewPoint(temp?.avgTemp, humVal);
+        const td = calculateDewPoint(temp?.value, humVal);
         dewEl.textContent = td !== null ? `${td.toFixed(1)}°C` : "--°C";
     }
 
-    // Dew point spread gauge in temperature card
-    updateDewPointSpreadGauge(temp?.avgTemp, humVal);
+    // =========================
+    // Dew point spread (temperature card)
+    // =========================
+    updateDewPointSpreadGauge(temp?.value, humVal);
 
-    // --- Surface wetness card ---
-    updateSurfaceWetness(wetness?.surfaceWetness);
+    // =========================
+    // Surface wetness
+    // =========================
+    updateSurfaceWetness(wetness?.value);
+
+    populatePopup('wetness-card', wetness?.dataDetails);
+        populatePopup('temperature-card', temp?.dataDetails);
+        populatePopup('pressure-card', pressure?.dataDetails);
+        populatePopup('humidity-card', hum?.dataDetails);
+
+        // NEW: color circles
+        setStatusCircleColor(
+            document.querySelector('#temperature-card .status-circle'),
+            temp?.dataDetails?.quality
+        );
+
+        setStatusCircleColor(
+            document.querySelector('#pressure-card .status-circle'),
+            pressure?.dataDetails?.quality
+        );
+
+        setStatusCircleColor(
+            document.querySelector('#humidity-card .status-circle'),
+            hum?.dataDetails?.quality
+        );
+
+        setStatusCircleColor(
+            document.querySelector('#wetness-card .status-circle'),
+            wetness?.dataDetails?.quality
+        );
 }
 
 async function updateDashboard() {
@@ -343,6 +422,106 @@ function startPolling(fn, interval) {
     return () => stopped = true;
 }
 
-// Kickstart system
+// ─── Status circle popup ──────────────────────────────────────────────────────
+// Single shared popup, appended to <body>
+const globalPopup = document.getElementById('global-popup');
+
+function populatePopup(cardId, details) {
+    // Store details on the circle's card for later use by click handler
+    const card = document.getElementById(cardId);
+    if (!card || !details) return;
+    card._popupDetails = details;
+}
+
+function buildPopupHTML(details) {
+    const sensor     = details.sensor     ?? '--';
+    const lastValue  = details.lastValue  ?? '--';
+    const quality    = details.quality    ?? 'MISSING';
+    const metricName = details.metricName ?? '--';
+    const arrivedAt  = formatArrivedAt(details.arrivedAt);
+    const qStyle     = getQualityStyle(quality);
+
+    return `
+        <div class="popup-heading">${metricName} - Last Measurement</div>
+        <div class="popup-row">
+            <span class="popup-key">Sensor</span>
+            <span class="popup-val">${sensor}</span>
+        </div>
+        <div class="popup-row">
+            <span class="popup-key">Last value</span>
+            <span class="popup-val">${lastValue}</span>
+        </div>
+        <div class="popup-row">
+            <span class="popup-key">Quality</span>
+            <span class="popup-val" style="color:${qStyle.color}; font-weight:600;">${quality}</span>
+        </div>
+        <div class="popup-row">
+            <span class="popup-key">Arrived</span>
+            <span class="popup-val">${arrivedAt}</span>
+        </div>
+    `;
+}
+
+function positionPopup(circle) {
+    const r      = circle.getBoundingClientRect();
+    const popupW = globalPopup.offsetWidth  || 220;
+    const popupH = globalPopup.offsetHeight || 140;
+    const margin = 8;
+    const vw     = window.innerWidth;
+    const vh     = window.innerHeight;
+
+    let top  = r.bottom + margin;
+    let left = r.right  - popupW;
+
+    if (left < margin)               left = margin;
+    if (left + popupW > vw - margin) left = vw - popupW - margin;
+    if (top  + popupH > vh - margin) top  = r.top - popupH - margin;
+    if (top  < margin)               top  = margin;
+
+    globalPopup.style.top  = `${Math.round(top)}px`;
+    globalPopup.style.left = `${Math.round(left)}px`;
+}
+
+function initStatusCircles() {
+    document.querySelectorAll('.status-circle').forEach(circle => {
+        circle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const card    = circle.closest('[id$="-card"]');
+            const details = card?._popupDetails;
+            const isOpen  = globalPopup.classList.contains('open')
+                         && globalPopup._sourceCircle === circle;
+
+            // Always close first
+            globalPopup.classList.remove('open');
+
+            if (!isOpen && details) {
+                globalPopup.innerHTML       = buildPopupHTML(details);
+                globalPopup._sourceCircle   = circle;
+                globalPopup.classList.add('open');
+                requestAnimationFrame(() => positionPopup(circle));
+            }
+        });
+    });
+
+    document.addEventListener('click', () => {
+        globalPopup.classList.remove('open');
+    });
+
+    // Reposition on scroll/resize in case the card moves
+    window.addEventListener('scroll', () => {
+        if (globalPopup.classList.contains('open') && globalPopup._sourceCircle) {
+            positionPopup(globalPopup._sourceCircle);
+        }
+    }, { passive: true });
+
+    window.addEventListener('resize', () => {
+        if (globalPopup.classList.contains('open') && globalPopup._sourceCircle) {
+            positionPopup(globalPopup._sourceCircle);
+        }
+    });
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 initEventListeners();
+initStatusCircles();
 startPolling(updateDashboard, 30000);
