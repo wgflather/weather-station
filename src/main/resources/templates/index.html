@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#21376e">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Weather Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -12,6 +10,9 @@
 </head>
 <div id="global-popup" class="details-popup"></div>
 <body th:with="d=${dashboard}">
+
+<div class="safari-top-anchor"></div>
+<div class="safari-bottom-anchor"></div>
 
 <div class="today_data_block">
     <div class="date-group">
