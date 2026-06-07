@@ -57,13 +57,16 @@
                 </div>
                 <div class="gauge-container">
                     <div class="gauge-track">
-                        <div class="gauge-marker" id="gauge-pin" data-spread="--°"></div>
+                        <div class="gauge-track-inner">
+                            <div class="gauge-marker" id="gauge-pin"></div>
+                        </div>
                     </div>
                     <div class="gauge-labels">
                         <span>0°</span>
                         <span>2°</span>
                         <span>4°</span>
-                        <span>6.5°</span>
+                        <span>6°</span>
+                        <span>8°</span>
                         <span>10°+</span>
                     </div>
                 </div>
@@ -99,8 +102,6 @@
                 <span id="humidity-val"></span><span class="unit">%</span>
             </div>
             <div class="humidity-meta">
-                <span class="humidity-desc" id="humidity-desc">Comfortable</span>
-                <span class="humidity-dew-sep">·</span>
                 <span class="humidity-dew-label">Dew</span>
                 <span class="humidity-dew-val" id="humidity-dew-val">--°C</span>
             </div>
@@ -113,7 +114,7 @@
             <span class="status-circle"></span>
             <div class="details-popup"></div>
         </div>
-        <div class="metric-content" style="align-items: flex-start; padding-top: 6px;">
+        <div class="metric-content">
             <div class="wetness-status-badge wetness-dry" id="wetness-badge">
                 <span class="wetness-status-dot"></span>
                 <span id="wetness-status-text">Dry</span>

@@ -311,12 +311,6 @@ function renderMetrics(dto) {
 
     if (humVal != null) {
         document.getElementById("humidity-val").textContent = humVal;
-
-        let desc = "Comfortable";
-        if (humVal > 70) desc = "Humid";
-        if (humVal < 35) desc = "Dry";
-
-        document.getElementById("humidity-desc").textContent = desc;
     }
 
     // Dew point

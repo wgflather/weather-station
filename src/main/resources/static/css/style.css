@@ -387,8 +387,8 @@ h3 {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-top: 4px;
-    padding-bottom: 10px; /* keeps marker dot (7px radius) inside panel's overflow:hidden */
+    margin-top: 8px;
+    padding-bottom: 14px; /* keeps marker dot (7px radius) inside panel's overflow:hidden */
 }
 
 .gauge-track {
@@ -397,18 +397,25 @@ h3 {
     border-radius: 4px;
     background: linear-gradient(90deg, #f87171 0%, #fbbf24 35%, #4ade80 70%, #2dd4bf 100%);
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+    /* remove padding */
+}
+
+.gauge-track-inner {
+    position: absolute;
+    inset: 0 5px;  /* 5px inset on left and right — pin stays inside */
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .gauge-marker {
     position: absolute;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 14px;
-    height: 14px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background-color: #ffffff;
     border: 3px solid #38bdf8;
-    left: 40%;
     transition: left 0.3s ease;
     cursor: pointer;
     box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
@@ -762,6 +769,23 @@ h3 {
     text-align: right;
 }
 
+/* All three metric cards: equal flex column layout */
+.dashboard-row.row-metric .pressure_block,
+.dashboard-row.row-metric .humidity_block,
+.dashboard-row.row-metric .wetness_block {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;  /* consistent top-anchoring */
+}
+
+/* Remove the inline override on wetness metric-content */
+/* In your HTML, change: style="align-items: flex-start; padding-top: 6px;"
+   to a CSS class instead: */
+.wetness_block .metric-content {
+    align-items: flex-start;
+    padding-top: 6px;
+}
+
 /* =========================================================
    RESPONSIVE LAYOUTS
 ========================================================= */
@@ -786,21 +810,22 @@ h3 {
 }
 
 @media (max-width: 600px) {
-    .dashboard-row {
-        gap: 10px;
-        flex-wrap: nowrap;
-    }
+        .dashboard-row.row-metric {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
 
-    /* wetness drops to its own full-width row below pressure+humidity */
-    .dashboard-row.row-metric {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
+        .dashboard-row.row-metric .pressure_block,
+        .dashboard-row.row-metric .humidity_block {
+            flex: 1 1 0;
+            min-width: 0;
+        }
 
-    .dashboard-row.row-metric .wetness_block {
-        flex: 1 1 100%;   /* full width on its own row */
-        min-width: 0;
-    }
+        .dashboard-row.row-metric .wetness_block {
+            flex: 1 1 100%;
+            min-width: 0;
+            margin-top: 10px; /* ← adds the missing row-level gap */
+        }
 
     .temperature_block,
     .pressure_block,
