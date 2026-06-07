@@ -31,9 +31,6 @@ body::before {
 }
 
 /* Explicitly paint html top/bottom to match gradient endpoints */
-html {
-    background-color: #3b629b; /* bottom color — shows behind bottom bar */
-}
 
 /* =========================================================
    DASHBOARD LAYOUT & PANELS
