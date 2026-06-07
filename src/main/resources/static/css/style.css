@@ -30,6 +30,31 @@ body::before {
     background: linear-gradient(180deg, #21376e 0%, #1e3e7a 50%, #3b629b 100%);
 }
 
+
+/* =========================================================
+   SAFARI LIQUID GLASS CHROME TINTING ENGINE
+========================================================= */
+.safari-top-anchor,
+.safari-bottom-anchor {
+    position: fixed;
+    left: 0;
+
+    width: 100%;
+    height: 6px;
+
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.safari-top-anchor {
+    top: 0;
+    background-color: #21376e;
+}
+
+.safari-bottom-anchor {
+    bottom: 0;
+    background-color: #3b629b;
+}
 /* =========================================================
    DASHBOARD LAYOUT & PANELS
 ========================================================= */
