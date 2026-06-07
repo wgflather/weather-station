@@ -117,16 +117,17 @@ public class AnalyticsService {
             metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.SURFACE_WETNESS, hardwareConfig));
   }
 
-  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric) {
+  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric, String resolution) {
+    String bucketInterval = resolution + "minutes";
     switch (metric) {
       case TEMPERATURE -> {
-        return dataPointToDto(repository.findChartTemperature(since));
+        return dataPointToDto(repository.findChartTemperature(since, bucketInterval));
       }
       case PRESSURE -> {
-        return dataPointToDto(repository.findChartPressure(since));
+        return dataPointToDto(repository.findChartPressure(since, bucketInterval));
       }
       case HUMIDITY -> {
-        return dataPointToDto(repository.findChartHumidity(since));
+        return dataPointToDto(repository.findChartHumidity(since, bucketInterval));
       }
       default -> throw new IllegalArgumentException("Unknown Metric");
     }
@@ -140,25 +141,25 @@ public class AnalyticsService {
         .toList();
   }
 
-  public ChartDto returnChart(Metric metric, String since) {
+  public ChartDto returnChart(Metric metric, String since, String resolution) {
     Instant sinceInstant =
         (since == null)
             ? LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant()
             : OffsetDateTime.parse(since).toInstant();
 
-    List<HourlyChartAvgDto> dtos = getMetricChart(sinceInstant, metric);
+    List<HourlyChartAvgDto> dtos = getMetricChart(sinceInstant, metric, resolution);
 
     Instant nextBucketExpectedAt = null;
 
     if (!dtos.isEmpty()) {
-      nextBucketExpectedAt = getNextExpectedBucketEpochMillis(dtos.getLast().hour());
+      nextBucketExpectedAt = getNextExpectedBucketEpochMillis(dtos.getLast().hour(), Integer.parseInt(resolution));
     }
 
     return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt);
   }
 
-  private Instant getNextExpectedBucketEpochMillis(ZonedDateTime zonedDateTime) {
-    return zonedDateTime.toInstant().plusSeconds(600);
+  private Instant getNextExpectedBucketEpochMillis(ZonedDateTime zonedDateTime, int resolution) {
+    return zonedDateTime.toInstant().plusSeconds(Duration.ofMinutes(resolution).toSeconds());
   }
 
   public TrendResult getTempTrend() {

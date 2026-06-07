@@ -6,19 +6,28 @@ export class FetchScheduler {
         this.renderFn = renderFn;
         this.bufferMs = bufferMs;
 
+        this.resolution = 10;
+
         this.timers = {
             temperature: null,
             pressure: null
         };
     }
 
-    start(metric, getChartFn) {
+    start(metric, getChartFn, resolution) {
         this.stop(metric);
+
+        this.resolution = resolution ?? this.resolution; // ✅ IMPORTANT
 
         const run = async () => {
             try {
                 const existingChart = getChartFn(metric);
-                const chartDto = await this.fetchChartFn(metric, existingChart);
+
+                const chartDto = await this.fetchChartFn(
+                    metric,
+                    existingChart,
+                    this.resolution   // ✅ FIX HERE
+                );
 
                 if (!chartDto) return;
 
@@ -27,8 +36,12 @@ export class FetchScheduler {
 
             } catch (err) {
                 console.error(`Scheduler error for [${metric}]:`, err);
-                // Fallback: If network drops, try again in 30 seconds
-                this.schedule(metric, new Date(Date.now() + 10000).toISOString(), getChartFn);
+
+                this.schedule(
+                    metric,
+                    new Date(Date.now() + 10000).toISOString(),
+                    getChartFn
+                );
             }
         };
 
@@ -76,7 +89,7 @@ export class FetchScheduler {
         }
 
         this.timers[metric] = setTimeout(() => {
-            this.start(metric, getChartFn);
+            this.start(metric, getChartFn, this.resolution);
         }, delay);
     }
 }

@@ -133,22 +133,58 @@
 </div>
 
 <div class="chart_block">
+
     <div class="chart-header">
         <h3>24-Hour Trend</h3>
+
         <div class="metric-selector">
+
+            <!-- Metric selector (always visible) -->
             <span class="selector-label">View:</span>
+
             <select id="metric-selector" class="metric-dropdown">
                 <option value="temperature">Temperature</option>
                 <option value="pressure">Pressure</option>
                 <option value="humidity">Humidity</option>
             </select>
+
+            <div class="resolution-wrapper" id="resolution-wrapper">
+
+                <!-- Desktop select -->
+                <select id="resolution-selector" class="resolution-dropdown">
+                    <option value="2">2 min</option>
+                    <option value="5">5 min</option>
+                    <option value="10" selected>10 min</option>
+                    <option value="30">30 min</option>
+                    <option value="60">60 min</option>
+                </select>
+
+                <!-- Mobile single button -->
+                <button type="button" id="resolution-btn" class="resolution-btn">
+                    ⚙
+                </button>
+
+                <!-- Mobile popup panel -->
+                <div class="resolution-panel" id="resolution-panel">
+                    <div class="resolution-title">Resolution</div>
+
+                    <button data-value="2">2 min</button>
+                    <button data-value="5">5 min</button>
+                    <button data-value="10">10 min</button>
+                    <button data-value="30">30 min</button>
+                    <button data-value="60">60 min</button>
+                </div>
+
+            </div>
+
         </div>
     </div>
+
     <div class="chart-container" style="position: relative; height:200px; width:100%;">
         <canvas id="weatherChart"></canvas>
     </div>
-</div>
 
+</div>
 <div class="system_health_block">
     <h3>System Health</h3>
     <div class="health-grid">

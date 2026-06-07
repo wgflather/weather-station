@@ -52,7 +52,7 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
       value =
           """
                   SELECT
-                      date_bin('10 minutes', measured_at, :since) AS bucket,
+                      date_bin(CAST(:bucketInterval AS interval), measured_at, :since) AS bucket,
                       ROUND(AVG(temperature)::numeric, 1)::double precision AS value
                   FROM weather_records
                   WHERE temperature_data_quality = 'OK'
@@ -61,13 +61,13 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   ORDER BY bucket ASC
                   """,
       nativeQuery = true)
-  List<DataPoint> findChartTemperature(@Param("since") Instant since);
+  List<DataPoint> findChartTemperature(@Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
 
   @Query(
       value =
           """
                           SELECT
-                              date_bin('10 minutes', measured_at, :since) AS bucket,
+                              date_bin(CAST(:bucketInterval AS interval), measured_at, :since) AS bucket,
                               ROUND(AVG(humidity)::numeric, 1)::double precision AS value
                           FROM weather_records
                           WHERE humidity_data_quality = 'OK'
@@ -76,13 +76,13 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                           ORDER BY bucket ASC
                           """,
       nativeQuery = true)
-  List<DataPoint> findChartHumidity(@Param("since") Instant since);
+  List<DataPoint> findChartHumidity(@Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
 
   @Query(
       value =
           """
                   SELECT
-                      date_bin('10 minutes', measured_at, :since) AS bucket,
+                      date_bin(CAST(:bucketInterval AS interval), measured_at, :since) AS bucket,
                       ROUND(AVG(pressure)::numeric, 1)::double precision AS value
                   FROM weather_records
                   WHERE pressure_data_quality = 'OK'
@@ -91,5 +91,5 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   ORDER BY bucket ASC
                   """,
       nativeQuery = true)
-  List<DataPoint> findChartPressure(@Param("since") Instant since);
+  List<DataPoint> findChartPressure(@Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
 }

@@ -5,6 +5,7 @@ const state = {
     metrics: null,
     systemHealth: null,
     currentMetric: 'temperature',
+    currentResolution: Number(localStorage.getItem('resolution')) || 10,
 
     charts: {
         temperature: null,
@@ -29,8 +30,8 @@ function getQualityStyle(quality) {
 }
 
 const scheduler = new FetchScheduler(
-    async (metric, existingChart) => {
-        let url = `/api/weather/chart?metric=${metric}`;
+    async (metric, existingChart, resolution) => {
+        let url = `/api/weather/chart?metric=${metric}&resolution=${resolution}`;
 
         if (existingChart && existingChart.length > 0) {
             const lastBucket = existingChart[existingChart.length - 1].hour;
@@ -39,6 +40,7 @@ const scheduler = new FetchScheduler(
 
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Chart fetch failed for ${metric}`);
+
         return await response.json();
     },
 
@@ -49,7 +51,7 @@ const scheduler = new FetchScheduler(
             state.charts[metric] = newChartPoints;
         } else {
             const existingHours = new Set(state.charts[metric].map(p => p.hour));
-            const uniqueDeltas  = newChartPoints.filter(p => !existingHours.has(p.hour));
+            const uniqueDeltas = newChartPoints.filter(p => !existingHours.has(p.hour));
             state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
         }
 
@@ -62,9 +64,12 @@ const scheduler = new FetchScheduler(
 );
 
 function startChart(metric) {
-    scheduler.start(metric, (m) => state.charts[m]);
+    scheduler.start(
+        metric,
+        (m) => state.charts[m],
+        state.currentResolution  
+    );
 }
-
 // ==========================================
 // DASHBOARD & EVENT INITIALIZATION
 // ==========================================
@@ -385,24 +390,155 @@ function renderSystemHealth(systemHealth) {
     document.getElementById("status").style.color = colors[systemHealth.status] || 'black';
 }
 
+function initResolutionFromMemory() {
+    const selector = document.getElementById('resolution-selector');
+    if (!selector) return;
+
+    // sync UI → state (initial load only)
+    selector.value = String(state.currentResolution);
+}
+
+function initResolutionControls() {
+    const btn = document.getElementById('resolution-btn');
+    const panel = document.getElementById('resolution-panel');
+    const select = document.getElementById('resolution-selector');
+
+    if (!select) return;
+
+    // ---- load persisted value or default ----
+    const saved = localStorage.getItem('resolution');
+    if (saved) {
+        select.value = saved;
+    } else {
+        select.value = '10'; // DEFAULT 10 min
+        localStorage.setItem('resolution', '10');
+    }
+
+    state.currentResolution = Number(select.value);
+
+    // sync mobile buttons state
+    function setResolution(val) {
+        state.currentResolution = Number(val);
+
+        localStorage.setItem('resolution', val);
+
+        // sync desktop select
+        if (select) select.value = val;
+
+        // reset charts + restart stream
+        state.charts[state.currentMetric] = [];
+        renderWeatherChart([], state.currentMetric);
+        startChart(state.currentMetric);
+    }
+
+    // desktop select
+    select.addEventListener('change', (e) => {
+        setResolution(e.target.value);
+    });
+
+    // mobile button toggle
+    if (btn && panel) {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            panel.classList.toggle('open');
+        });
+
+        // click options
+        panel.querySelectorAll('button[data-value]').forEach(b => {
+            b.addEventListener('click', () => {
+                setResolution(b.dataset.value);
+                panel.classList.remove('open');
+            });
+        });
+
+        // close on outside click
+        document.addEventListener('click', () => {
+            panel.classList.remove('open');
+        });
+    }
+}
+
+function initResolutionToggle() {
+    const wrapper = document.getElementById('resolution-wrapper');
+    const toggle  = document.getElementById('resolution-toggle');
+    const select  = document.getElementById('resolution-selector');
+
+    if (!wrapper || !toggle || !select) return;
+
+    function updateLabel() {
+        const val = select.value;
+        toggle.textContent = `${val}m ▾`;
+    }
+
+    updateLabel();
+
+    select.addEventListener('change', () => {
+        updateLabel();
+    });
+
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        wrapper.classList.toggle('open');
+    });
+
+    document.addEventListener('click', () => {
+        wrapper.classList.remove('open');
+    });
+}
+
 function initEventListeners() {
     const selector = document.getElementById('metric-selector');
     if (!selector) return;
 
     state.currentMetric = selector.value;
+
+    // IMPORTANT: resolution must already be loaded before chart starts
+    initResolutionControls();
+
     startChart(state.currentMetric);
 
     selector.addEventListener('change', (event) => {
         const selectedMetric = event.target.value;
-        state.currentMetric  = selectedMetric;
-        const activeData     = state.charts[selectedMetric];
 
-        if (activeData === null) {
-            renderWeatherChart([], selectedMetric);
-            startChart(selectedMetric);
-        } else {
-            renderWeatherChart(activeData, selectedMetric);
+        state.currentMetric = selectedMetric;
+
+        if (!state.charts[selectedMetric]) {
+            state.charts[selectedMetric] = [];
         }
+
+        renderWeatherChart(state.charts[selectedMetric], selectedMetric);
+        startChart(selectedMetric);
+    });
+}
+
+function loadResolution() {
+    const saved = localStorage.getItem('chartResolution');
+    return saved ? Number(saved) : 5;
+}
+
+function saveResolution(res) {
+    localStorage.setItem('chartResolution', String(res));
+}
+
+function initResolutionListener() {
+    const selector = document.getElementById('resolution-selector');
+    if (!selector) return;
+
+    // ✅ hydrate state FIRST
+    state.currentResolution = loadResolution();
+
+    // ✅ sync UI to state (THIS IS THE MISSING PIECE)
+    selector.value = String(state.currentResolution);
+
+    selector.addEventListener('change', (event) => {
+        const newResolution = Number(event.target.value);
+
+        state.currentResolution = newResolution;
+        saveResolution(newResolution);
+
+        state.charts[state.currentMetric] = [];
+        renderWeatherChart([], state.currentMetric);
+        startChart(state.currentMetric);
     });
 }
 
@@ -517,6 +653,11 @@ function initStatusCircles() {
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
-initEventListeners();
+initEventListeners();        // sets up listeners
 initStatusCircles();
+
+// ✅ sync UI + state BEFORE scheduler starts
+initResolutionFromMemory();
+
+// now safe to start polling / charts
 startPolling(updateDashboard, 30000);
