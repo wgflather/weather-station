@@ -118,35 +118,54 @@ function updateTemperatureTrend(direction, changeValue) {
 function classifyPressureTrend(direction, changePerHour) {
     const abs = Math.abs(changePerHour ?? 0);
 
-    if (abs < 0.5) return { cssClass: 'pressure-stable',       arrow: '→', label: 'Stable'          };
+    if (abs < 0.5) {
+        return {
+            cssClass: 'pressure-stable',
+            arrow: '',
+            label: 'Stable'
+        };
+    }
 
     if (direction === 'UP') {
-        if (abs < 1.5) return { cssClass: 'pressure-rising-slow',  arrow: '↑', label: 'Slowly rising' };
-        if (abs < 3.0) return { cssClass: 'pressure-rising',       arrow: '↑', label: 'Rising'         };
-                       return { cssClass: 'pressure-rising-fast',  arrow: '↑', label: 'Rapidly rising' };
+        if (abs < 1.5) return { cssClass: 'pressure-rising-slow', arrow: '↑', label: 'Slowly rising' };
+        if (abs < 3.0) return { cssClass: 'pressure-rising', arrow: '↑', label: 'Rising' };
+        return { cssClass: 'pressure-rising-fast', arrow: '↑', label: 'Rapidly rising' };
     }
 
     if (direction === 'DOWN') {
         if (abs < 1.5) return { cssClass: 'pressure-falling-slow', arrow: '↓', label: 'Slowly falling' };
-        if (abs < 3.0) return { cssClass: 'pressure-falling',      arrow: '↓', label: 'Falling'         };
-                       return { cssClass: 'pressure-falling-fast', arrow: '↓', label: 'Rapidly falling' };
+        if (abs < 3.0) return { cssClass: 'pressure-falling', arrow: '↓', label: 'Falling' };
+        return { cssClass: 'pressure-falling-fast', arrow: '↓', label: 'Rapidly falling' };
     }
 
-    return { cssClass: 'pressure-stable', arrow: '→', label: 'Stable' };
+    return {
+        cssClass: 'pressure-stable',
+        arrow: '',
+        label: 'Stable'
+    };
 }
 
 function updatePressureTrend(direction, changeValue) {
     const el = document.getElementById('pressure-trend');
     if (!el) return;
 
-    const { cssClass, arrow, label } = classifyPressureTrend(direction, changeValue);
     const absVal = Math.abs(changeValue ?? 0);
-    const valStr = absVal > 0 ? `<span class="trend-val">${absVal.toFixed(1)}/h</span>` : '';
+
+    const { cssClass, arrow, label } =
+        classifyPressureTrend(direction, changeValue);
+
+    const showArrow = absVal > 0.4 && arrow;
+
+    const valStr =
+        absVal > 0.5
+            ? `<span class="trend-val">${absVal.toFixed(1)}/h</span>`
+            : '';
 
     el.className = cssClass;
+
     el.innerHTML = `
         <span class="pressure-trend-indicator">
-            <span class="trend-arrow">${arrow}</span>
+            ${showArrow ? `<span class="trend-arrow">${arrow}</span>` : ''}
             ${valStr}
         </span>
         <span class="pressure-trend-label">${label}</span>
