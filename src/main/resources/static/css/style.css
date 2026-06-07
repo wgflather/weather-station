@@ -30,6 +30,11 @@ body::before {
     background: linear-gradient(180deg, #21376e 0%, #1e3e7a 50%, #3b629b 100%);
 }
 
+/* Explicitly paint html top/bottom to match gradient endpoints */
+html {
+    background-color: #3b629b; /* bottom color — shows behind bottom bar */
+}
+
 /* =========================================================
    DASHBOARD LAYOUT & PANELS
 ========================================================= */
