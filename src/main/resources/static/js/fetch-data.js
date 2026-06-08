@@ -151,18 +151,20 @@ function renderTemperatureTrend(trendResult) {
 
 function renderPressure(pressure) {
     if (!pressure) return;
-
     document.getElementById('avg-pressure').textContent = pressure.value ?? '--';
-
-    renderPressureTrend(pressure.pressureTrend);
+    renderPressureTrend(pressure.pressureTrend, pressure.trendResult?.changeValue);
 }
 
-function renderPressureTrend(pressureTrend) {
+function renderPressureTrend(pressureTrend, changeValue) {
     const el = document.getElementById('pressure-trend');
     if (!el) return;
 
-    const config = PRESSURE_TREND_CONFIG[pressureTrend] ?? PRESSURE_TREND_CONFIG.STABLE;
+    const config   = PRESSURE_TREND_CONFIG[pressureTrend] ?? PRESSURE_TREND_CONFIG.STABLE;
     const isStable = pressureTrend === 'STABLE' || !pressureTrend;
+    const absVal   = Math.abs(changeValue ?? 0);
+    const valStr   = !isStable && absVal > 0
+        ? `<span class="trend-val">${absVal.toFixed(1)}/h</span>`
+        : '';
 
     el.className = '';
     el.style.color = config.color;
@@ -170,6 +172,7 @@ function renderPressureTrend(pressureTrend) {
     el.innerHTML = `
         <span class="pressure-trend-indicator" style="color: ${config.color}">
             ${!isStable ? `<span class="trend-arrow">${config.arrow}</span>` : ''}
+            ${valStr}
         </span>
         <span class="pressure-trend-label" style="color: ${config.color}">${config.label}</span>
     `;
@@ -251,14 +254,9 @@ function renderSurfaceWetness(wetness) {
     if (!badgeEl) return;
 
     const status = wetness?.surfaceWetnessStatus;
-    const raw    = wetness?.value;
+    const pct    = wetness?.value;
 
-    // Calculate display percentage from raw ADC (0–4095, inverted)
-    const pct = raw != null
-        ? ((4095 - Math.min(4095, Math.max(0, raw))) / 4095) * 100
-        : null;
-
-    if (pct === null || !status) {
+    if (pct == null || !status) {
         textEl.textContent = '--';
         pctEl.textContent  = 'Wetness --';
         barEl.style.width  = '0%';
@@ -267,10 +265,10 @@ function renderSurfaceWetness(wetness) {
 
     const config = SURFACE_WETNESS_CONFIG[status] ?? SURFACE_WETNESS_CONFIG.DRY;
 
-    badgeEl.className          = `wetness-status-badge ${config.cssClass}`;
-    textEl.textContent         = config.label;
-    pctEl.textContent          = `Wetness ${Math.round(pct)}%`;
-    barEl.style.width          = `${pct.toFixed(1)}%`;
+    badgeEl.className           = `wetness-status-badge ${config.cssClass}`;
+    textEl.textContent          = config.label;
+    pctEl.textContent           = `Wetness ${Math.round(pct)}%`;
+    barEl.style.width           = `${pct.toFixed(1)}%`;
     barEl.style.backgroundColor = config.barColor;
 }
 

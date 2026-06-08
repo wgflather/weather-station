@@ -3,19 +3,19 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.config.WeatherValidationProperties;
 import com.flather.weatherstation.domain.constant.*;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.projection.DataPoint;
-import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
 import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
 import java.util.*;
 import java.util.function.Function;
-import org.apache.commons.math3.stat.regression.SimpleRegression;
+
 import org.apache.commons.math3.util.Precision;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,18 +28,21 @@ public class AnalyticsService {
   private final SensorStateCache sensorStateCache;
   private final MetricDataDetailsMapper metricDataDetailsMapper;
   private final HardwareConfig hardwareConfig;
+  private final WeatherValidationProperties weatherValidationProperties;
 
   public AnalyticsService(
       WeatherReportRepository repository,
       TimezoneProperties timezoneProperties,
       SensorStateCache sensorStateCache,
       MetricDataDetailsMapper metricDataDetailsMapper,
-      HardwareConfig hardwareConfig) {
+      HardwareConfig hardwareConfig,
+      WeatherValidationProperties weatherValidationProperties) {
     this.repository = repository;
     this.zoneId = timezoneProperties.getZoneId();
     this.sensorStateCache = sensorStateCache;
     this.metricDataDetailsMapper = metricDataDetailsMapper;
     this.hardwareConfig = hardwareConfig;
+    this.weatherValidationProperties = weatherValidationProperties;
   }
 
   private DateRangeHelper.DateRange today() {
@@ -129,9 +132,13 @@ public class AnalyticsService {
 
   public SurfaceWetnessDto getSurfaceWetness(){
     long rawAdc = sensorStateCache.getMetricsWindow().getLast().getSurfaceWetness();
-    return new SurfaceWetnessDto(rawAdc,
+    double pctWetness = MeteoMath.rawToWetnessPct(rawAdc,
+            weatherValidationProperties.getSurfaceWetnessDryBaseline(),
+            weatherValidationProperties.getSurfaceWetnessWetBaseline());
+
+    return new SurfaceWetnessDto(pctWetness,
             metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.SURFACE_WETNESS, hardwareConfig),
-            SurfaceWetnessStatus.classify(rawAdc));
+            SurfaceWetnessStatus.classify(pctWetness));
   }
 
   public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric, String resolution) {

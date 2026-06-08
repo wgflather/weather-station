@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalDouble;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,8 +70,8 @@ public class DataQualityValidator {
             Optional.ofNullable(anomalyDto.getSurfaceWetness())
                     .map(Long::doubleValue)
                     .orElse(null),
-            properties.getSurfaceWetnessMinimal(),
-            properties.getSurfaceWetnessMaximum(),
+            properties.getSurfaceWetnessWetBaseline(),
+            properties.getSurfaceWetnessDryBaseline(),
             dataQualityMap);
 
     return new ValidationResult(

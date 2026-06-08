@@ -1130,9 +1130,32 @@ h3 {
     }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 420px) {
+    .dew-main {
+        font-size: 1.1rem;
+    }
+
+    .dew-sub {
+        font-size: 0.58rem;
+        letter-spacing: -0.2px; /* tighten character spacing slightly */
+    }
+
     .dew-values {
-        flex-direction: column;
-        gap: 2px;
+        gap: 5px;
+    }
+}
+
+@media (max-width: 390px) {
+    .dew-main {
+        font-size: 1rem;
+    }
+
+    .dew-sub {
+        font-size: 0.55rem;
+        letter-spacing: -0.3px;
+    }
+
+    .dew-values {
+        gap: 4px;
     }
 }
