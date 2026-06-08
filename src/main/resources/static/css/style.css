@@ -193,12 +193,13 @@ h3 {
 }
 
 .temp-section {
+    flex: 1 1 auto;
+    min-width: 0;           
+    padding-right: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex: 1 1 0;
-    padding-right: 20px;
 }
 
 .metric-content {
@@ -359,10 +360,10 @@ h3 {
    DEW POINT SECTION & GAUGE
 ========================================================= */
 .dew-point-section {
-    flex: 1 1 auto;           /* grows to fill available space, shrinks freely */
-    min-width: 120px;         /* floor — below this the layout would break */
-    max-width: 380px;         /* ceiling on large screens */
-    border-left: 1px solid rgba(180, 220, 255, 0.25); /* divider always present */
+    flex: 1 1 auto;
+    min-width: 0;            
+    max-width: 55%;          
+    border-left: 1px solid rgba(180, 220, 255, 0.25);
     padding-left: 20px;
     margin-left: 0;
     overflow: hidden;
@@ -397,6 +398,7 @@ h3 {
     display: flex;
     align-items: baseline;
     gap: 8px;
+    flex-wrap: nowrap;       /* never wrap */
     font-size: 0.9em;
 }
 
@@ -405,18 +407,18 @@ h3 {
     font-weight: 700;
     color: #facc15;
     white-space: nowrap;
-    flex-shrink: 0;
+    flex-shrink: 0;          /* never compress the value */
 }
 
 .dew-sub {
-    font-size: 0.75rem;
+    font-size: 0.72rem;      /* slightly smaller so it fits */
     color: #9fc2f5;
     font-weight: 600;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    flex-shrink: 1;
     min-width: 0;
 }
+
 
 .dew-status-badge {
     border: 1px solid #ffb088;
@@ -1035,15 +1037,22 @@ h3 {
         min-width: 0;
     }
 
-    /* tighten the dew section on small screens */
+    
+    .dew-main {
+        font-size: 1.15rem;  /* was 1.2rem override — shrink further */
+    }
+
+    .dew-sub {
+        font-size: 0.65rem;
+    }
+
     .dew-point-section {
+        max-width: 52%;
         padding-left: 12px;
-        min-width: 100px;
     }
 
     .temp-section {
         padding-right: 12px;
-        align-items: center; /* keep centered at smaller sizes */
     }
 
     /* hide the badge to save horizontal space */
@@ -1060,9 +1069,6 @@ h3 {
     #temp-trend .trend-arrow { font-size: 0.7rem; }
     #temp-trend .trend-val   { font-size: 0.6rem; }
 
-    .dew-main {
-        font-size: 1.2rem;
-    }
 
     .health-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -1101,12 +1107,18 @@ h3 {
         justify-content: center;
     }
 
-    /* on very small screens, allow dew section to go narrower */
-    .dew-point-section {
-        min-width: 80px;
-        padding-left: 10px;
+    .dew-main {
+        font-size: 1rem;
     }
 
+    .dew-sub {
+        font-size: 0.6rem;
+    }
+
+    .dew-point-section {
+        min-width: 0;
+        padding-left: 10px;
+    }
     .temp-section {
         padding-right: 10px;
         align-items: center;

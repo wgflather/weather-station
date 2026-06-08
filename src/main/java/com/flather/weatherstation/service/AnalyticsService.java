@@ -3,10 +3,7 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.config.TimezoneProperties;
-import com.flather.weatherstation.domain.constant.DataQuality;
-import com.flather.weatherstation.domain.constant.DataStatus;
-import com.flather.weatherstation.domain.constant.Metric;
-import com.flather.weatherstation.domain.constant.TrendDirection;
+import com.flather.weatherstation.domain.constant.*;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
@@ -102,19 +99,39 @@ public class AnalyticsService {
   }
 
   public PressureDto getPressure() {
+    TrendResult trendResult = getPressureTrend();
     return new PressureDto(
-        averageOfFiveLastReadings(WeatherRecord::getPressure, WeatherRecord::getPressureDataQuality), getPressureTrend(),
-            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.PRESSURE, hardwareConfig));
+        averageOfFiveLastReadings(WeatherRecord::getPressure, WeatherRecord::getPressureDataQuality), trendResult,
+            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.PRESSURE, hardwareConfig),
+            PressureTrend.classify(trendResult));
   }
 
   public HumidityDto getHumidity() {
-    return new HumidityDto(averageOfFiveLastReadings(WeatherRecord::getHumidity, WeatherRecord::getHumidityDataQuality),
-            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.HUMIDITY, hardwareConfig));
+    Double temperature = averageOfFiveLastReadings(
+            WeatherRecord::getTemperature, WeatherRecord::getTemperatureDataQuality);
+    Double humidity = averageOfFiveLastReadings(
+            WeatherRecord::getHumidity, WeatherRecord::getHumidityDataQuality);
+
+    Double dewPoint      = null;
+    DewPointRisk dewPointRisk = DewPointRisk.POSSIBLE;
+
+    if (temperature != null && humidity != null) {
+      dewPoint     = MeteoMath.calculateDewPoint(temperature, humidity);
+      dewPointRisk = DewPointRisk.classify(temperature - dewPoint);
+    }
+
+    return new HumidityDto(
+            humidity,
+            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.HUMIDITY, hardwareConfig),
+            dewPoint,
+            dewPointRisk);
   }
 
   public SurfaceWetnessDto getSurfaceWetness(){
-    return new SurfaceWetnessDto(sensorStateCache.getMetricsWindow().getLast().getSurfaceWetness(),
-            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.SURFACE_WETNESS, hardwareConfig));
+    long rawAdc = sensorStateCache.getMetricsWindow().getLast().getSurfaceWetness();
+    return new SurfaceWetnessDto(rawAdc,
+            metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.SURFACE_WETNESS, hardwareConfig),
+            SurfaceWetnessStatus.classify(rawAdc));
   }
 
   public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric, String resolution) {
@@ -163,53 +180,11 @@ public class AnalyticsService {
   }
 
   public TrendResult getTempTrend() {
-    return calculateTrend(extractDataPoints(WeatherRecord::getTemperature));
+    return MeteoMath.calculateTrend(extractDataPoints(WeatherRecord::getTemperature));
   }
 
   public TrendResult getPressureTrend() {
-    return calculateTrend(extractDataPoints(WeatherRecord::getPressure));
+    return MeteoMath.calculateTrend(extractDataPoints(WeatherRecord::getPressure));
   }
 
-  public TrendResult calculateTrend(List<DataPoint> dataPoints) {
-    if (dataPoints.isEmpty()) {
-      return new TrendResult(0.0, TrendDirection.STABLE);
-    }
-
-    List<DataPoint> filteredPoints =
-        dataPoints.stream().filter(dataPoint -> dataPoint.value() != null).toList();
-
-    if (filteredPoints.size() < 2) {
-      return new TrendResult(0.0, TrendDirection.STABLE);
-    }
-
-    Instant firstDataTime = filteredPoints.getFirst().hour();
-
-    SimpleRegression regression = new SimpleRegression();
-
-    for (DataPoint point : filteredPoints) {
-      double x = Duration.between(firstDataTime, point.hour()).toMillis() / 1000.0;
-
-      double y = point.value();
-
-      regression.addData(x, y);
-    }
-
-    double slope = regression.getSlope();
-
-    double hourlyChange = slope * 3600.0;
-
-    hourlyChange = Math.round(hourlyChange * 10.0) / 10.0;
-
-    TrendDirection direction;
-
-    if (Math.abs(hourlyChange) < 0.15) {
-      direction = TrendDirection.STABLE;
-      hourlyChange = 0.0;
-    } else if (hourlyChange > 0) {
-      direction = TrendDirection.UP;
-    } else {
-      direction = TrendDirection.DOWN;
-    }
-    return new TrendResult(hourlyChange, direction);
-  }
 }

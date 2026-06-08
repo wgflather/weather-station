@@ -1,11 +1,15 @@
 import { renderWeatherChart } from './weather-chart.js';
 import { FetchScheduler } from './FetchScheduler.js';
 
+// ==========================================
+// STATE
+// ==========================================
+
 const state = {
     metrics: null,
     systemHealth: null,
     currentMetric: 'temperature',
-    currentResolution: Number(localStorage.getItem('resolution')) || 10,
+    currentResolution: Number(localStorage.getItem('chartResolution')) || 10,
 
     charts: {
         temperature: null,
@@ -14,20 +18,44 @@ const state = {
     }
 };
 
-const QUALITY_STYLE = {
-    OK:      { color: '#22c55e', label: 'OK' },        // green
-    SPIKE:   { color: '#f59e0b', label: 'SPIKE' },     // orange
-    ANOMALY: { color: '#ef4444', label: 'ANOMALY' },   // red
-    MISSING: { color: '#111827', label: 'MISSING' }    // near black
+// ==========================================
+// ENUM MAPPINGS  — all display concerns live here, not on the backend
+// ==========================================
+
+const DATA_QUALITY_COLORS = {
+    OK:      '#22c55e',
+    SPIKE:   '#f59e0b',
+    ANOMALY: '#ef4444',
+    MISSING: '#111827',
 };
 
-function getMetric(dto, key) {
-    return dto?.[key] ?? null;
-}
+const PRESSURE_TREND_CONFIG = {
+    RISING_FAST:  { arrow: '↑', label: 'Rapidly rising',  color: '#fca5a5' },
+    RISING:       { arrow: '↑', label: 'Rising',           color: '#fcd34d' },
+    RISING_SLOW:  { arrow: '↑', label: 'Slowly rising',   color: '#d1fae5' },
+    STABLE:       { arrow: '→', label: 'Stable',           color: '#cbd5e1' },
+    FALLING_SLOW: { arrow: '↓', label: 'Slowly falling',  color: '#bae6fd' },
+    FALLING:      { arrow: '↓', label: 'Falling',          color: '#7dd3fc' },
+    FALLING_FAST: { arrow: '↓', label: 'Rapidly falling', color: '#60a5fa' },
+};
 
-function getQualityStyle(quality) {
-    return QUALITY_STYLE[quality] ?? QUALITY_STYLE.MISSING;
-}
+const DEW_POINT_RISK_CONFIG = {
+    SATURATED:   { label: 'Condensation Imminent', cssClass: 'trend-up'     },
+    VERY_LIKELY: { label: 'Condensation Likely',   cssClass: 'trend-up'     },
+    POSSIBLE:    { label: 'Condensation Possible', cssClass: 'trend-stable' },
+    UNLIKELY:    { label: 'Condensation Unlikely', cssClass: 'trend-stable' },
+};
+
+const SURFACE_WETNESS_CONFIG = {
+    DRY:    { label: 'Dry',    cssClass: 'wetness-dry',    barColor: '#4ade80' },
+    DAMP:   { label: 'Damp',   cssClass: 'wetness-damp',   barColor: '#facc15' },
+    WET:    { label: 'Wet',    cssClass: 'wetness-wet',    barColor: '#38bdf8' },
+    SOAKED: { label: 'Soaked', cssClass: 'wetness-soaked', barColor: '#818cf8' },
+};
+
+// ==========================================
+// CHART SCHEDULER
+// ==========================================
 
 const scheduler = new FetchScheduler(
     async (metric, existingChart, resolution) => {
@@ -40,7 +68,6 @@ const scheduler = new FetchScheduler(
 
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Chart fetch failed for ${metric}`);
-
         return await response.json();
     },
 
@@ -51,7 +78,7 @@ const scheduler = new FetchScheduler(
             state.charts[metric] = newChartPoints;
         } else {
             const existingHours = new Set(state.charts[metric].map(p => p.hour));
-            const uniqueDeltas = newChartPoints.filter(p => !existingHours.has(p.hour));
+            const uniqueDeltas  = newChartPoints.filter(p => !existingHours.has(p.hour));
             state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
         }
 
@@ -64,29 +91,40 @@ const scheduler = new FetchScheduler(
 );
 
 function startChart(metric) {
-    scheduler.start(
-        metric,
-        (m) => state.charts[m],
-        state.currentResolution  
-    );
+    scheduler.start(metric, (m) => state.charts[m], state.currentResolution);
 }
+
 // ==========================================
-// DASHBOARD & EVENT INITIALIZATION
+// DASHBOARD FETCH
 // ==========================================
 
 async function fetchDashboard() {
-    const response = await fetch(`/api/weather/dashboard`);
-    if (!response.ok) throw new Error("Dashboard fetch failed");
+    const response = await fetch('/api/weather/dashboard');
+    if (!response.ok) throw new Error('Dashboard fetch failed');
     return await response.json();
 }
 
 // ==========================================
-// TREND RENDERING HELPERS
+// TEMPERATURE
 // ==========================================
 
-function updateTemperatureTrend(direction, changeValue) {
+function renderTemperature(temp) {
+    if (!temp) return;
+
+    document.getElementById('avg-temp').textContent = temp.value ?? '--';
+    document.getElementById('min-temp').textContent = temp.min   ?? '--';
+    document.getElementById('max-temp').textContent = temp.max   ?? '--';
+
+    renderTemperatureTrend(temp.trendResult);
+}
+
+function renderTemperatureTrend(trendResult) {
     const el = document.getElementById('temp-trend');
     if (!el) return;
+
+    const direction   = trendResult?.direction;
+    const changeValue = trendResult?.changeValue ?? 0;
+
     el.className = '';
 
     if (direction === 'UP') {
@@ -107,509 +145,322 @@ function updateTemperatureTrend(direction, changeValue) {
     }
 }
 
-/* =========================================================
-   PRESSURE TREND STATE CLASSIFICATION
-   Thresholds based on standard meteorological convention:
-     < 0.5 hPa/h  → stable
-     0.5–1.5      → slowly rising/falling
-     1.5–3.0      → rising/falling
-     > 3.0        → rapidly rising/falling
-========================================================= */
-function classifyPressureTrend(direction, changePerHour) {
-    const abs = Math.abs(changePerHour ?? 0);
+// ==========================================
+// PRESSURE
+// ==========================================
 
-    if (abs < 0.5) {
-        return {
-            cssClass: 'pressure-stable',
-            arrow: '',
-            label: 'Stable'
-        };
-    }
+function renderPressure(pressure) {
+    if (!pressure) return;
 
-    if (direction === 'UP') {
-        if (abs < 1.5) return { cssClass: 'pressure-rising-slow', arrow: '↑', label: 'Slowly rising' };
-        if (abs < 3.0) return { cssClass: 'pressure-rising', arrow: '↑', label: 'Rising' };
-        return { cssClass: 'pressure-rising-fast', arrow: '↑', label: 'Rapidly rising' };
-    }
+    document.getElementById('avg-pressure').textContent = pressure.value ?? '--';
 
-    if (direction === 'DOWN') {
-        if (abs < 1.5) return { cssClass: 'pressure-falling-slow', arrow: '↓', label: 'Slowly falling' };
-        if (abs < 3.0) return { cssClass: 'pressure-falling', arrow: '↓', label: 'Falling' };
-        return { cssClass: 'pressure-falling-fast', arrow: '↓', label: 'Rapidly falling' };
-    }
-
-    return {
-        cssClass: 'pressure-stable',
-        arrow: '',
-        label: 'Stable'
-    };
+    renderPressureTrend(pressure.pressureTrend);
 }
 
-function updatePressureTrend(direction, changeValue) {
+function renderPressureTrend(pressureTrend) {
     const el = document.getElementById('pressure-trend');
     if (!el) return;
 
-    const absVal = Math.abs(changeValue ?? 0);
+    const config = PRESSURE_TREND_CONFIG[pressureTrend] ?? PRESSURE_TREND_CONFIG.STABLE;
+    const isStable = pressureTrend === 'STABLE' || !pressureTrend;
 
-    const { cssClass, arrow, label } =
-        classifyPressureTrend(direction, changeValue);
-
-    const showArrow = absVal > 0.4 && arrow;
-
-    const valStr =
-        absVal > 0.5
-            ? `<span class="trend-val">${absVal.toFixed(1)}/h</span>`
-            : '';
-
-    el.className = cssClass;
+    el.className = '';
+    el.style.color = config.color;
 
     el.innerHTML = `
-        <span class="pressure-trend-indicator">
-            ${showArrow ? `<span class="trend-arrow">${arrow}</span>` : ''}
-            ${valStr}
+        <span class="pressure-trend-indicator" style="color: ${config.color}">
+            ${!isStable ? `<span class="trend-arrow">${config.arrow}</span>` : ''}
         </span>
-        <span class="pressure-trend-label">${label}</span>
+        <span class="pressure-trend-label" style="color: ${config.color}">${config.label}</span>
     `;
 }
 
 // ==========================================
-// METEOROLOGICAL CALCULATIONS
+// HUMIDITY + DEW POINT
 // ==========================================
 
-function calculateDewPoint(temp, humidity) {
-    if (temp == null || humidity == null) return null;
-    const a     = 17.625;
-    const b     = 243.04;
-    const alpha = Math.log(humidity / 100) + (a * temp) / (b + temp);
-    return (b * alpha) / (a - alpha);
+function renderHumidity(humidity) {
+    if (!humidity) return;
+
+    const humVal = humidity.value;
+    if (humVal != null) {
+        document.getElementById('humidity-val').textContent = humVal;
+    }
+
+    // Dew point value
+    const dewEl = document.getElementById('humidity-dew-val');
+    if (dewEl) {
+        dewEl.textContent = humidity.dewPoint != null
+            ? `${humidity.dewPoint.toFixed(1)}°C`
+            : '--°C';
+    }
+
+    // Dew point spread gauge (temperature card) — needs both temp and dewPoint
+    renderDewPointGauge(humidity);
 }
 
-function updateDewPointSpreadGauge(temp, humidity) {
-    const tdVal = calculateDewPoint(temp, humidity);
+function renderDewPointGauge(humidity) {
+    const spreadValEl = document.getElementById('dew-spread-val');
+    const dewTEl      = document.getElementById('dew-t');
+    const dewTdEl     = document.getElementById('dew-td');
+    const badgeEl     = document.getElementById('dew-status');
+    const pinEl       = document.getElementById('gauge-pin');
 
-    const spreadValEl = document.getElementById("dew-spread-val");
-    const dewTEl      = document.getElementById("dew-t");
-    const dewTdEl     = document.getElementById("dew-td");
-    const badgeEl     = document.getElementById("dew-status");
-    const pinEl       = document.getElementById("gauge-pin");
+    if (!spreadValEl || !pinEl) return;
 
-    if (tdVal === null) {
-        if (spreadValEl) spreadValEl.textContent = "--°";
+    const dewPoint = humidity?.dewPoint;
+    const risk     = humidity?.dewPointRisk;
+
+    // We still need temperature for the gauge — read from already-rendered DOM
+    const tempText = document.getElementById('avg-temp')?.textContent;
+    const temp     = tempText && tempText !== '--' ? parseFloat(tempText) : null;
+
+    if (dewPoint == null || temp == null) {
+        spreadValEl.textContent = '--°';
         return;
     }
 
-    const spread  = temp - tdVal;
+    const spread  = parseFloat((temp - dewPoint).toFixed(1));
     const percent = Math.min(100, Math.max(0, (spread / 10) * 100));
 
     spreadValEl.textContent = `${spread.toFixed(1)}°`;
-    dewTEl.textContent      = temp.toFixed(1);
-    dewTdEl.textContent     = tdVal.toFixed(1);
-    pinEl.style.left        = `${percent}%`;
+    if (dewTEl)  dewTEl.textContent  = temp.toFixed(1);
+    if (dewTdEl) dewTdEl.textContent = dewPoint.toFixed(1);
+
+    pinEl.style.left = `${percent}%`;
     pinEl.setAttribute('data-spread', `${spread.toFixed(1)}°`);
 
-    badgeEl.className = "dew-status-badge";
-    if (spread <= 2) {
-        badgeEl.textContent = "Danger";
-        badgeEl.classList.add("trend-up");
-    } else if (spread <= 4) {
-        badgeEl.textContent = "High Risk";
-        badgeEl.classList.add("trend-up");
-    } else if (spread <= 6.5) {
-        badgeEl.textContent = "Caution";
-        badgeEl.classList.add("trend-stable");
-    } else {
-        badgeEl.textContent = "Safe";
-        badgeEl.classList.add("trend-stable");
+    // Badge from backend enum
+    if (badgeEl && risk) {
+        const config = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
+        badgeEl.className   = `dew-status-badge ${config.cssClass}`;
+        badgeEl.textContent = config.label;
     }
 }
 
-/* =========================================================
-   SURFACE WETNESS
-   HW-028 rain sensor: raw ADC 0–4095 (12-bit),
-   HIGH value = dry, LOW value = wet  →  invert to get wetness %
-========================================================= */
-const ADC_MAX = 4095;
+// ==========================================
+// SURFACE WETNESS
+// ==========================================
 
-function rawToWetnessPct(raw) {
-    if (raw == null) return null;
-    const clamped = Math.min(ADC_MAX, Math.max(0, raw));
-    return ((ADC_MAX - clamped) / ADC_MAX) * 100;
-}
-
-function classifyWetness(pct) {
-    if (pct < 10)  return { cssClass: 'wetness-dry',    label: 'Dry',    barColor: '#4ade80' };
-    if (pct < 40)  return { cssClass: 'wetness-damp',   label: 'Damp',   barColor: '#facc15' };
-    if (pct < 70)  return { cssClass: 'wetness-wet',    label: 'Wet',    barColor: '#38bdf8' };
-                   return { cssClass: 'wetness-soaked', label: 'Soaked', barColor: '#818cf8' };
-}
-
-function updateSurfaceWetness(raw) {
-    const badgeEl  = document.getElementById('wetness-badge');
-    const textEl   = document.getElementById('wetness-status-text');
-    const pctEl    = document.getElementById('wetness-pct');
-    const barEl    = document.getElementById('wetness-bar');
+function renderSurfaceWetness(wetness) {
+    const badgeEl = document.getElementById('wetness-badge');
+    const textEl  = document.getElementById('wetness-status-text');
+    const pctEl   = document.getElementById('wetness-pct');
+    const barEl   = document.getElementById('wetness-bar');
 
     if (!badgeEl) return;
 
-    const pct = rawToWetnessPct(raw);
-    if (pct === null) {
+    const status = wetness?.surfaceWetnessStatus;
+    const raw    = wetness?.value;
+
+    // Calculate display percentage from raw ADC (0–4095, inverted)
+    const pct = raw != null
+        ? ((4095 - Math.min(4095, Math.max(0, raw))) / 4095) * 100
+        : null;
+
+    if (pct === null || !status) {
         textEl.textContent = '--';
         pctEl.textContent  = 'Wetness --';
         barEl.style.width  = '0%';
         return;
     }
 
-    const { cssClass, label, barColor } = classifyWetness(pct);
+    const config = SURFACE_WETNESS_CONFIG[status] ?? SURFACE_WETNESS_CONFIG.DRY;
 
-    // Update badge state class
-    badgeEl.className = `wetness-status-badge ${cssClass}`;
-    textEl.textContent = label;
-
-    // Update percentage label and bar
-    pctEl.textContent          = `Wetness ${pct.toFixed(0)}%`;
+    badgeEl.className          = `wetness-status-badge ${config.cssClass}`;
+    textEl.textContent         = config.label;
+    pctEl.textContent          = `Wetness ${Math.round(pct)}%`;
     barEl.style.width          = `${pct.toFixed(1)}%`;
-    barEl.style.backgroundColor = barColor;
+    barEl.style.backgroundColor = config.barColor;
 }
-
-function formatArrivedAt(value) {
-    if (!value) return '--';
-
-    const date = new Date(value);
-    if (isNaN(date.getTime())) return '--';
-
-    return date.toLocaleString('en-GB', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-}
-
-function setStatusCircleColor(circleEl, quality) {
-    if (!circleEl) return;
-
-    const { color } = getQualityStyle(quality);
-
-    circleEl.style.backgroundColor = color;
-    circleEl.style.boxShadow = `0 0 0 2px ${color}33`; // subtle glow
-}
-
 
 // ==========================================
 // MAIN RENDER
 // ==========================================
 
 function renderMetrics(dto) {
-    const temp     = getMetric(dto, "temperature");
-    const pressure = getMetric(dto, "pressure");
-    const hum      = getMetric(dto, "humidity");
-    const wetness  = getMetric(dto, "surfaceWetness");
+    const temp     = dto?.temperature;
+    const pressure = dto?.pressure;
+    const humidity = dto?.humidity;
+    const wetness  = dto?.surfaceWetness;
 
-    // =========================
-    // Temperature
-    // =========================
-    document.getElementById("avg-temp").textContent = temp?.value ?? "--";
-    document.getElementById("min-temp").textContent  = temp?.min ?? "--";
-    document.getElementById("max-temp").textContent  = temp?.max ?? "--";
+    renderTemperature(temp);
+    renderPressure(pressure);
+    renderHumidity(humidity);
+    renderSurfaceWetness(wetness);
 
-    updateTemperatureTrend(
-        temp?.trendResult?.direction,
-        temp?.trendResult?.changeValue
-    );
+    // Populate status circle popups
+    populatePopup('temperature-card', temp?.dataDetails);
+    populatePopup('pressure-card',    pressure?.dataDetails);
+    populatePopup('humidity-card',    humidity?.dataDetails);
+    populatePopup('wetness-card',     wetness?.dataDetails);
 
-    // =========================
-    // Pressure
-    // =========================
-    document.getElementById("avg-pressure").textContent = pressure?.value ?? "--";
-
-    updatePressureTrend(
-        pressure?.trendResult?.direction,
-        pressure?.trendResult?.changeValue
-    );
-
-    // =========================
-    // Humidity
-    // =========================
-    const humVal = hum?.value;
-
-    if (humVal != null) {
-        document.getElementById("humidity-val").textContent = humVal;
-    }
-
-    // Dew point
-    const dewEl = document.getElementById("humidity-dew-val");
-    if (dewEl) {
-        const td = calculateDewPoint(temp?.value, humVal);
-        dewEl.textContent = td !== null ? `${td.toFixed(1)}°C` : "--°C";
-    }
-
-    // =========================
-    // Dew point spread (temperature card)
-    // =========================
-    updateDewPointSpreadGauge(temp?.value, humVal);
-
-    // =========================
-    // Surface wetness
-    // =========================
-    updateSurfaceWetness(wetness?.value);
-
-    populatePopup('wetness-card', wetness?.dataDetails);
-        populatePopup('temperature-card', temp?.dataDetails);
-        populatePopup('pressure-card', pressure?.dataDetails);
-        populatePopup('humidity-card', hum?.dataDetails);
-
-        // NEW: color circles
-        setStatusCircleColor(
-            document.querySelector('#temperature-card .status-circle'),
-            temp?.dataDetails?.quality
-        );
-
-        setStatusCircleColor(
-            document.querySelector('#pressure-card .status-circle'),
-            pressure?.dataDetails?.quality
-        );
-
-        setStatusCircleColor(
-            document.querySelector('#humidity-card .status-circle'),
-            hum?.dataDetails?.quality
-        );
-
-        setStatusCircleColor(
-            document.querySelector('#wetness-card .status-circle'),
-            wetness?.dataDetails?.quality
-        );
+    // Color status circles
+    setStatusCircleColor(document.querySelector('#temperature-card .status-circle'), temp?.dataDetails?.quality);
+    setStatusCircleColor(document.querySelector('#pressure-card .status-circle'),    pressure?.dataDetails?.quality);
+    setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality);
+    setStatusCircleColor(document.querySelector('#wetness-card .status-circle'),     wetness?.dataDetails?.quality);
 }
 
 async function updateDashboard() {
     try {
-        const data = await fetchDashboard();
+        const data         = await fetchDashboard();
         state.metrics      = data.metricsDashboardDto;
         state.systemHealth = data.systemHealthDashboardDto;
 
         renderMetrics(state.metrics);
         renderSystemHealth(state.systemHealth);
     } catch (error) {
-        console.error(error);
+        console.error('Dashboard update failed:', error);
     }
 }
+
+// ==========================================
+// SYSTEM HEALTH
+// ==========================================
 
 function renderSystemHealth(systemHealth) {
-    document.getElementById("status").textContent       = systemHealth.status;
-    document.getElementById("lag").textContent          = systemHealth.lagMinutes + ' min';
-    document.getElementById("todayRecords").textContent = systemHealth.recordsToday;
+    if (!systemHealth) return;
 
-    const lastUpdate = document.getElementById("lastUpdate");
+    document.getElementById('status').textContent       = systemHealth.status;
+    document.getElementById('lag').textContent          = systemHealth.lagMinutes + ' min';
+    document.getElementById('todayRecords').textContent = systemHealth.recordsToday;
+
+    const lastUpdate = document.getElementById('lastUpdate');
     lastUpdate.textContent = systemHealth.lastMeasuredAt
         ? new Date(systemHealth.lastMeasuredAt).toLocaleTimeString('en-GB')
-        : "--:--:--";
+        : '--:--:--';
 
-    const colors = { LIVE: 'green', DELAYED: 'yellow', STALE: 'orange', OFFLINE: 'red' };
-    document.getElementById("status").style.color = colors[systemHealth.status] || 'black';
+    const colors = { LIVE: '#22c55e', DELAYED: '#fcd34d', STALE: '#f97316', OFFLINE: '#ef4444' };
+    document.getElementById('status').style.color = colors[systemHealth.status] ?? '#ffffff';
 }
 
-function initResolutionFromMemory() {
-    const selector = document.getElementById('resolution-selector');
-    if (!selector) return;
-
-    // sync UI → state (initial load only)
-    selector.value = String(state.currentResolution);
-}
+// ==========================================
+// RESOLUTION + METRIC CONTROLS
+// ==========================================
 
 function initResolutionControls() {
-    const btn = document.getElementById('resolution-btn');
-    const panel = document.getElementById('resolution-panel');
-    const select = document.getElementById('resolution-selector');
+    const resDesktop  = document.getElementById('resolution-selector');
+    const resMobile   = document.getElementById('resolution-selector-mobile');
 
-    if (!select) return;
+    if (!resDesktop) return;
 
-    // ---- load persisted value or default ----
-    const saved = localStorage.getItem('resolution');
-    if (saved) {
-        select.value = saved;
-    } else {
-        select.value = '10'; // DEFAULT 10 min
-        localStorage.setItem('resolution', '10');
-    }
+    // Hydrate UI from persisted state
+    resDesktop.value = String(state.currentResolution);
+    if (resMobile) resMobile.value = String(state.currentResolution);
 
-    state.currentResolution = Number(select.value);
+    function onResolutionChange(value) {
+        const resolution = parseInt(value, 10);
+        state.currentResolution = resolution;
+        localStorage.setItem('chartResolution', String(resolution));
 
-    // sync mobile buttons state
-    function setResolution(val) {
-        state.currentResolution = Number(val);
+        // Keep both selectors in sync
+        resDesktop.value = value;
+        if (resMobile) resMobile.value = value;
 
-        localStorage.setItem('resolution', val);
-
-        // sync desktop select
-        if (select) select.value = val;
-
-        // reset charts + restart stream
+        // Wipe cache and re-fetch
         state.charts[state.currentMetric] = [];
         renderWeatherChart([], state.currentMetric);
         startChart(state.currentMetric);
     }
 
-    // desktop select
-    select.addEventListener('change', (e) => {
-        setResolution(e.target.value);
-    });
-
-    // mobile button toggle
-    if (btn && panel) {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            panel.classList.toggle('open');
-        });
-
-        // click options
-        panel.querySelectorAll('button[data-value]').forEach(b => {
-            b.addEventListener('click', () => {
-                setResolution(b.dataset.value);
-                panel.classList.remove('open');
-            });
-        });
-
-        // close on outside click
-        document.addEventListener('click', () => {
-            panel.classList.remove('open');
-        });
-    }
-}
-
-function initResolutionToggle() {
-    const wrapper = document.getElementById('resolution-wrapper');
-    const toggle  = document.getElementById('resolution-toggle');
-    const select  = document.getElementById('resolution-selector');
-
-    if (!wrapper || !toggle || !select) return;
-
-    function updateLabel() {
-        const val = select.value;
-        toggle.textContent = `${val}m ▾`;
-    }
-
-    updateLabel();
-
-    select.addEventListener('change', () => {
-        updateLabel();
-    });
-
-    toggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        wrapper.classList.toggle('open');
-    });
-
-    document.addEventListener('click', () => {
-        wrapper.classList.remove('open');
-    });
+    resDesktop.addEventListener('change', (e) => onResolutionChange(e.target.value));
+    resMobile?.addEventListener('change', (e) => onResolutionChange(e.target.value));
 }
 
 function initEventListeners() {
-    const selector = document.getElementById('metric-selector');
-    if (!selector) return;
+    const metricDesktop = document.getElementById('metric-selector');
+    const metricMobile  = document.getElementById('metric-selector-mobile');
+    const toggleBtn     = document.getElementById('chart-controls-toggle');
+    const mobilePanel   = document.getElementById('chart-controls-mobile');
 
-    state.currentMetric = selector.value;
+    if (!metricDesktop) return;
 
-    // IMPORTANT: resolution must already be loaded before chart starts
+    state.currentMetric = metricDesktop.value;
+
+    // Resolution must be ready before chart starts
     initResolutionControls();
-
     startChart(state.currentMetric);
 
-    selector.addEventListener('change', (event) => {
-        const selectedMetric = event.target.value;
+    function onMetricChange(value) {
+        state.currentMetric = value;
+        metricDesktop.value = value;
+        if (metricMobile) metricMobile.value = value;
 
-        state.currentMetric = selectedMetric;
-
-        if (!state.charts[selectedMetric]) {
-            state.charts[selectedMetric] = [];
-        }
-
-        renderWeatherChart(state.charts[selectedMetric], selectedMetric);
-        startChart(selectedMetric);
-    });
-}
-
-function loadResolution() {
-    const saved = localStorage.getItem('chartResolution');
-    return saved ? Number(saved) : 5;
-}
-
-function saveResolution(res) {
-    localStorage.setItem('chartResolution', String(res));
-}
-
-function initResolutionListener() {
-    const selector = document.getElementById('resolution-selector');
-    if (!selector) return;
-
-    // ✅ hydrate state FIRST
-    state.currentResolution = loadResolution();
-
-    // ✅ sync UI to state (THIS IS THE MISSING PIECE)
-    selector.value = String(state.currentResolution);
-
-    selector.addEventListener('change', (event) => {
-        const newResolution = Number(event.target.value);
-
-        state.currentResolution = newResolution;
-        saveResolution(newResolution);
-
-        state.charts[state.currentMetric] = [];
-        renderWeatherChart([], state.currentMetric);
-        startChart(state.currentMetric);
-    });
-}
-
-function startPolling(fn, interval) {
-    let stopped = false;
-    async function loop() {
-        if (stopped) return;
-        await fn();
-        setTimeout(loop, interval);
+        if (!state.charts[value]) state.charts[value] = [];
+        renderWeatherChart(state.charts[value], value);
+        startChart(value);
     }
-    loop();
-    return () => stopped = true;
+
+    metricDesktop.addEventListener('change', (e) => onMetricChange(e.target.value));
+    metricMobile?.addEventListener('change', (e) => onMetricChange(e.target.value));
+
+    // Mobile panel toggle
+    toggleBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = mobilePanel.classList.toggle('open');
+        toggleBtn.classList.toggle('active', isOpen);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (mobilePanel && !mobilePanel.contains(e.target) && e.target !== toggleBtn) {
+            mobilePanel.classList.remove('open');
+            toggleBtn?.classList.remove('active');
+        }
+    });
 }
 
-// ─── Status circle popup ──────────────────────────────────────────────────────
-// Single shared popup, appended to <body>
+// ==========================================
+// STATUS CIRCLE POPUP
+// ==========================================
+
 const globalPopup = document.getElementById('global-popup');
 
 function populatePopup(cardId, details) {
-    // Store details on the circle's card for later use by click handler
     const card = document.getElementById(cardId);
     if (!card || !details) return;
     card._popupDetails = details;
 }
 
+function formatArrivedAt(value) {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return '--';
+    return date.toLocaleString('en-GB', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+}
+
 function buildPopupHTML(details) {
-    const sensor     = details.sensor     ?? '--';
-    const lastValue  = details.lastValue  ?? '--';
-    const quality    = details.quality    ?? 'MISSING';
-    const metricName = details.metricName ?? '--';
-    const arrivedAt  = formatArrivedAt(details.arrivedAt);
-    const qStyle     = getQualityStyle(quality);
+    const qColor = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
 
     return `
-        <div class="popup-heading">${metricName} - Last Measurement</div>
+        <div class="popup-heading">${details.metricName ?? '--'} — Last Measurement</div>
         <div class="popup-row">
             <span class="popup-key">Sensor</span>
-            <span class="popup-val">${sensor}</span>
+            <span class="popup-val">${details.sensor ?? '--'}</span>
         </div>
         <div class="popup-row">
             <span class="popup-key">Last value</span>
-            <span class="popup-val">${lastValue}</span>
+            <span class="popup-val">${details.lastValue ?? '--'}</span>
         </div>
         <div class="popup-row">
             <span class="popup-key">Quality</span>
-            <span class="popup-val" style="color:${qStyle.color}; font-weight:600;">${quality}</span>
+            <span class="popup-val" style="color:${qColor}; font-weight:600;">${details.quality ?? '--'}</span>
         </div>
         <div class="popup-row">
             <span class="popup-key">Arrived</span>
-            <span class="popup-val">${arrivedAt}</span>
+            <span class="popup-val">${formatArrivedAt(details.arrivedAt)}</span>
         </div>
     `;
+}
+
+function setStatusCircleColor(circleEl, quality) {
+    if (!circleEl) return;
+    const color = DATA_QUALITY_COLORS[quality] ?? DATA_QUALITY_COLORS.MISSING;
+    circleEl.style.backgroundColor = color;
+    circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
 }
 
 function positionPopup(circle) {
@@ -641,23 +492,19 @@ function initStatusCircles() {
             const isOpen  = globalPopup.classList.contains('open')
                          && globalPopup._sourceCircle === circle;
 
-            // Always close first
             globalPopup.classList.remove('open');
 
             if (!isOpen && details) {
-                globalPopup.innerHTML       = buildPopupHTML(details);
-                globalPopup._sourceCircle   = circle;
+                globalPopup.innerHTML     = buildPopupHTML(details);
+                globalPopup._sourceCircle = circle;
                 globalPopup.classList.add('open');
                 requestAnimationFrame(() => positionPopup(circle));
             }
         });
     });
 
-    document.addEventListener('click', () => {
-        globalPopup.classList.remove('open');
-    });
+    document.addEventListener('click', () => globalPopup.classList.remove('open'));
 
-    // Reposition on scroll/resize in case the card moves
     window.addEventListener('scroll', () => {
         if (globalPopup.classList.contains('open') && globalPopup._sourceCircle) {
             positionPopup(globalPopup._sourceCircle);
@@ -671,12 +518,25 @@ function initStatusCircles() {
     });
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-initEventListeners();        // sets up listeners
+// ==========================================
+// POLLING
+// ==========================================
+
+function startPolling(fn, interval) {
+    let stopped = false;
+    async function loop() {
+        if (stopped) return;
+        await fn();
+        setTimeout(loop, interval);
+    }
+    loop();
+    return () => stopped = true;
+}
+
+// ==========================================
+// BOOT
+// ==========================================
+
+initEventListeners();
 initStatusCircles();
-
-// ✅ sync UI + state BEFORE scheduler starts
-initResolutionFromMemory();
-
-// now safe to start polling / charts
 startPolling(updateDashboard, 30000);
