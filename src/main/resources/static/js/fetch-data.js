@@ -338,32 +338,27 @@ function renderSystemHealth(systemHealth) {
 // ==========================================
 
 function initResolutionControls() {
-    const resDesktop  = document.getElementById('resolution-selector');
-    const resMobile   = document.getElementById('resolution-selector-mobile');
+    const select = document.getElementById('resolution-selector');
 
-    if (!resDesktop) return;
+    if (!select) return;
 
-    // Hydrate UI from persisted state
-    resDesktop.value = String(state.currentResolution);
-    if (resMobile) resMobile.value = String(state.currentResolution);
+    const saved = localStorage.getItem('resolution') ?? '10';
 
-    function onResolutionChange(value) {
-        const resolution = parseInt(value, 10);
-        state.currentResolution = resolution;
-        localStorage.setItem('chartResolution', String(resolution));
+    select.value = saved;
+    state.currentResolution = Number(saved);
 
-        // Keep both selectors in sync
-        resDesktop.value = value;
-        if (resMobile) resMobile.value = value;
+    select.addEventListener('change', (e) => {
+        const value = e.target.value;
 
-        // Wipe cache and re-fetch
+        state.currentResolution = Number(value);
+        localStorage.setItem('resolution', value);
+
+        // force chart reload at new resolution
         state.charts[state.currentMetric] = [];
+
         renderWeatherChart([], state.currentMetric);
         startChart(state.currentMetric);
-    }
-
-    resDesktop.addEventListener('change', (e) => onResolutionChange(e.target.value));
-    resMobile?.addEventListener('change', (e) => onResolutionChange(e.target.value));
+    });
 }
 
 function initEventListeners() {
@@ -459,6 +454,7 @@ function setStatusCircleColor(circleEl, quality) {
     const color = DATA_QUALITY_COLORS[quality] ?? DATA_QUALITY_COLORS.MISSING;
     circleEl.style.backgroundColor = color;
     circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
+    circleEl.classList.toggle('pulsing', quality === 'OK');
 }
 
 function positionPopup(circle) {

@@ -124,6 +124,17 @@ body::before {
     min-width: 0;
 }
 
+@keyframes pulse-live {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+    50%       { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+}
+
+/* Apply only when the circle is green (LIVE/OK) */
+.status-circle.pulsing {
+    animation: pulse-live 2.5s ease-in-out infinite;
+}
+
+
 .date-group {
     display: flex;
     flex-direction: column;
@@ -657,33 +668,60 @@ h3 {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: nowrap;
 }
 /* =========================================================
    BASE UI (BRIGHT FLAT DASHBOARD STYLE)
 ========================================================= */
-.metric-dropdown,
-.resolution-dropdown,
-.resolution-panel {
-    background: #142a52; /* lighter than before */
-    border: 1px solid rgba(120, 170, 255, 0.25);
-
-    border-radius: 10px;
-
-    color: #e2eeff; /* brighter text */
-    font-family: 'Nunito', sans-serif;
-
-    box-shadow: none; /* REMOVE 3D */
-}
-
-/* =========================================================
-   WRAPPERS
-========================================================= */
-.metric-selector,
 .resolution-wrapper {
     display: flex;
     align-items: center;
+}
+
+.metric-selector {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    position: relative;
+    flex-wrap: nowrap;
+}
+
+.metric-dropdown,
+.resolution-dropdown {
+    -webkit-appearance: none;
+    appearance: none;
+
+    /* Allow shrinking */
+    flex: 0 1 auto;
+    min-width: 0;
+    width: auto;
+
+    padding: 6px 28px 6px 10px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #ffffff;
+    background-color: rgba(30, 58, 138, 0.7);
+    border: 1px solid rgba(140, 190, 255, 0.4);
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2338bdf8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 11px;
+}
+
+.metric-dropdown:focus-visible,
+.resolution-dropdown:focus-visible {
+    background-color: rgba(42, 74, 138, 0.9);
+    border-color: #38bdf8;
+}
+
+.metric-dropdown option,
+.resolution-dropdown option {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
 }
 
 /* =========================================================
@@ -752,22 +790,7 @@ h3 {
 /* =========================================================
    MOBILE BUTTON (FLAT, CLEAN)
 ========================================================= */
-.resolution-btn {
-    display: none;
 
-    padding: 7px 10px;
-
-    background: #1b3f7a;
-    border: 1px solid rgba(120, 170, 255, 0.25);
-    border-radius: 10px;
-
-    color: #9bbcff;
-    font-size: 14px;
-
-    cursor: pointer;
-
-    box-shadow: none;
-}
 
 /* =========================================================
    MOBILE PANEL (FLAT LIST STYLE)
@@ -823,26 +846,7 @@ h3 {
 /* =========================================================
    MOBILE MODE
 ========================================================= */
-@media (max-width: 600px) {
 
-    .resolution-dropdown {
-        display: none;
-    }
-
-    .resolution-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-}
-
-.selector-label {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #9fc2f5;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
 
 /* =========================================================
    SYSTEM HEALTH
@@ -965,6 +969,12 @@ h3 {
     white-space: nowrap;
 }
 
+.main-value,
+#realTime,
+.dew-main {
+    font-variant-numeric: tabular-nums;
+}
+
 .popup-val {
     font-size: 11px;
     color: #c8daf5;
@@ -1036,6 +1046,21 @@ h3 {
         flex: 1 1 0;
         min-width: 0;
     }
+
+     .selector-label {
+            display: none; /* drop the "VIEW:" label to save space */
+        }
+
+     .metric-dropdown,
+      .resolution-dropdown {
+          flex: 0 0 auto;      /* don't grow */
+          width: fit-content;  /* size to content */
+          min-width: unset;
+      }
+
+        .metric-selector {
+            gap: 6px;
+        }
 
     
     .dew-main {
@@ -1142,6 +1167,14 @@ h3 {
 
     .dew-values {
         gap: 5px;
+    }
+}
+
+@media (max-width: 400px) {
+    .metric-dropdown,
+    .resolution-dropdown {
+        font-size: 0.72rem;
+        padding: 4px 20px 4px 7px;
     }
 }
 
