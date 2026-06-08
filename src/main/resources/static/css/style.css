@@ -1015,7 +1015,7 @@ h3 {
 @media (max-width: 600px) {
         .dashboard-row.row-metric {
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 15px 15px;
         }
 
         .dashboard-row.row-metric .pressure_block,
