@@ -38,63 +38,90 @@ function tempToRgbString(temp, alpha = 1) {
 
 /* =========================================================
    METRIC CONFIG
-   Single source of truth for per-metric colors/labels/units.
-   Add new metrics here — nothing else needs to change.
 ========================================================= */
 const METRIC_CONFIG = {
     temperature: {
-        label:          'Temperature',
-        tooltipSuffix:  '°C',
-        yAxisSuffix:    '°',
-        yStep:          1,
-        // Line color is dynamic (gradient) — handled separately
-        lineColor:      null,
-        shadowColor:    'rgba(255, 120, 90, 0.25)',
-        fillTop:        null,   // computed from avg temp
-        fillMid:        null,
-        maxNodeColor:   '#ef4444',
-        minNodeColor:   '#3b82f6',
-        innerBorder:    '#ffffff',
+        label:         'Temperature',
+        tooltipSuffix: '°C',
+        yAxisSuffix:   '°',
+        yStep:         1,
+        lineColor:     null,
+        shadowColor:   'rgba(255, 120, 90, 0.25)',
+        fillTop:       null,
+        fillMid:       null,
+        maxNodeColor:  '#ef4444',
+        minNodeColor:  '#3b82f6',
+        innerBorder:   '#ffffff',
     },
     pressure: {
-        label:          'Pressure',
-        tooltipSuffix:  ' hPa',
-        yAxisSuffix:    '',
-        yStep:          4,
-        lineColor:      '#cbd5e1',                      // slate-200 — neutral/atmospheric
-        shadowColor:    'rgba(203, 213, 225, 0.20)',
-        fillTop:        'rgba(203, 213, 225, 0.22)',
-        fillMid:        'rgba(203, 213, 225, 0.05)',
-        maxNodeColor:   '#e2e8f0',
-        minNodeColor:   '#94a3b8',
-        innerBorder:    '#f8fafc',
+        label:         'Pressure',
+        tooltipSuffix: ' hPa',
+        yAxisSuffix:   '',
+        yStep:         4,
+        lineColor:     '#cbd5e1',
+        shadowColor:   'rgba(203, 213, 225, 0.20)',
+        fillTop:       'rgba(203, 213, 225, 0.22)',
+        fillMid:       'rgba(203, 213, 225, 0.05)',
+        maxNodeColor:  '#e2e8f0',
+        minNodeColor:  '#94a3b8',
+        innerBorder:   '#f8fafc',
     },
     humidity: {
-        label:          'Humidity',
-        tooltipSuffix:  '%',
-        yAxisSuffix:    '%',
-        yStep:          5,
-        lineColor:      '#38bdf8',                      // sky-400 — water/moisture
-        shadowColor:    'rgba(56, 189, 248, 0.25)',
-        fillTop:        'rgba(56, 189, 248, 0.22)',
-        fillMid:        'rgba(56, 189, 248, 0.05)',
-        maxNodeColor:   '#7dd3fc',
-        minNodeColor:   '#0ea5e9',
-        innerBorder:    '#e0f2fe',
+        label:         'Humidity',
+        tooltipSuffix: '%',
+        yAxisSuffix:   '%',
+        yStep:         5,
+        lineColor:     '#38bdf8',
+        shadowColor:   'rgba(56, 189, 248, 0.25)',
+        fillTop:       'rgba(56, 189, 248, 0.22)',
+        fillMid:       'rgba(56, 189, 248, 0.05)',
+        maxNodeColor:  '#7dd3fc',
+        minNodeColor:  '#0ea5e9',
+        innerBorder:   '#e0f2fe',
     },
 };
+
+/* =========================================================
+   GAP DETECTION
+========================================================= */
+function insertGapNulls(chartPoints, resolutionMinutes) {
+    if (chartPoints.length < 2) return chartPoints;
+
+    const result       = [];
+    const gapThreshold = resolutionMinutes * 60 * 1000 * 2.5;
+
+    for (let i = 0; i < chartPoints.length; i++) {
+        result.push(chartPoints[i]);
+
+        if (i < chartPoints.length - 1) {
+            const curr = chartPoints[i].x.getTime();
+            const next = chartPoints[i + 1].x.getTime();
+
+            if (next - curr > gapThreshold) {
+                result.push({ x: new Date(curr + 1000), y: null });
+                result.push({ x: new Date(next - 1000), y: null });
+            }
+        }
+    }
+
+    return result;
+}
 
 /* =========================================================
    DYNAMIC Y AXIS BOUNDS
 ========================================================= */
 function getDynamicYBounds(points, metric) {
-    if (!points || points.length === 0) {
-        if (metric === 'humidity') return { suggestedMin: 20, suggestedMax: 100 };
+    // filter out null gap points before calculating bounds
+    const real = (points || []).filter(p => p.y != null);
+
+    if (!real.length) {
+        if (metric === 'humidity') return { suggestedMin: 20,  suggestedMax: 100  };
         if (metric === 'pressure') return { suggestedMin: 990, suggestedMax: 1030 };
         return { suggestedMin: 10, suggestedMax: 30 };
     }
-    const values = points.map(p => p.y);
-    const pad = metric === 'humidity' ? 3 : metric === 'pressure' ? 2 : 2;
+
+    const values = real.map(p => p.y);
+    const pad    = metric === 'humidity' ? 3 : 2;
     return {
         suggestedMin: Math.min(...values) - pad,
         suggestedMax: Math.max(...values) + pad,
@@ -102,19 +129,30 @@ function getDynamicYBounds(points, metric) {
 }
 
 function getMinMaxPoints(points) {
-    if (!points || points.length === 0) {
-        return { minIndex: -1, maxIndex: -1, isTooClose: false };
-    }
+    // only consider real (non-null) points for min/max
+    const real = (points || []).filter(p => p.y != null);
+
+    if (!real.length) return { minIndex: -1, maxIndex: -1, isTooClose: false };
+
     let minIndex = 0;
     let maxIndex = 0;
-    points.forEach((point, index) => {
-        if (point.y < points[minIndex].y) minIndex = index;
-        if (point.y > points[maxIndex].y) maxIndex = index;
+
+    real.forEach((point, index) => {
+        if (point.y < real[minIndex].y) minIndex = index;
+        if (point.y > real[maxIndex].y) maxIndex = index;
     });
+
     const indexDistance = Math.abs(maxIndex - minIndex);
-    const valueDelta    = Math.abs(points[maxIndex].y - points[minIndex].y);
+    const valueDelta    = Math.abs(real[maxIndex].y - real[minIndex].y);
     const isTooClose    = indexDistance <= 2 || valueDelta < 0.2;
-    return { minIndex, maxIndex, isTooClose };
+
+    // map back to full array indices (including null points)
+    const minVal = real[minIndex].x.getTime();
+    const maxVal = real[maxIndex].x.getTime();
+    const fullMinIndex = points.findIndex(p => p.x.getTime() === minVal);
+    const fullMaxIndex = points.findIndex(p => p.x.getTime() === maxVal);
+
+    return { minIndex: fullMinIndex, maxIndex: fullMaxIndex, isTooClose };
 }
 
 function hasEnoughDataDuration(backendData) {
@@ -125,7 +163,7 @@ function hasEnoughDataDuration(backendData) {
 }
 
 /* =========================================================
-   TEMPERATURE GRADIENT (only used for temperature metric)
+   TEMPERATURE GRADIENT
 ========================================================= */
 function createDynamicGradient(ctx, chartArea, yAxis) {
     const grad = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
@@ -145,20 +183,36 @@ function createDynamicGradient(ctx, chartArea, yAxis) {
 const minMaxLabelsPlugin = {
     id: 'minMaxLabels',
     afterDatasetsDraw(chart, args, pluginOptions) {
-        const { ctx }  = chart;
-        const meta     = chart.getDatasetMeta(0);
+        const { ctx } = chart;
+        const meta    = chart.getDatasetMeta(0);
         if (!meta.data || !meta.data.length) return;
 
         const {
             minIndex, maxIndex, isTooClose,
             latestIndex, showMinMax,
             maxLabelColor, minLabelColor,
+            isMobile,
         } = pluginOptions;
 
-        const renderMinMax  = showMinMax && minIndex !== -1 && maxIndex !== -1 && minIndex !== maxIndex;
-        const maxPoint      = meta.data[maxIndex];
-        const minPoint      = meta.data[minIndex];
-        const latestPoint   = meta.data[latestIndex];
+        // Hide H/L labels on mobile
+        if (isMobile) {
+            const latestPoint = meta.data[latestIndex];
+            if (latestPoint) {
+                ctx.save();
+                ctx.font         = '700 10px Nunito';
+                ctx.fillStyle    = '#ffffff';
+                ctx.textAlign    = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Now', latestPoint.x, latestPoint.y - 20);
+                ctx.restore();
+            }
+            return;
+        }
+
+        const renderMinMax = showMinMax && minIndex !== -1 && maxIndex !== -1 && minIndex !== maxIndex;
+        const maxPoint     = meta.data[maxIndex];
+        const minPoint     = meta.data[minIndex];
+        const latestPoint  = meta.data[latestIndex];
 
         ctx.save();
         ctx.font         = '700 11px Nunito';
@@ -194,23 +248,30 @@ Chart.register(minMaxLabelsPlugin);
 /* =========================================================
    MAIN CHART RENDER ENGINE
 ========================================================= */
-export function renderWeatherChart(backendData, metric = 'temperature') {
+export function renderWeatherChart(backendData, metric = 'temperature', resolutionMinutes = 10) {
     try {
-        const config = METRIC_CONFIG[metric] ?? METRIC_CONFIG.temperature;
-        const isTemp = metric === 'temperature';
+        const config   = METRIC_CONFIG[metric] ?? METRIC_CONFIG.temperature;
+        const isTemp   = metric === 'temperature';
+        const isMobile = window.innerWidth <= 480;
 
-        const chartPoints = (backendData || []).map(item => ({
+        const rawPoints = (backendData || []).map(item => ({
             x: new Date(item.hour),
             y: item.hourlyValue,
         }));
+
+        const chartPoints = insertGapNulls(rawPoints, resolutionMinutes);
 
         const today      = new Date();
         const startRange = new Date(today); startRange.setHours(0, 0, 0, 0);
         const endRange   = new Date(today); endRange.setHours(23, 59, 59, 999);
 
-        const yBounds              = getDynamicYBounds(chartPoints, metric);
+        const yBounds                            = getDynamicYBounds(chartPoints, metric);
         const { minIndex, maxIndex, isTooClose } = getMinMaxPoints(chartPoints);
-        const showMinMax           = hasEnoughDataDuration(backendData);
+        const showMinMax                         = hasEnoughDataDuration(backendData);
+
+        // Find last non-null point for "Now" marker
+        let latestIndex = chartPoints.length - 1;
+        while (latestIndex > 0 && chartPoints[latestIndex].y == null) latestIndex--;
 
         if (weatherChartInstance !== null) {
             weatherChartInstance.destroy();
@@ -226,8 +287,9 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
         const gradientFill = ctx.createLinearGradient(0, 0, 0, 350);
 
         if (isTemp) {
-            const avgTemp  = chartPoints.length
-                ? chartPoints.reduce((s, p) => s + p.y, 0) / chartPoints.length
+            const realPoints = chartPoints.filter(p => p.y != null);
+            const avgTemp    = realPoints.length
+                ? realPoints.reduce((s, p) => s + p.y, 0) / realPoints.length
                 : 15;
             gradientFill.addColorStop(0,   tempToRgbString(avgTemp, 0.28));
             gradientFill.addColorStop(0.5, tempToRgbString(avgTemp, 0.07));
@@ -242,8 +304,15 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
             type: 'line',
             data: {
                 datasets: [{
-                    label: config.label,
-                    data:  chartPoints,
+                    label:           config.label,
+                    data:            chartPoints,
+                    spanGaps:        false,          // break line at null gap points
+                    backgroundColor: gradientFill,
+                    fill:            true,
+                    tension:         0.5,            // increased from 0.45 for smoother line
+                    borderWidth:     2.8,
+                    borderCapStyle:  'round',
+                    borderJoinStyle: 'round',
 
                     borderColor: (context) => {
                         if (!isTemp) return config.lineColor;
@@ -253,46 +322,37 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                         return createDynamicGradient(ctx, chartArea, scales.y);
                     },
 
-                    backgroundColor:  gradientFill,
-                    fill:             true,
-                    tension:          0.45,
-                    borderWidth:      2.8,
-                    borderCapStyle:   'round',
-                    borderJoinStyle:  'round',
-
                     pointRadius: (context) => {
-                        const i = context.dataIndex;
-                        const last = chartPoints.length - 1;
-                        if (i === last)     return 6;
-                        if (i === maxIndex) return 4.5;
-                        if (i === minIndex) return 4.5;
+                        const i    = context.dataIndex;
+                        const pt   = chartPoints[i];
+                        if (pt?.y == null) return 0;          // never show null gap points
+                        if (i === latestIndex) return 6;
+                        if (i === maxIndex)    return 4.5;
+                        if (i === minIndex)    return 4.5;
                         return 0;
                     },
                     pointHoverRadius: 6,
 
                     pointBackgroundColor: (context) => {
-                        const i    = context.dataIndex;
-                        const last = chartPoints.length - 1;
-                        if (i === last)     return '#ffffff';
-                        if (i === maxIndex) return config.maxNodeColor;
-                        if (i === minIndex) return config.minNodeColor;
+                        const i = context.dataIndex;
+                        if (i === latestIndex) return '#ffffff';
+                        if (i === maxIndex)    return config.maxNodeColor;
+                        if (i === minIndex)    return config.minNodeColor;
                         return config.lineColor ?? '#7dd3fc';
                     },
 
                     pointBorderColor: (context) => {
-                        const i    = context.dataIndex;
-                        const last = chartPoints.length - 1;
-                        if (i === last) return isTemp
-                            ? tempToRgbString(chartPoints[last].y)
+                        const i = context.dataIndex;
+                        if (i === latestIndex) return isTemp
+                            ? tempToRgbString(chartPoints[latestIndex].y)
                             : config.lineColor;
                         if (i === maxIndex) return config.innerBorder;
                         if (i === minIndex) return config.innerBorder;
                         return config.lineColor ?? '#7dd3fc';
                     },
 
-                    pointBorderWidth: (context) => {
-                        return context.dataIndex === chartPoints.length - 1 ? 3 : 2;
-                    },
+                    pointBorderWidth: (context) =>
+                        context.dataIndex === latestIndex ? 3 : 2,
                 }]
             },
             options: {
@@ -303,8 +363,8 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                     tension: {
                         duration: 1200,
                         easing:   'easeOutQuart',
-                        from:     0.2,
-                        to:       0.45,
+                        from:     0.3,
+                        to:       0.5,
                     }
                 },
                 scales: {
@@ -317,8 +377,8 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                         },
                         min: startRange,
                         max: endRange,
-                        ticks: { stepSize: 3, color: '#94a3b8', font: { size: 11 } },
-                        grid:  { color: 'rgba(255,255,255,0.045)', drawBorder: false },
+                        ticks:  { stepSize: 3, color: '#94a3b8', font: { size: 11 } },
+                        grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
                         border: { display: false },
                     },
                     y: {
@@ -346,6 +406,7 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                         bodyColor:       '#e2e8f0',
                         titleFont: { size: 12, weight: '600' },
                         bodyFont:  { size: 14, weight: '700' },
+                        filter: (item) => item.raw?.y != null,  // hide tooltip on gap points
                         callbacks: {
                             title: (items) => {
                                 if (!items.length) return '';
@@ -353,15 +414,17 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                                     hour: '2-digit', minute: '2-digit',
                                 });
                             },
-                            label: (context) => ` ${context.parsed.y.toFixed(1)}${config.tooltipSuffix}`,
+                            label: (context) =>
+                                ` ${context.parsed.y.toFixed(1)}${config.tooltipSuffix}`,
                         }
                     },
                     minMaxLabels: {
                         minIndex,
                         maxIndex,
                         isTooClose,
-                        latestIndex:   chartPoints.length - 1,
+                        latestIndex,
                         showMinMax,
+                        isMobile,
                         maxLabelColor: config.maxNodeColor,
                         minLabelColor: config.minNodeColor,
                     }
@@ -373,7 +436,9 @@ export function renderWeatherChart(backendData, metric = 'temperature') {
                     beforeDatasetsDraw(chart) {
                         if (!chartPoints.length) return;
                         const { ctx, chartArea, scales } = chart;
-                        const latestX    = scales.x.getPixelForValue(chartPoints[chartPoints.length - 1].x);
+                        const lastReal  = chartPoints[latestIndex];
+                        if (!lastReal)  return;
+                        const latestX   = scales.x.getPixelForValue(lastReal.x);
                         const overlayStart = latestX + 3;
                         ctx.save();
                         ctx.fillStyle = 'rgba(255,255,255,0.045)';

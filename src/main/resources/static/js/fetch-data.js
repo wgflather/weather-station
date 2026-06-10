@@ -6,9 +6,9 @@ import { FetchScheduler } from './FetchScheduler.js';
 // ==========================================
 
 const state = {
-    metrics: null,
-    systemHealth: null,
-    currentMetric: 'temperature',
+    metrics:           null,
+    systemHealth:      null,
+    currentMetric:     'temperature',
     currentResolution: Number(localStorage.getItem('chartResolution')) || 10,
 
     charts: {
@@ -19,7 +19,7 @@ const state = {
 };
 
 // ==========================================
-// ENUM MAPPINGS  — all display concerns live here, not on the backend
+// ENUM MAPPINGS
 // ==========================================
 
 const DATA_QUALITY_COLORS = {
@@ -53,6 +53,33 @@ const SURFACE_WETNESS_CONFIG = {
     SOAKED: { label: 'Soaked', cssClass: 'wetness-soaked', barColor: '#818cf8' },
 };
 
+const DEW_POINT_RISK_INFO = {
+    SATURATED: {
+        title:       'Condensation Imminent',
+        explanation: 'Air is nearly saturated. Water droplets will form on most surfaces.',
+        surfaces:    ['Metal objects', 'Glass windows', 'Car bodywork', 'Leaves and grass'],
+        tip:         'Fog or heavy dew is likely. Avoid leaving sensitive equipment outdoors.'
+    },
+    VERY_LIKELY: {
+        title:       'Condensation Likely',
+        explanation: 'Spread is very small. Cold or poorly insulated surfaces will collect moisture.',
+        surfaces:    ['Cold pipes', 'Single-pane windows', 'Metal tools', 'Outdoor furniture'],
+        tip:         'Morning dew expected. Cover or store moisture-sensitive items.'
+    },
+    POSSIBLE: {
+        title:       'Condensation Possible',
+        explanation: 'Moderate spread. Condensation may form on surfaces significantly cooler than air temperature.',
+        surfaces:    ['Cold drinks left outside', 'Underground pipes', 'Shaded metal surfaces'],
+        tip:         'Low risk for most surfaces. Watch for dew on exposed metal overnight.'
+    },
+    UNLIKELY: {
+        title:       'Condensation Unlikely',
+        explanation: 'Large spread between air and dew point. Air is relatively dry.',
+        surfaces:    [],
+        tip:         'Comfortable conditions. No condensation risk for typical outdoor surfaces.'
+    }
+};
+
 // ==========================================
 // CHART SCHEDULER
 // ==========================================
@@ -83,7 +110,7 @@ const scheduler = new FetchScheduler(
         }
 
         if (metric === state.currentMetric) {
-            renderWeatherChart(state.charts[metric], metric);
+            renderWeatherChart(state.charts[metric], metric, state.currentResolution);
         }
     },
 
@@ -110,11 +137,9 @@ async function fetchDashboard() {
 
 function renderTemperature(temp) {
     if (!temp) return;
-
     document.getElementById('avg-temp').textContent = temp.value ?? '--';
     document.getElementById('min-temp').textContent = temp.min   ?? '--';
     document.getElementById('max-temp').textContent = temp.max   ?? '--';
-
     renderTemperatureTrend(temp.trendResult);
 }
 
@@ -166,7 +191,7 @@ function renderPressureTrend(pressureTrend, changeValue) {
         ? `<span class="trend-val">${absVal.toFixed(1)}/h</span>`
         : '';
 
-    el.className = '';
+    el.className   = '';
     el.style.color = config.color;
 
     el.innerHTML = `
@@ -190,7 +215,6 @@ function renderHumidity(humidity) {
         document.getElementById('humidity-val').textContent = humVal;
     }
 
-    // Dew point value
     const dewEl = document.getElementById('humidity-dew-val');
     if (dewEl) {
         dewEl.textContent = humidity.dewPoint != null
@@ -198,7 +222,6 @@ function renderHumidity(humidity) {
             : '--°C';
     }
 
-    // Dew point spread gauge (temperature card) — needs both temp and dewPoint
     renderDewPointGauge(humidity);
 }
 
@@ -214,7 +237,6 @@ function renderDewPointGauge(humidity) {
     const dewPoint = humidity?.dewPoint;
     const risk     = humidity?.dewPointRisk;
 
-    // We still need temperature for the gauge — read from already-rendered DOM
     const tempText = document.getElementById('avg-temp')?.textContent;
     const temp     = tempText && tempText !== '--' ? parseFloat(tempText) : null;
 
@@ -226,18 +248,19 @@ function renderDewPointGauge(humidity) {
     const spread  = parseFloat((temp - dewPoint).toFixed(1));
     const percent = Math.min(100, Math.max(0, (spread / 10) * 100));
 
-    spreadValEl.textContent = `${spread.toFixed(1)}°`;
+    spreadValEl.textContent  = `${spread.toFixed(1)}°`;
     if (dewTEl)  dewTEl.textContent  = temp.toFixed(1);
     if (dewTdEl) dewTdEl.textContent = dewPoint.toFixed(1);
 
     pinEl.style.left = `${percent}%`;
     pinEl.setAttribute('data-spread', `${spread.toFixed(1)}°`);
 
-    // Badge from backend enum
     if (badgeEl && risk) {
-        const config = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
+        const config      = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
         badgeEl.className   = `dew-status-badge ${config.cssClass}`;
         badgeEl.textContent = config.label;
+        badgeEl.style.cursor = 'pointer';
+        badgeEl._dewRisk    = risk;
     }
 }
 
@@ -287,13 +310,11 @@ function renderMetrics(dto) {
     renderHumidity(humidity);
     renderSurfaceWetness(wetness);
 
-    // Populate status circle popups
     populatePopup('temperature-card', temp?.dataDetails);
     populatePopup('pressure-card',    pressure?.dataDetails);
     populatePopup('humidity-card',    humidity?.dataDetails);
     populatePopup('wetness-card',     wetness?.dataDetails);
 
-    // Color status circles
     setStatusCircleColor(document.querySelector('#temperature-card .status-circle'), temp?.dataDetails?.quality);
     setStatusCircleColor(document.querySelector('#pressure-card .status-circle'),    pressure?.dataDetails?.quality);
     setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality);
@@ -305,7 +326,6 @@ async function updateDashboard() {
         const data         = await fetchDashboard();
         state.metrics      = data.metricsDashboardDto;
         state.systemHealth = data.systemHealthDashboardDto;
-
         renderMetrics(state.metrics);
         renderSystemHealth(state.systemHealth);
     } catch (error) {
@@ -339,72 +359,44 @@ function renderSystemHealth(systemHealth) {
 
 function initResolutionControls() {
     const select = document.getElementById('resolution-selector');
-
     if (!select) return;
 
-    const saved = localStorage.getItem('resolution') ?? '10';
-
-    select.value = saved;
+    const saved = localStorage.getItem('chartResolution') ?? '10';
+    select.value            = saved;
     state.currentResolution = Number(saved);
 
     select.addEventListener('change', (e) => {
         const value = e.target.value;
-
         state.currentResolution = Number(value);
-        localStorage.setItem('resolution', value);
+        localStorage.setItem('chartResolution', value);
 
-        // force chart reload at new resolution
         state.charts[state.currentMetric] = [];
-
-        renderWeatherChart([], state.currentMetric);
+        renderWeatherChart([], state.currentMetric, state.currentResolution);
         startChart(state.currentMetric);
     });
 }
 
 function initEventListeners() {
-    const metricDesktop = document.getElementById('metric-selector');
-    const metricMobile  = document.getElementById('metric-selector-mobile');
-    const toggleBtn     = document.getElementById('chart-controls-toggle');
-    const mobilePanel   = document.getElementById('chart-controls-mobile');
+    const metricSelector = document.getElementById('metric-selector');
+    if (!metricSelector) return;
 
-    if (!metricDesktop) return;
+    state.currentMetric = metricSelector.value;
 
-    state.currentMetric = metricDesktop.value;
-
-    // Resolution must be ready before chart starts
     initResolutionControls();
     startChart(state.currentMetric);
 
-    function onMetricChange(value) {
+    metricSelector.addEventListener('change', (e) => {
+        const value         = e.target.value;
         state.currentMetric = value;
-        metricDesktop.value = value;
-        if (metricMobile) metricMobile.value = value;
 
         if (!state.charts[value]) state.charts[value] = [];
-        renderWeatherChart(state.charts[value], value);
+        renderWeatherChart(state.charts[value], value, state.currentResolution);
         startChart(value);
-    }
-
-    metricDesktop.addEventListener('change', (e) => onMetricChange(e.target.value));
-    metricMobile?.addEventListener('change', (e) => onMetricChange(e.target.value));
-
-    // Mobile panel toggle
-    toggleBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = mobilePanel.classList.toggle('open');
-        toggleBtn.classList.toggle('active', isOpen);
-    });
-
-    document.addEventListener('click', (e) => {
-        if (mobilePanel && !mobilePanel.contains(e.target) && e.target !== toggleBtn) {
-            mobilePanel.classList.remove('open');
-            toggleBtn?.classList.remove('active');
-        }
     });
 }
 
 // ==========================================
-// STATUS CIRCLE POPUP
+// STATUS CIRCLE + DEW RISK POPUPS
 // ==========================================
 
 const globalPopup = document.getElementById('global-popup');
@@ -427,7 +419,6 @@ function formatArrivedAt(value) {
 
 function buildPopupHTML(details) {
     const qColor = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
-
     return `
         <div class="popup-heading">${details.metricName ?? '--'} — Last Measurement</div>
         <div class="popup-row">
@@ -449,6 +440,33 @@ function buildPopupHTML(details) {
     `;
 }
 
+function buildDewRiskPopupHTML(risk) {
+    const info = DEW_POINT_RISK_INFO[risk];
+    if (!info) return '';
+
+    const surfacesList = info.surfaces.length
+        ? `<div class="popup-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
+               <span class="popup-key">At-risk surfaces</span>
+               <span class="popup-val" style="text-align:left; line-height:1.6">
+                   ${info.surfaces.join(' · ')}
+               </span>
+           </div>`
+        : '';
+
+    return `
+        <div class="popup-heading">${info.title}</div>
+        <div class="popup-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
+            <span class="popup-key">What this means</span>
+            <span class="popup-val" style="text-align:left; line-height:1.6">${info.explanation}</span>
+        </div>
+        ${surfacesList}
+        <div class="popup-row" style="flex-direction:column; align-items:flex-start; gap:4px; margin-top:4px;">
+            <span class="popup-key" style="color:#38bdf8">Tip</span>
+            <span class="popup-val" style="text-align:left; line-height:1.6; color:#38bdf8">${info.tip}</span>
+        </div>
+    `;
+}
+
 function setStatusCircleColor(circleEl, quality) {
     if (!circleEl) return;
     const color = DATA_QUALITY_COLORS[quality] ?? DATA_QUALITY_COLORS.MISSING;
@@ -457,8 +475,8 @@ function setStatusCircleColor(circleEl, quality) {
     circleEl.classList.toggle('pulsing', quality === 'OK');
 }
 
-function positionPopup(circle) {
-    const r      = circle.getBoundingClientRect();
+function positionPopup(anchor) {
+    const r      = anchor.getBoundingClientRect();
     const popupW = globalPopup.offsetWidth  || 220;
     const popupH = globalPopup.offsetHeight || 140;
     const margin = 8;
@@ -477,6 +495,13 @@ function positionPopup(circle) {
     globalPopup.style.left = `${Math.round(left)}px`;
 }
 
+function openPopup(html, anchor) {
+    globalPopup.innerHTML   = html;
+    globalPopup._sourceEl   = anchor;
+    globalPopup.classList.add('open');
+    requestAnimationFrame(() => positionPopup(anchor));
+}
+
 function initStatusCircles() {
     document.querySelectorAll('.status-circle').forEach(circle => {
         circle.addEventListener('click', (e) => {
@@ -484,31 +509,26 @@ function initStatusCircles() {
             const card    = circle.closest('[id$="-card"]');
             const details = card?._popupDetails;
             const isOpen  = globalPopup.classList.contains('open')
-                         && globalPopup._sourceCircle === circle;
+                         && globalPopup._sourceEl === circle;
 
             globalPopup.classList.remove('open');
-
-            if (!isOpen && details) {
-                globalPopup.innerHTML     = buildPopupHTML(details);
-                globalPopup._sourceCircle = circle;
-                globalPopup.classList.add('open');
-                requestAnimationFrame(() => positionPopup(circle));
-            }
+            if (!isOpen && details) openPopup(buildPopupHTML(details), circle);
         });
     });
+}
 
-    document.addEventListener('click', () => globalPopup.classList.remove('open'));
+function initDewRiskBadge() {
+    const badgeEl = document.getElementById('dew-status');
+    if (!badgeEl) return;
 
-    window.addEventListener('scroll', () => {
-        if (globalPopup.classList.contains('open') && globalPopup._sourceCircle) {
-            positionPopup(globalPopup._sourceCircle);
-        }
-    }, { passive: true });
+    badgeEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const risk   = badgeEl._dewRisk;
+        const isOpen = globalPopup.classList.contains('open')
+                    && globalPopup._sourceEl === badgeEl;
 
-    window.addEventListener('resize', () => {
-        if (globalPopup.classList.contains('open') && globalPopup._sourceCircle) {
-            positionPopup(globalPopup._sourceCircle);
-        }
+        globalPopup.classList.remove('open');
+        if (!isOpen && risk) openPopup(buildDewRiskPopupHTML(risk), badgeEl);
     });
 }
 
@@ -531,6 +551,21 @@ function startPolling(fn, interval) {
 // BOOT
 // ==========================================
 
+document.addEventListener('click', () => globalPopup.classList.remove('open'));
+
+window.addEventListener('scroll', () => {
+    if (globalPopup.classList.contains('open') && globalPopup._sourceEl) {
+        positionPopup(globalPopup._sourceEl);
+    }
+}, { passive: true });
+
+window.addEventListener('resize', () => {
+    if (globalPopup.classList.contains('open') && globalPopup._sourceEl) {
+        positionPopup(globalPopup._sourceEl);
+    }
+});
+
 initEventListeners();
 initStatusCircles();
+initDewRiskBadge();
 startPolling(updateDashboard, 30000);
