@@ -8,6 +8,7 @@ import { FetchScheduler } from './FetchScheduler.js';
 const state = {
     metrics:           null,
     systemHealth:      null,
+    astronomy:         null,
     currentMetric:     'temperature',
     currentResolution: Number(localStorage.getItem('chartResolution')) || 10,
 
@@ -180,6 +181,32 @@ function renderPressure(pressure) {
     renderPressureTrend(pressure.pressureTrend, pressure.trendResult?.changeValue);
 }
 
+// ==========================================
+// ASTRONOMY
+// ==========================================
+
+function renderAstronomy(astronomy) {
+    if (!astronomy) return;
+
+    const formatTime = (isoString) => {
+        if (!isoString) return '--:--';
+        const date = new Date(isoString);
+        return isNaN(date.getTime())
+            ? '--:--'
+            : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const sunRiseEl  = document.getElementById('sun-rise');
+    const sunSetEl   = document.getElementById('sun-set');
+    const moonRiseEl = document.getElementById('moon-rise');
+    const moonSetEl  = document.getElementById('moon-set');
+
+    if (sunRiseEl)  sunRiseEl.textContent  = formatTime(astronomy.sun?.rise);
+    if (sunSetEl)   sunSetEl.textContent   = formatTime(astronomy.sun?.set);
+    if (moonRiseEl) moonRiseEl.textContent = formatTime(astronomy.moon?.rise);
+    if (moonSetEl)  moonSetEl.textContent  = formatTime(astronomy.moon?.set);
+}
+
 function renderPressureTrend(pressureTrend, changeValue) {
     const el = document.getElementById('pressure-trend');
     if (!el) return;
@@ -326,8 +353,11 @@ async function updateDashboard() {
         const data         = await fetchDashboard();
         state.metrics      = data.metricsDashboardDto;
         state.systemHealth = data.systemHealthDashboardDto;
+        state.astronomy    = data.astronomySnapshot;
+
         renderMetrics(state.metrics);
         renderSystemHealth(state.systemHealth);
+        renderAstronomy(state.astronomy);
     } catch (error) {
         console.error('Dashboard update failed:', error);
     }

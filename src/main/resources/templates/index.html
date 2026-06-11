@@ -15,11 +15,46 @@
 <div class="safari-bottom-anchor"></div>
 
 <div class="today_data_block">
-    <div class="date-group">
-        <div id="date"></div>
-        <div id="fullDay"></div>
+    <div class="datetime-container">
+        <div class="date-row">
+            <span id="fullDay">Thursday</span>
+            <span id="date-day-num">11,</span>
+        </div>
+        <span id="realTime">19:50</span>
     </div>
-    <div id="realTime"></div>
+
+    <div class="astro-grid">
+        <div class="astro-item">
+            <svg class="astro-icon astro-sun" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4"></circle>
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+            </svg>
+            <span id="sun-rise" class="astro-time">--:--</span>
+        </div>
+
+        <div class="astro-item">
+            <svg class="astro-icon astro-sun" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v2M4.93 4.93l1.41 1.41M2 12h2M20 12h2M19.07 4.93l-1.41 1.41"></path>
+                <path d="M22 22H2M16 14a4 4 0 0 0-8 0"></path>
+            </svg>
+            <span id="sun-set" class="astro-time">--:--</span>
+        </div>
+
+        <div class="astro-item">
+            <svg class="astro-icon astro-moon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+            </svg>
+            <span id="moon-rise" class="astro-time">--:--</span>
+        </div>
+
+        <div class="astro-item">
+            <svg class="astro-icon astro-moon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" opacity="0.6"></path>
+                <path d="M22 22H2"></path>
+            </svg>
+            <span id="moon-set" class="astro-time">--:--</span>
+        </div>
+    </div>
 </div>
 
 <div class="dashboard-row row-full">

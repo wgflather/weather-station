@@ -147,9 +147,127 @@ body::before {
     min-width: 0;
 }
 
-#date { font-size: 1.1rem; color: #c3d7f3; }
-#fullDay { font-size: 1.5rem; font-weight: bold; color: #ffffff; }
-#realTime { font-size: 2rem; font-weight: 750; color: #38bdf8; text-align: right; }
+/* Fix date and time sizing */
+#date {
+    font-size: 0.9rem;
+    color: #c3d7f3;
+}
+#fullDay {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #ffffff;
+}
+#realTime {
+    font-size: 1.6rem;
+    font-weight: 750;
+    color: #38bdf8;
+    text-align: right;
+}
+
+/* =========================================================
+   TODAY DATA BLOCK: LEFT/RIGHT SPLIT LAYOUT
+========================================================= */
+/* =========================================================
+   TODAY DATA BLOCK: LEFT/RIGHT SPLIT LAYOUT (FLUID)
+========================================================= */
+.today_data_block {
+    max-width: 820px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: clamp(8px, 2vw, 20px);
+    margin: 0 auto 20px auto;
+}
+
+.datetime-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.date-row {
+    display: flex;
+    align-items: baseline;
+    gap: clamp(4px, 1vw, 6px);
+    font-size: clamp(0.95rem, 4vw, 1.5rem);
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+#fullDay, #date-day-num {
+    color: #ffffff;
+    white-space: nowrap;   /* Keeps "Thursday 11," strictly together */
+}
+
+#realTime {
+    color: #38bdf8;
+    font-size: clamp(1.1rem, 4.5vw, 1.75rem); /* Slightly larger accent for clock */
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+/* Right side alignment: 2x2 Clean Grid */
+.astro-grid {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: clamp(4px, 1vw, 8px) clamp(8px, 2vw, 16px);
+}
+
+.astro-item {
+    display: flex;
+    align-items: center;
+    gap: clamp(5px, 1vw, 8px);
+}
+
+.astro-icon {
+    /* Scales smoothly between 14px and 18px */
+    width: clamp(14px, 2vw, 18px);
+    height: clamp(14px, 2vw, 18px);
+    flex-shrink: 0;
+}
+
+.astro-sun {
+    stroke: #facc15;
+}
+
+.astro-moon {
+    stroke: #93c5fd;
+}
+
+.astro-time {
+    /* Scales smoothly between 0.78rem and 0.95rem */
+    font-size: clamp(0.78rem, 2vw, 0.95rem);
+    font-weight: 600;
+    color: #f1f5f9;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Fallback breakpoint only for wrapping orientation on extremely small devices if needed */
+@media (max-width: 480px) {
+    /* Keeps everything on one line if space permits, but allows safe breathing room */
+    .today_data_block {
+        padding: 12px;
+    }
+}
+
+/* Specific breakpoint to force the clock to drop cleanly below the date */
+@media (max-width: 520px) {
+    .datetime-container {
+        flex-direction: column; /* Switches from row to stacked column layout */
+        align-items: flex-start; /* Aligns both lines perfectly to the left */
+        gap: 2px 0;             /* Small vertical space between date and time */
+    }
+
+    #realTime {
+        margin-left: 0;         /* Reset the horizontal spacing when stacked */
+    }
+}
+
 
 /* Card Headers & Icons */
 .card-header {
@@ -997,6 +1115,47 @@ h3 {
 .wetness_block .metric-content {
     align-items: flex-start;
     padding-top: 6px;
+}
+
+/* =========================================================
+   SUN / MOON RISE & SET LAYOUT
+========================================================= */
+.astro-container {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.astro-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #e2eeff;
+}
+
+.astro-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+/* Thematic stroke colors for the SVGs */
+.astro-sun {
+    stroke: #facc15; /* Warm gold/yellow */
+    fill: rgba(250, 204, 21, 0.1);
+}
+
+.astro-moon {
+    stroke: #93c5fd; /* Soft silver/blue */
+    fill: rgba(147, 197, 253, 0.1);
+}
+
+.astro-time {
+    font-weight: 600;
+    color: #ffffff;
 }
 
 /* =========================================================

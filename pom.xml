@@ -166,9 +166,28 @@
             <version>1.0.3</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>us.dustinj.timezonemap</groupId>
+            <artifactId>timezonemap</artifactId>
+            <version>4.5</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.cosinekitty</groupId>
+            <artifactId>astronomy</artifactId>
+            <version>v2.1.19</version>
+        </dependency>
+
 
 
     </dependencies>
+
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>
