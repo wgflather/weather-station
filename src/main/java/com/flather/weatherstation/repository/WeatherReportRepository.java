@@ -61,7 +61,8 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   ORDER BY bucket ASC
                   """,
       nativeQuery = true)
-  List<DataPoint> findChartTemperature(@Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
+  List<DataPoint> findChartTemperature(
+      @Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
 
   @Query(
       value =
@@ -76,7 +77,8 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                           ORDER BY bucket ASC
                           """,
       nativeQuery = true)
-  List<DataPoint> findChartHumidity(@Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
+  List<DataPoint> findChartHumidity(
+      @Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
 
   @Query(
       value =
@@ -91,5 +93,6 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   ORDER BY bucket ASC
                   """,
       nativeQuery = true)
-  List<DataPoint> findChartPressure(@Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
+  List<DataPoint> findChartPressure(
+      @Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
 }

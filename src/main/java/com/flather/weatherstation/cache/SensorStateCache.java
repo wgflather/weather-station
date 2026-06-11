@@ -1,11 +1,10 @@
 package com.flather.weatherstation.cache;
 
-import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.config.LocationProperties;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
-import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -25,13 +24,12 @@ public class SensorStateCache {
 
   // Spike detection reference — small, can be reset aggressively
   // represents "current conditions" not "recent history"
-  @Getter
-  private final Map<Metric, Deque<Double>> metricsSpikeWindow;
+  @Getter private final Map<Metric, Deque<Double>> metricsSpikeWindow;
 
   private static final int METRICS_WINDOW_MINUTES = 60;
   public static final int SPIKE_REFERENCE_SIZE = 5;
 
-  private final TimezoneProperties timezoneProperties;
+  private final LocationProperties locationProperties;
 
   private final Map<Metric, Integer> consecutiveSpikes;
 
@@ -41,22 +39,24 @@ public class SensorStateCache {
 
   @Setter @Getter private volatile WeatherRecord lastSavedMeasurement;
 
-  public SensorStateCache(TimezoneProperties timezoneProperties) {
-    this.timezoneProperties = timezoneProperties;
+  public SensorStateCache(LocationProperties locationProperties) {
+    this.locationProperties = locationProperties;
 
-    metricsSpikeWindow = Map.of(
+    metricsSpikeWindow =
+        Map.of(
             Metric.TEMPERATURE, new ArrayDeque<>(),
             Metric.PRESSURE, new ArrayDeque<>(),
             Metric.HUMIDITY, new ArrayDeque<>());
 
-    consecutiveSpikes = new EnumMap<>(
+    consecutiveSpikes =
+        new EnumMap<>(
             Map.of(
-                    Metric.TEMPERATURE, 0,
-                    Metric.PRESSURE, 0,
-                    Metric.HUMIDITY, 0));
+                Metric.TEMPERATURE, 0,
+                Metric.PRESSURE, 0,
+                Metric.HUMIDITY, 0));
   }
 
-  @Scheduled(cron = "0 0 0 * * *", zone = "#{@timezoneProperties.zoneId}")
+  @Scheduled(cron = "0 0 0 * * *", zone = "#{@locationProperties.zoneId}")
   public void resetDailyExtremes() {
     log.info("[DAILY_RESET] Resetting daily temperature extremes");
     resetDailyTemperatureExtremes();
@@ -80,14 +80,13 @@ public class SensorStateCache {
     addSpikeIfPresent(Metric.HUMIDITY, dto.getHumidity());
   }
 
-  void loadCacheSnapshot(
-          List<WeatherRecord> dtos, ExtremesProjection extremesProjection) {
+  void loadCacheSnapshot(List<WeatherRecord> dtos, ExtremesProjection extremesProjection) {
 
     log.info(
-            "[CACHE_INIT] Loading cache snapshot: {} records, min={}, max={}",
-            dtos.size(),
-            extremesProjection.min(),
-            extremesProjection.max());
+        "[CACHE_INIT] Loading cache snapshot: {} records, min={}, max={}",
+        dtos.size(),
+        extremesProjection.min(),
+        extremesProjection.max());
 
     metricsWindow.addAll(dtos);
 
@@ -99,7 +98,7 @@ public class SensorStateCache {
     todayMinTemp = extremesProjection.min();
 
     log.info(
-            "[CACHE_INIT] Cache initialized successfully. metricsWindowSize={}", metricsWindow.size());
+        "[CACHE_INIT] Cache initialized successfully. metricsWindowSize={}", metricsWindow.size());
   }
 
   public synchronized void resetDailyTemperatureExtremes() {
@@ -110,10 +109,10 @@ public class SensorStateCache {
   public synchronized void updateCachedMeasurements(WeatherRecord savedRecord) {
 
     log.debug(
-            "[CACHE_UPDATE] New measurement received: temp={}, pressure={}, time={}",
-            savedRecord.getTemperature(),
-            savedRecord.getPressure(),
-            savedRecord.getMeasuredAt().atZone(timezoneProperties.getZoneId()));
+        "[CACHE_UPDATE] New measurement received: temp={}, pressure={}, time={}",
+        savedRecord.getTemperature(),
+        savedRecord.getPressure(),
+        savedRecord.getMeasuredAt().atZone(locationProperties.getZoneId()));
 
     updateMetricsWindow(savedRecord);
     if (savedRecord.getTemperature() != null) {
@@ -157,13 +156,9 @@ public class SensorStateCache {
   private void updateMetricsWindow(WeatherRecord savedRecord) {
     metricsWindow.addLast(savedRecord);
 
-    Instant cutoff =
-            savedRecord
-                    .getMeasuredAt()
-                    .minus(METRICS_WINDOW_MINUTES, ChronoUnit.MINUTES);
+    Instant cutoff = savedRecord.getMeasuredAt().minus(METRICS_WINDOW_MINUTES, ChronoUnit.MINUTES);
 
-    while (!metricsWindow.isEmpty()
-            && metricsWindow.peekFirst().getMeasuredAt().isBefore(cutoff)) {
+    while (!metricsWindow.isEmpty() && metricsWindow.peekFirst().getMeasuredAt().isBefore(cutoff)) {
 
       metricsWindow.removeFirst();
     }
@@ -201,9 +196,9 @@ public class SensorStateCache {
 
   public synchronized void forceBaselineReset(Metric metricToReset, double newReality) {
     log.info(
-            "[BASELINE_RESET] Spike reference window reset for {}. New baseline = {}",
-            metricToReset,
-            newReality);
+        "[BASELINE_RESET] Spike reference window reset for {}. New baseline = {}",
+        metricToReset,
+        newReality);
 
     metricsSpikeWindow.get(metricToReset).clear();
 

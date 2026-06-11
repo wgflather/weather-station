@@ -17,8 +17,8 @@ public class DashboardService {
     return MetricsDashboardDto.builder()
         .temperature(analyticsService.getTemperature())
         .pressure(analyticsService.getPressure())
-            .surfaceWetness(analyticsService.getSurfaceWetness())
-            .humidity(analyticsService.getHumidity())
+        .surfaceWetness(analyticsService.getSurfaceWetness())
+        .humidity(analyticsService.getHumidity())
         .build();
   }
 

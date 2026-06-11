@@ -37,6 +37,4 @@ hardware:
   pressure-sensor: BMP180
   surface-wetness-sensor: HW-028
 
-timezone:
-  zone-id: Europe/Kiev
 

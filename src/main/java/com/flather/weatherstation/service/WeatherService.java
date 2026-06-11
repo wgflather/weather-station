@@ -1,7 +1,7 @@
 package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.SensorStateCache;
-import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.config.LocationProperties;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
@@ -25,7 +25,7 @@ public class WeatherService {
   private final WeatherReportRepository repository;
   private final DataQualityValidator qualityValidator;
   private final WeatherRecordMapper mapper;
-  private final TimezoneProperties timezoneProperties;
+  private final LocationProperties locationProperties;
   private final SensorStateCache sensorStateCache;
 
   private Double medianOf(Metric metric, Median median) {
@@ -39,8 +39,7 @@ public class WeatherService {
 
     DataQuality quality = validationResult.getByMetric(metric);
 
-    if (quality.equals(DataQuality.OK)
-        && sensorStateCache.getLastSavedMeasurement() == null) {
+    if (quality.equals(DataQuality.OK) && sensorStateCache.getLastSavedMeasurement() == null) {
       return DataQuality.OK;
     }
 
@@ -78,7 +77,6 @@ public class WeatherService {
     return DataQuality.OK;
   }
 
-
   @Transactional
   public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto) {
 
@@ -101,7 +99,6 @@ public class WeatherService {
         validateIfOk(
             Metric.HUMIDITY, anomalyAndMissingValidationResult, weatherRecordDto.getHumidity());
 
-
     updateCache(tempQuality, Metric.TEMPERATURE, record.getTemperature());
 
     record.setTemperatureDataQuality(tempQuality);
@@ -114,7 +111,8 @@ public class WeatherService {
 
     record.setHumidityDataQuality(humidityQuality);
 
-    record.setSurfaceWetnessDataQuality(anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
+    record.setSurfaceWetnessDataQuality(
+        anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
 
     // ============================
     // persist
@@ -137,7 +135,7 @@ public class WeatherService {
   @Transactional(readOnly = true)
   public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord() {
 
-    ZoneId zoneId = timezoneProperties.getZoneId();
+    ZoneId zoneId = locationProperties.getZoneId();
 
     LocalDate currentDate = LocalDate.now(zoneId);
 

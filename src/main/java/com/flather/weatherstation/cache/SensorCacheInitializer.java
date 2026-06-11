@@ -1,10 +1,8 @@
 package com.flather.weatherstation.cache;
 
-import com.flather.weatherstation.config.TimezoneProperties;
+import com.flather.weatherstation.config.LocationProperties;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
-import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
-import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.Instant;
@@ -18,12 +16,12 @@ import org.springframework.stereotype.Component;
 public class SensorCacheInitializer implements ApplicationRunner {
   private final SensorStateCache sensorStateCache;
   private final WeatherReportRepository repository;
-  private final TimezoneProperties properties;
+  private final LocationProperties properties;
 
   public SensorCacheInitializer(
       SensorStateCache sensorStateCache,
       WeatherReportRepository repository,
-      TimezoneProperties properties) {
+      LocationProperties properties) {
     this.sensorStateCache = sensorStateCache;
     this.repository = repository;
     this.properties = properties;

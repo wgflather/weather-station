@@ -2,10 +2,12 @@ package com.flather.weatherstation.dto.validation;
 
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
-import com.flather.weatherstation.dto.analytics.SurfaceWetnessDto;
 
 public record ValidationResult(
-        DataQuality temperature, DataQuality pressure, DataQuality humidity, DataQuality surfaceWetness) {
+    DataQuality temperature,
+    DataQuality pressure,
+    DataQuality humidity,
+    DataQuality surfaceWetness) {
   public DataQuality getByMetric(Metric metric) {
     return switch (metric) {
       case TEMPERATURE -> temperature;
