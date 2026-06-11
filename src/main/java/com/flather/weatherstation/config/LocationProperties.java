@@ -26,13 +26,13 @@ public class LocationProperties {
   @DecimalMax(value = "90.0", message = "location.latitude must be between -90 and 90 degrees")
   @Setter
   @NotNull(message = "location.latitude is required")
-  private double latitude;
+  private Double latitude;
 
   @DecimalMin(value = "-180.0", message = "location.longitude must be between -180 and 180 degrees")
   @DecimalMax(value = "180.0", message = "location.longitude must be between -180 and 180 degrees")
   @Setter
   @NotNull(message = "location.longitude is required")
-  private double longitude;
+  private Double longitude;
 
   @DecimalMin(value = "-430.0", message = "Elevation must be above sea level limits")
   @DecimalMax(value = "8850.0", message = "Elevation must be realistic (below Everest range)")
@@ -51,12 +51,16 @@ public class LocationProperties {
 
     // Get the ZoneId object
     TimeZone zone = map.getOverlappingTimeZone(latitude, longitude);
-
-    elevation = elevation != null ? elevation : 0.0;
+    if(elevation == null){
+      log.info("Elevation not set, fall to default 0.0");
+      elevation = 0.0;
+    }
 
     if (zone == null) {
       throw new RuntimeException();
     }
+
+    this.zoneId = ZoneId.of(zone.getZoneId());
 
     if ("Etc/GMT".equals(zone.getZoneId())) {
       log.warn(
@@ -66,9 +70,9 @@ public class LocationProperties {
           zone.getZoneId());
     }
 
-    log.info("Resolved timezone {} for coordinates ({}, {})", zoneId, latitude, longitude);
+    log.info("Resolved timezone {} for coordinates ({}, {}) with {}m elevation", zoneId, latitude, longitude, elevation);
 
-    this.zoneId = ZoneId.of(zone.getZoneId());
+
 
     observer = new Observer(latitude, longitude, elevation);
   }
