@@ -1,6 +1,7 @@
 package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.domain.constant.DataStatus;
+import com.flather.weatherstation.dto.dashboard.AstronomySnapshot;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
 import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DashboardService {
   private final AnalyticsService analyticsService;
+  private final AstronomySearch astronomySearchService;
 
   public MetricsDashboardDto getMetricsDashboard() {
     return MetricsDashboardDto.builder()
@@ -20,6 +22,10 @@ public class DashboardService {
         .surfaceWetness(analyticsService.getSurfaceWetness())
         .humidity(analyticsService.getHumidity())
         .build();
+  }
+
+  public AstronomySnapshot getAstronomyBlock(){
+    return new AstronomySnapshot(astronomySearchService.getSun(), astronomySearchService.getMoon());
   }
 
   public SystemHealthDashboardDto getSystemHealth() {
@@ -47,6 +53,7 @@ public class DashboardService {
 
   public WeatherDashboardDto getWeatherDashboard() {
     SystemHealthDashboardDto systemHealthDashboardDto = getSystemHealth();
+    AstronomySnapshot astronomyDashboardBlock = getAstronomyBlock();
     MetricsDashboardDto metricsDashboardDto =
         (systemHealthDashboardDto.getStatus() == DataStatus.EMPTY)
             ? MetricsDashboardDto.empty()
@@ -55,6 +62,7 @@ public class DashboardService {
     return WeatherDashboardDto.builder()
         .metricsDashboardDto(metricsDashboardDto)
         .systemHealthDashboardDto(systemHealthDashboardDto)
+            .astronomySnapshot(astronomyDashboardBlock)
         .build();
   }
 }

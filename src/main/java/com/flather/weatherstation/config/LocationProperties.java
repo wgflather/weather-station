@@ -1,5 +1,6 @@
 package com.flather.weatherstation.config;
 
+import io.github.cosinekitty.astronomy.Observer;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -33,16 +34,25 @@ public class LocationProperties {
   @NotNull(message = "location.longitude is required")
   private double longitude;
 
+  @DecimalMin(value = "-430.0", message = "Elevation must be above sea level limits")
+  @DecimalMax(value = "8850.0", message = "Elevation must be realistic (below Everest range)")
+  @Setter
+  private Double elevation;
+
+  private Observer observer;
+
   @Getter private ZoneId zoneId;
 
   @PostConstruct
-  private void determineTimezone() {
+  private void initLocationProperties() {
 
     // Initialize for the entire world map
     TimeZoneMap map = TimeZoneMap.forEverywhere();
 
     // Get the ZoneId object
     TimeZone zone = map.getOverlappingTimeZone(latitude, longitude);
+
+    elevation = elevation != null ? elevation : 0.0;
 
     if (zone == null) {
       throw new RuntimeException();
@@ -59,5 +69,7 @@ public class LocationProperties {
     log.info("Resolved timezone {} for coordinates ({}, {})", zoneId, latitude, longitude);
 
     this.zoneId = ZoneId.of(zone.getZoneId());
+
+    observer = new Observer(latitude, longitude, elevation);
   }
 }

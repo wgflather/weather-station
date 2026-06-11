@@ -12,4 +12,5 @@ import lombok.RequiredArgsConstructor;
 public class WeatherDashboardDto {
   private MetricsDashboardDto metricsDashboardDto;
   private SystemHealthDashboardDto systemHealthDashboardDto;
+  private AstronomySnapshot astronomySnapshot;
 }
