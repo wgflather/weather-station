@@ -52,6 +52,7 @@ const METRIC_CONFIG = {
         maxNodeColor:  '#ef4444',
         minNodeColor:  '#3b82f6',
         innerBorder:   '#ffffff',
+        closeThreshold: 0.3,
     },
     pressure: {
         label:         'Pressure',
@@ -65,6 +66,7 @@ const METRIC_CONFIG = {
         maxNodeColor:  '#e2e8f0',
         minNodeColor:  '#94a3b8',
         innerBorder:   '#f8fafc',
+        closeThreshold: 0.5,
     },
     humidity: {
         label:         'Humidity',
@@ -78,6 +80,7 @@ const METRIC_CONFIG = {
         maxNodeColor:  '#7dd3fc',
         minNodeColor:  '#0ea5e9',
         innerBorder:   '#e0f2fe',
+        closeThreshold: 2,
     },
 };
 
@@ -109,13 +112,25 @@ function insertGapNulls(rawPoints, resolutionMinutes) {
 
 /* =========================================================
    GAP SEGMENT EXTRACTION — builds second dataset for dashed bridge
+   Covers gaps between readings, plus the "no data yet" edges
+   between the start of the day / first reading and the last
+   reading / now (now -> end of day is handled by the future overlay).
 ========================================================= */
-function extractGapSegments(rawPoints, resolutionMinutes) {
-    if (rawPoints.length < 2) return [];
+function extractGapSegments(rawPoints, resolutionMinutes, startRange, now) {
+    if (!rawPoints.length) return [];
 
     const gapThreshold = resolutionMinutes * 60 * 1000 * 2.5;
     const segments     = [];
 
+    // Leading gap: start of day -> first reading
+    const first = rawPoints[0];
+    if (first.x.getTime() - startRange.getTime() > gapThreshold) {
+        segments.push({ x: startRange, y: first.y });
+        segments.push({ x: first.x, y: first.y });
+        segments.push({ x: new Date(first.x.getTime() + 1), y: null });
+    }
+
+    // Internal gaps between consecutive readings
     for (let i = 0; i < rawPoints.length - 1; i++) {
         const curr = rawPoints[i];
         const next = rawPoints[i + 1];
@@ -127,6 +142,14 @@ function extractGapSegments(rawPoints, resolutionMinutes) {
             // null separator so multiple gaps don't connect
             segments.push({ x: new Date(next.x.getTime() + 1), y: null });
         }
+    }
+
+    // Trailing gap: last reading -> now
+    const last = rawPoints[rawPoints.length - 1];
+    if (now.getTime() - last.x.getTime() > gapThreshold) {
+        segments.push({ x: last.x, y: last.y });
+        segments.push({ x: now, y: last.y });
+        segments.push({ x: new Date(now.getTime() + 1), y: null });
     }
 
     return segments;
@@ -157,7 +180,7 @@ function getDynamicYBounds(points, metric) {
 ========================================================= */
 function getMinMaxPoints(points) {
     const real = (points || []).filter(p => p.y != null);
-    if (!real.length) return { minIndex: -1, maxIndex: -1, isTooClose: false };
+    if (!real.length) return { minIndex: -1, maxIndex: -1 };
 
     let minReal = 0;
     let maxReal = 0;
@@ -167,17 +190,13 @@ function getMinMaxPoints(points) {
         if (pt.y > real[maxReal].y) maxReal = i;
     });
 
-    const indexDistance = Math.abs(maxReal - minReal);
-    const valueDelta    = Math.abs(real[maxReal].y - real[minReal].y);
-    const isTooClose    = indexDistance <= 2 || valueDelta < 0.2;
-
     // map back to full array indices
     const minTime = real[minReal].x.getTime();
     const maxTime = real[maxReal].x.getTime();
     const fullMin = points.findIndex(p => p.x.getTime() === minTime && p.y != null);
     const fullMax = points.findIndex(p => p.x.getTime() === maxTime && p.y != null);
 
-    return { minIndex: fullMin, maxIndex: fullMax, isTooClose };
+    return { minIndex: fullMin, maxIndex: fullMax };
 }
 
 function hasEnoughDataDuration(backendData) {
@@ -205,69 +224,401 @@ function createDynamicGradient(ctx, chartArea, yAxis) {
 /* =========================================================
    MIN / MAX / NOW LABELS PLUGIN
 ========================================================= */
+const LABEL_PADDING = 2;
+
+// Estimate the on-screen box a label will occupy
+function measureLabel(ctx, text, font) {
+    ctx.font = font;
+    const m       = ctx.measureText(text);
+    const ascent  = m.actualBoundingBoxAscent  ?? parseInt(font, 10) * 0.7;
+    const descent = m.actualBoundingBoxDescent ?? parseInt(font, 10) * 0.3;
+    return {
+        halfW: m.width / 2 + LABEL_PADDING,
+        halfH: (ascent + descent) / 2 + LABEL_PADDING,
+    };
+}
+
+// Position a label above/below its point, flipping side (and clamping)
+// so it never gets clipped by the chart area's edges/borders
+function placeLabel(label, chartArea) {
+    const { halfW, halfH } = label;
+
+    let y = label.preferAbove ? label.point.y - label.gap : label.point.y + label.gap;
+
+    if (label.preferAbove && y - halfH < chartArea.top) {
+        y = label.point.y + label.gap;
+    } else if (!label.preferAbove && y + halfH > chartArea.bottom) {
+        y = label.point.y - label.gap;
+    }
+
+    label.y = Math.min(Math.max(y, chartArea.top + halfH), chartArea.bottom - halfH);
+    label.x = Math.min(Math.max(label.point.x, chartArea.left + halfW), chartArea.right - halfW);
+}
+
+// Like placeLabel, but never flips sides — used for labels that must stay
+// pinned to a fixed offset from their anchor (H/L absorbed into "Now")
+function placeFixedOffsetLabel(label, chartArea) {
+    const { halfW, halfH } = label;
+    const y = label.preferAbove ? label.point.y - label.gap : label.point.y + label.gap;
+    label.y = Math.min(Math.max(y, chartArea.top + halfH), chartArea.bottom - halfH);
+    label.x = Math.min(Math.max(label.point.x, chartArea.left + halfW), chartArea.right - halfW);
+}
+
+// Push apart any labels whose boxes overlap, keeping them inside chartArea
+function resolveLabelOverlaps(labels, chartArea) {
+    for (let pass = 0; pass < 4; pass++) {
+        let moved = false;
+
+        for (let i = 0; i < labels.length; i++) {
+            for (let j = i + 1; j < labels.length; j++) {
+                const a = labels[i];
+                const b = labels[j];
+
+                const xOverlap = (a.halfW + b.halfW) - Math.abs(a.x - b.x);
+                const yOverlap = (a.halfH + b.halfH) - Math.abs(a.y - b.y);
+                if (xOverlap <= 0 || yOverlap <= 0) continue;
+
+                const push = yOverlap / 2 + 1;
+                if (a.y <= b.y) {
+                    a.y -= push;
+                    b.y += push;
+                } else {
+                    a.y += push;
+                    b.y -= push;
+                }
+
+                a.y = Math.min(Math.max(a.y, chartArea.top + a.halfH), chartArea.bottom - a.halfH);
+                b.y = Math.min(Math.max(b.y, chartArea.top + b.halfH), chartArea.bottom - b.halfH);
+                moved = true;
+            }
+        }
+
+        if (!moved) break;
+    }
+}
+
+// True if any two labels still collide after overlap resolution —
+// the chart is too small/cramped to place them legibly
+function hasResidualOverlap(labels) {
+    for (let i = 0; i < labels.length; i++) {
+        for (let j = i + 1; j < labels.length; j++) {
+            const a = labels[i];
+            const b = labels[j];
+
+            const xOverlap = (a.halfW + b.halfW) - Math.abs(a.x - b.x);
+            const yOverlap = (a.halfH + b.halfH) - Math.abs(a.y - b.y);
+            if (xOverlap > 0 && yOverlap > 0) return true;
+        }
+    }
+    return false;
+}
+
+// Minimum on-screen gap (px) between two pins before they're considered "overlapping"
+const PIN_GAP = 2;
+
+function pinsOverlap(a, b) {
+    if (!a || !b) return false;
+    const ra = a.options?.radius ?? 0;
+    const rb = b.options?.radius ?? 0;
+    return Math.hypot(a.x - b.x, a.y - b.y) < ra + rb + PIN_GAP;
+}
+
+/* =========================================================
+   CONTEXT-AWARE H/L/NOW COLLISION RESOLUTION
+========================================================= */
+// "1-2 hours" from the spec, used as the triple-collision window
+const TRIPLE_COLLISION_WINDOW_MINUTES = 90;
+
+// Hysteresis memory per metric — persists across re-renders (the module
+// stays loaded across the 20s polling cycle) so layouts don't flicker
+// as new data streams in near a threshold boundary
+const COLLISION_STATE = {
+    temperature: { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    pressure:    { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    humidity:    { triple: false, maxAbsorbed: false, minAbsorbed: false },
+};
+
+// Decide how today's High/Low pins relate to "Now": 'triple' (H and L both
+// collapse onto Now), 'maxAbsorbed' (H collapses onto Now, L stays put),
+// 'minAbsorbed' (mirror), or 'none' (render H/L/Now independently, subject
+// to the pixel-geometry pass below)
+function resolveCollisionScenario(metric, chartPoints, minIndex, maxIndex,
+                                   latestIndex, validMinMax, resolutionMinutes, config) {
+    const state = COLLISION_STATE[metric];
+    if (!validMinMax) {
+        state.triple = state.maxAbsorbed = state.minAbsorbed = false;
+        return 'none';
+    }
+
+    const nowValue  = chartPoints[latestIndex].y;
+    const maxValue  = chartPoints[maxIndex].y;
+    const minValue  = chartPoints[minIndex].y;
+    const threshold = config.closeThreshold;
+
+    const deltaMax = latestIndex - maxIndex; // always >= 0
+    const deltaMin = latestIndex - minIndex;
+
+    // --- Scenario 1: triple collision (own window + own hysteresis) ---
+    const tripleWindow = Math.max(2, Math.round(TRIPLE_COLLISION_WINDOW_MINUTES / resolutionMinutes));
+    const valuesClose  = Math.abs(maxValue - minValue) <= threshold;
+    const tripleEntry  = deltaMax <= tripleWindow && deltaMin <= tripleWindow && valuesClose;
+    const tripleExit   = deltaMax > tripleWindow + 1 || deltaMin > tripleWindow + 1 || !valuesClose;
+    state.triple = state.triple ? !tripleExit : tripleEntry;
+
+    if (state.triple) {
+        state.maxAbsorbed = false;
+        state.minAbsorbed = false;
+        return 'triple';
+    }
+
+    // --- Scenarios 2/3: per-extreme "adjacent to Now" absorption ---
+    const maxDiff = Math.abs(maxValue - nowValue);
+    const minDiff = Math.abs(minValue - nowValue);
+
+    const maxEntry = deltaMax <= 1 && maxDiff <= threshold;
+    const maxExit  = deltaMax >= 2 || maxDiff > threshold;
+    state.maxAbsorbed = state.maxAbsorbed ? !maxExit : maxEntry;
+
+    const minEntry = deltaMin <= 1 && minDiff <= threshold;
+    const minExit  = deltaMin >= 2 || minDiff > threshold;
+    state.minAbsorbed = state.minAbsorbed ? !minExit : minEntry;
+
+    if (state.maxAbsorbed && state.minAbsorbed) return 'triple'; // degenerate both-absorbed case, same rendering
+    if (state.maxAbsorbed) return 'maxAbsorbed';
+    if (state.minAbsorbed) return 'minAbsorbed';
+    return 'none';
+}
+
 const minMaxLabelsPlugin = {
     id: 'minMaxLabels',
-    afterDatasetsDraw(chart, args, pluginOptions) {
-        const { ctx } = chart;
-        const meta    = chart.getDatasetMeta(0);
+
+    // Decide which of H / L / Now get a pin + label this frame. `scenario`
+    // (from resolveCollisionScenario) dispatches to a dedicated layout for
+    // H/L positions that have collapsed onto "Now"; the 'none' fallback
+    // uses pixel-geometry overlap detection — "Now" always wins, H and L
+    // are dropped (pin and label both) in that order until nothing overlaps.
+    beforeDatasetsDraw(chart, args, pluginOptions) {
+        const meta = chart.getDatasetMeta(0);
         if (!meta.data || !meta.data.length) return;
 
         const {
-            minIndex, maxIndex, isTooClose,
-            latestIndex, showMinMax,
+            minIndex, maxIndex, latestIndex, validMinMax, scenario, isMobile,
             maxLabelColor, minLabelColor,
-            isMobile,
         } = pluginOptions;
 
-        const latestPoint = meta.data[latestIndex];
+        chart.$hideMaxPin    = false;
+        chart.$hideMinPin    = false;
+        chart.$visibleLabels = [];
 
-        // On mobile: only render "Now", skip H/L
-        if (isMobile) {
-            if (latestPoint) {
-                ctx.save();
-                ctx.font         = '700 10px Nunito';
-                ctx.fillStyle    = '#ffffff';
-                ctx.textAlign    = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('Now', latestPoint.x, latestPoint.y - 20);
-                ctx.restore();
+        const nowEl = meta.data[latestIndex];
+        const maxEl = validMinMax ? meta.data[maxIndex] : null;
+        const minEl = validMinMax ? meta.data[minIndex] : null;
+
+        const maxIsNow = validMinMax && maxIndex === latestIndex;
+
+        const { ctx, chartArea } = chart;
+        const hlFont   = isMobile ? '700 8px Nunito' : '700 11px Nunito';
+        const nowFont  = isMobile ? '700 8px Nunito' : '700 10px Nunito';
+        const gap      = isMobile ? 9 : 14;
+        const fixedGap = 14;
+
+        let visible;
+
+        if (scenario === 'triple') {
+            // H and L both collapse onto "Now" — hide their own dots and
+            // flank the Now pin with fixed-offset H/L labels
+            if (maxEl !== nowEl) {
+                maxEl.options.radius      = 0;
+                maxEl.options.borderWidth = 0;
+                chart.$hideMaxPin = true;
             }
-            return;
+            if (minEl !== nowEl) {
+                minEl.options.radius      = 0;
+                minEl.options.borderWidth = 0;
+                chart.$hideMinPin = true;
+            }
+
+            const hLabel = {
+                key: 'max', point: nowEl, text: 'H', color: maxLabelColor, font: hlFont,
+                gap: fixedGap, preferAbove: true, ...measureLabel(ctx, 'H', hlFont),
+            };
+            const lLabel = {
+                key: 'min', point: nowEl, text: 'L', color: minLabelColor, font: hlFont,
+                gap: fixedGap, preferAbove: false, ...measureLabel(ctx, 'L', hlFont),
+            };
+            placeFixedOffsetLabel(hLabel, chartArea);
+            placeFixedOffsetLabel(lLabel, chartArea);
+            visible = [hLabel, lLabel];
+
+        } else if (scenario === 'maxAbsorbed') {
+            // H collapses onto "Now" — ring Now in H's color, pin "H" 14px
+            // above it, and render "L" + "Now" normally
+            if (maxEl !== nowEl) {
+                maxEl.options.radius      = 0;
+                maxEl.options.borderWidth = 0;
+                chart.$hideMaxPin = true;
+            }
+            nowEl.options.borderColor = maxLabelColor;
+
+            const hLabel = {
+                key: 'max', point: nowEl, text: 'H', color: maxLabelColor, font: hlFont,
+                gap: fixedGap, preferAbove: true, ...measureLabel(ctx, 'H', hlFont),
+            };
+            const nowLabel = {
+                key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
+                gap, preferAbove: false, ...measureLabel(ctx, 'Now', nowFont),
+            };
+            const lLabel = {
+                key: 'min', point: minEl, text: 'L', color: minLabelColor, font: hlFont,
+                gap, preferAbove: false, ...measureLabel(ctx, 'L', hlFont),
+            };
+
+            placeFixedOffsetLabel(hLabel, chartArea);
+            placeLabel(nowLabel, chartArea);
+            placeLabel(lLabel, chartArea);
+            resolveLabelOverlaps([nowLabel, lLabel], chartArea);
+
+            visible = [hLabel, nowLabel, lLabel];
+
+        } else if (scenario === 'minAbsorbed') {
+            // L collapses onto "Now" — ring Now in L's color, pin "L" 14px
+            // below it, and render "H" + "Now" normally
+            if (minEl !== nowEl) {
+                minEl.options.radius      = 0;
+                minEl.options.borderWidth = 0;
+                chart.$hideMinPin = true;
+            }
+            nowEl.options.borderColor = minLabelColor;
+
+            const lLabel = {
+                key: 'min', point: nowEl, text: 'L', color: minLabelColor, font: hlFont,
+                gap: fixedGap, preferAbove: false, ...measureLabel(ctx, 'L', hlFont),
+            };
+            const nowLabel = {
+                key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
+                gap, preferAbove: true, ...measureLabel(ctx, 'Now', nowFont),
+            };
+            const hLabel = {
+                key: 'max', point: maxEl, text: 'H', color: maxLabelColor, font: hlFont,
+                gap, preferAbove: true, ...measureLabel(ctx, 'H', hlFont),
+            };
+
+            placeFixedOffsetLabel(lLabel, chartArea);
+            placeLabel(nowLabel, chartArea);
+            placeLabel(hLabel, chartArea);
+            resolveLabelOverlaps([nowLabel, hLabel], chartArea);
+
+            visible = [lLabel, nowLabel, hLabel];
+
+        } else {
+            // ── 'none': pixel-geometry fallback ──────────────────────
+            // Pin-overlap pass: drop a colliding H/L pin entirely
+            if (validMinMax) {
+                const minIsNow      = minIndex === latestIndex;
+                const maxNearNow    = !maxIsNow && pinsOverlap(maxEl, nowEl);
+                const minNearNow    = !minIsNow && pinsOverlap(minEl, nowEl);
+                const maxMinOverlap = pinsOverlap(maxEl, minEl);
+
+                chart.$hideMaxPin = maxMinOverlap || maxNearNow;
+                chart.$hideMinPin = maxMinOverlap || minNearNow;
+
+                if (chart.$hideMaxPin && maxEl !== nowEl) {
+                    maxEl.options.radius      = 0;
+                    maxEl.options.borderWidth = 0;
+                }
+                if (chart.$hideMinPin && minEl !== nowEl) {
+                    minEl.options.radius      = 0;
+                    minEl.options.borderWidth = 0;
+                }
+
+                // A distinct H/L pin got folded into "Now" because it sits right
+                // on top of it — ring "Now" with that color so the overlap isn't
+                // lost entirely (skip if Now is already H or L itself, or if both
+                // H and L are crowding Now and it'd be ambiguous which to show)
+                if (!maxIsNow && !minIsNow) {
+                    if (maxNearNow && !minNearNow) {
+                        nowEl.options.borderColor = maxLabelColor;
+                    } else if (minNearNow && !maxNearNow) {
+                        nowEl.options.borderColor = minLabelColor;
+                    }
+                }
+            }
+
+            // Label layout pass: place H/L/Now, then drop H, then L (never
+            // "Now") until no two labels overlap
+            const candidates = [];
+
+            if (validMinMax && !chart.$hideMaxPin) {
+                candidates.push({
+                    key: 'max', point: maxEl, text: 'H', color: maxLabelColor, font: hlFont,
+                    gap, preferAbove: true,
+                    ...measureLabel(ctx, 'H', hlFont),
+                });
+            }
+
+            if (validMinMax && !chart.$hideMinPin) {
+                candidates.push({
+                    key: 'min', point: minEl, text: 'L', color: minLabelColor, font: hlFont,
+                    gap, preferAbove: false,
+                    ...measureLabel(ctx, 'L', hlFont),
+                });
+            }
+
+            if (nowEl) {
+                // When "Now" lands on the same point as H, put "Now" on the
+                // opposite side so both labels sit cleanly above/below the pin
+                candidates.push({
+                    key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
+                    gap, preferAbove: !maxIsNow,
+                    ...measureLabel(ctx, 'Now', nowFont),
+                });
+            }
+
+            candidates.forEach(label => placeLabel(label, chartArea));
+            resolveLabelOverlaps(candidates, chartArea);
+
+            visible = candidates;
+            if (hasResidualOverlap(visible)) {
+                for (const key of ['max', 'min']) {
+                    if (!visible.some(l => l.key === key)) continue;
+                    visible = visible.filter(l => l.key !== key);
+                    visible.forEach(l => placeLabel(l, chartArea));
+                    resolveLabelOverlaps(visible, chartArea);
+                    if (!hasResidualOverlap(visible)) break;
+                }
+            }
+
+            // Hide the pin for any H/L whose label didn't make the cut
+            if (validMinMax) {
+                if (maxEl !== nowEl && !chart.$hideMaxPin && !visible.some(l => l.key === 'max')) {
+                    maxEl.options.radius      = 0;
+                    maxEl.options.borderWidth = 0;
+                    chart.$hideMaxPin = true;
+                }
+                if (minEl !== nowEl && !chart.$hideMinPin && !visible.some(l => l.key === 'min')) {
+                    minEl.options.radius      = 0;
+                    minEl.options.borderWidth = 0;
+                    chart.$hideMinPin = true;
+                }
+            }
         }
 
-        const renderMinMax = showMinMax
-            && minIndex !== -1 && maxIndex !== -1
-            && minIndex !== maxIndex;
+        chart.$visibleLabels = visible;
+    },
 
-        const maxPoint = meta.data[maxIndex];
-        const minPoint = meta.data[minIndex];
+    afterDatasetsDraw(chart) {
+        const labels = chart.$visibleLabels;
+        if (!labels || !labels.length) return;
 
+        const { ctx } = chart;
         ctx.save();
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-
-        if (renderMinMax && maxPoint) {
-            ctx.font      = '700 11px Nunito';
-            ctx.fillStyle = maxLabelColor;
-            ctx.fillText('H', maxPoint.x, maxPoint.y + (latestIndex === maxIndex ? -22 : -20));
-        }
-
-        if (renderMinMax && minPoint) {
-            ctx.font      = '700 11px Nunito';
-            ctx.fillStyle = minLabelColor;
-            const yOffset = isTooClose ? 24 : 20;
-            ctx.fillText('L', minPoint.x, minPoint.y + (latestIndex === minIndex ? 26 : yOffset));
-        }
-
-        if (latestPoint) {
-            ctx.font      = '700 10px Nunito';
-            ctx.fillStyle = '#ffffff';
-            let nowOffset = -28;
-            if (renderMinMax && latestIndex === maxIndex) nowOffset = -42;
-            if (renderMinMax && latestIndex === minIndex) nowOffset = isTooClose ? 38 : -28;
-            ctx.fillText('Now', latestPoint.x, latestPoint.y + nowOffset);
-        }
-
+        labels.forEach(label => {
+            ctx.font      = label.font;
+            ctx.fillStyle = label.color;
+            ctx.fillText(label.text, label.x, label.y);
+        });
         ctx.restore();
     }
 };
@@ -283,6 +634,11 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
         const isTemp   = metric === 'temperature';
         const isMobile = window.innerWidth <= 480;
 
+        // ── Time range ──────────────────────────────────────────
+        const today      = new Date();
+        const startRange = new Date(today); startRange.setHours(0, 0, 0, 0);
+        const endRange   = new Date(today); endRange.setHours(23, 59, 59, 999);
+
         // ── Build point arrays ──────────────────────────────────
         const rawPoints = (backendData || []).map(item => ({
             x: new Date(item.hour),
@@ -290,21 +646,24 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
         }));
 
         const chartPoints = insertGapNulls(rawPoints, resolutionMinutes);
-        const gapPoints   = extractGapSegments(rawPoints, resolutionMinutes);
-
-        // ── Time range ──────────────────────────────────────────
-        const today      = new Date();
-        const startRange = new Date(today); startRange.setHours(0, 0, 0, 0);
-        const endRange   = new Date(today); endRange.setHours(23, 59, 59, 999);
+        const gapPoints   = extractGapSegments(rawPoints, resolutionMinutes, startRange, today);
 
         // ── Analytics ───────────────────────────────────────────
-        const yBounds                            = getDynamicYBounds(chartPoints, metric);
-        const { minIndex, maxIndex, isTooClose } = getMinMaxPoints(chartPoints);
-        const showMinMax                         = hasEnoughDataDuration(backendData);
+        const yBounds              = getDynamicYBounds(chartPoints, metric);
+        const { minIndex, maxIndex } = getMinMaxPoints(chartPoints);
+        const showMinMax           = hasEnoughDataDuration(backendData);
+        const validMinMax          = showMinMax
+            && minIndex !== -1 && maxIndex !== -1
+            && minIndex !== maxIndex;
 
         // Last non-null point index for "Now" marker + future overlay
         let latestIndex = chartPoints.length - 1;
         while (latestIndex > 0 && chartPoints[latestIndex]?.y == null) latestIndex--;
+
+        const scenario = resolveCollisionScenario(
+            metric, chartPoints, minIndex, maxIndex, latestIndex,
+            validMinMax, resolutionMinutes, config
+        );
 
         // ── Destroy previous instance ───────────────────────────
         if (weatherChartInstance !== null) {
@@ -361,9 +720,9 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                 const i  = context.dataIndex;
                 const pt = chartPoints[i];
                 if (!pt || pt.y == null) return 0;
-                if (i === latestIndex) return 6;
-                if (i === maxIndex)    return 4.5;
-                if (i === minIndex)    return 4.5;
+                if (i === latestIndex || i === maxIndex || i === minIndex) {
+                    return isMobile ? 3 : 3.5;
+                }
                 return 0;
             },
             pointHoverRadius: (context) => {
@@ -381,16 +740,21 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
 
             pointBorderColor: (context) => {
                 const i = context.dataIndex;
-                if (i === latestIndex) return isTemp
-                    ? tempToRgbString(chartPoints[latestIndex].y)
-                    : config.lineColor;
+                if (i === latestIndex) {
+                    // Latest reading is also today's high/low — ring the
+                    // "Now" pin in the H/L color to mark the overlap
+                    if (showMinMax && i === maxIndex) return config.maxNodeColor;
+                    if (showMinMax && i === minIndex) return config.minNodeColor;
+                    return isTemp
+                        ? tempToRgbString(chartPoints[latestIndex].y)
+                        : config.lineColor;
+                }
                 if (i === maxIndex) return config.innerBorder;
                 if (i === minIndex) return config.innerBorder;
                 return config.lineColor ?? '#7dd3fc';
             },
 
-            pointBorderWidth: (context) =>
-                context.dataIndex === latestIndex ? 3 : 2,
+            pointBorderWidth: 2,
         };
 
         // ── Gap bridge dataset ──────────────────────────────────
@@ -440,7 +804,7 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                         },
                         min:    startRange,
                         max:    endRange,
-                        ticks:  { stepSize: 3, color: '#94a3b8', font: { size: 11 } },
+                        ticks:  { stepSize: 3, color: '#94a3b8', font: { size: isMobile ? 9 : 11 } },
                         grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
                         border: { display: false },
                     },
@@ -451,7 +815,7 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                             stepSize: config.yStep,
                             callback: (val) => `${val}${config.yAxisSuffix}`,
                             color:    '#94a3b8',
-                            font:     { size: 11 },
+                            font:     { size: isMobile ? 9 : 11 },
                         },
                         grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
                         border: { display: false },
@@ -462,15 +826,17 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                     legend: { display: false },
 
                     tooltip: {
-                        backgroundColor: 'rgba(12, 20, 42, 0.94)',
-                        borderColor:     'rgba(255,255,255,0.10)',
-                        borderWidth:     1,
-                        padding:         12,
-                        displayColors:   false,
-                        titleColor:      '#ffffff',
-                        bodyColor:       '#e2e8f0',
-                        titleFont: { size: 12, weight: '600' },
-                        bodyFont:  { size: 14, weight: '700' },
+                        backgroundColor:   'rgba(8, 14, 28, 0.7)',
+                        borderColor:       'rgba(148, 197, 255, 0.28)',
+                        borderWidth:       1,
+                        cornerRadius:      10,
+                        padding:           8,
+                        displayColors:     false,
+                        titleColor:        '#ffffff',
+                        bodyColor:         '#cbd5e1',
+                        titleFont: { size: 10, weight: '700' },
+                        bodyFont:  { size: 12, weight: '600' },
+                        titleMarginBottom: 4,
 
                         filter: (item) => {
                             // hide null sentinel points from both datasets
@@ -514,7 +880,20 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                                     return ' No data recorded';
                                 }
 
-                                return ` ${context.parsed.y.toFixed(1)}${config.tooltipSuffix}`;
+                                let suffix = '';
+                                if (validMinMax) {
+                                    const idx = context.dataIndex;
+                                    if (scenario === 'triple'
+                                        && (idx === maxIndex || idx === minIndex || idx === latestIndex)) {
+                                        suffix = ' (Max/Min Peak)';
+                                    } else if (idx === maxIndex) {
+                                        suffix = ' (Today Highest)';
+                                    } else if (idx === minIndex) {
+                                        suffix = ' (Today Lowest)';
+                                    }
+                                }
+
+                                return ` ${context.parsed.y.toFixed(1)}${config.tooltipSuffix}${suffix}`;
                             },
 
                             labelTextColor: (context) =>
@@ -527,9 +906,9 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                     minMaxLabels: {
                         minIndex,
                         maxIndex,
-                        isTooClose,
                         latestIndex,
-                        showMinMax,
+                        validMinMax,
+                        scenario,
                         isMobile,
                         maxLabelColor: config.maxNodeColor,
                         minLabelColor: config.minNodeColor,
@@ -547,7 +926,11 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                         const lastReal = chartPoints[latestIndex];
                         if (!lastReal) return;
 
-                        const latestX      = scales.x.getPixelForValue(lastReal.x);
+                        // Start the "future" shading at now — any gap between
+                        // the last reading and now is rendered as a missing-data
+                        // bridge instead (see extractGapSegments)
+                        const anchor       = Math.max(today.getTime(), lastReal.x.getTime());
+                        const latestX      = scales.x.getPixelForValue(new Date(anchor));
                         const overlayStart = latestX + 3;
 
                         ctx.save();
@@ -596,11 +979,13 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
 
                         const { ctx, chartArea } = chart;
                         const data = chart.data.datasets[1].data;
+                        const font = isMobile ? '500 9px Nunito' : '500 10px Nunito';
 
                         ctx.save();
-                        ctx.font      = '500 10px Nunito';
-                        ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
-                        ctx.textAlign = 'center';
+                        ctx.fillStyle    = 'rgba(148, 163, 184, 0.4)';
+                        ctx.textAlign    = 'center';
+                        ctx.textBaseline = 'middle';
+                        const { halfW, halfH } = measureLabel(ctx, 'No data', font);
 
                         for (let i = 0; i < data.length - 1; i++) {
                             const a = data[i];
@@ -611,13 +996,15 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                             const bPoint = gapMeta.data[i + 1];
                             if (!aPoint || !bPoint) continue;
 
-                            const midX  = (aPoint.x + bPoint.x) / 2;
-                            const midY  = chartArea.top + (chartArea.bottom - chartArea.top) * 0.5;
                             const gapPx = bPoint.x - aPoint.x;
+                            if (gapPx <= 50) continue;
 
-                            if (gapPx > 50) {
-                                ctx.fillText('No data', midX, midY);
-                            }
+                            // follow the bridge's own height instead of the
+                            // chart's vertical center, clamped clear of the edges
+                            const midX = Math.min(Math.max((aPoint.x + bPoint.x) / 2, chartArea.left + halfW), chartArea.right - halfW);
+                            const midY = Math.min(Math.max((aPoint.y + bPoint.y) / 2, chartArea.top + halfH), chartArea.bottom - halfH);
+
+                            ctx.fillText('No data', midX, midY);
                         }
 
                         ctx.restore();

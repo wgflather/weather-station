@@ -779,7 +779,7 @@ h3 {
 
 .chart_block canvas, .chart_block .chart-container {
     width: 100% !important;
-    height: 320px;
+    height: clamp(125px, 26vw, 200px);
 }
 
 .metric-selector {
@@ -1272,10 +1272,6 @@ h3 {
 
     .dashboard-row {
         flex-wrap: wrap;
-    }
-
-    .chart_block canvas, .chart_block .chart-container {
-        height: 140px;
     }
 
     .main-value {
