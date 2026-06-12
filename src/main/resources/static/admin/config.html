@@ -14,6 +14,12 @@
 <div class="config-page">
     <a class="back-to-dashboard" href="/">&larr; Back to Dashboard</a>
 
+    <div class="section-tabs">
+        <button type="button" class="section-tab active" data-section="configuration">Configuration</button>
+        <button type="button" class="section-tab" data-section="database">Database</button>
+    </div>
+
+    <section class="config-section" data-section="configuration">
     <div class="configuration_block">
         <h3>Station Configuration</h3>
 
@@ -156,8 +162,70 @@
             </form>
         </div>
     </div>
+    </section>
+
+    <section class="config-section" data-section="database" hidden>
+    <div class="configuration_block">
+        <h3>Raw Database</h3>
+
+        <div class="config-body">
+            <div class="db-panel">
+                <div class="db-toolbar">
+                    <div class="config-field db-filter">
+                        <label for="db-quality-filter">Filter by quality</label>
+                        <select id="db-quality-filter" class="db-select">
+                            <option value="all">All records</option>
+                            <option value="OK">OK</option>
+                            <option value="SPIKE">Spike</option>
+                            <option value="ANOMALY">Anomaly</option>
+                            <option value="MISSING">Missing</option>
+                        </select>
+                    </div>
+                    <div class="config-field db-filter">
+                        <label for="db-metric-filter">Metric</label>
+                        <select id="db-metric-filter" class="db-select" disabled>
+                            <option value="any">Any metric</option>
+                            <option value="temperature">Temperature</option>
+                            <option value="pressure">Pressure</option>
+                            <option value="humidity">Humidity</option>
+                            <option value="surfaceWetness">Surface Wetness</option>
+                        </select>
+                    </div>
+                    <button type="button" id="db-refresh" class="config-save-btn">Refresh</button>
+                    <span class="db-meta" id="db-meta"></span>
+                </div>
+
+                <div class="db-table-wrap">
+                    <table class="db-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Device</th>
+                                <th>Measured At</th>
+                                <th>Temp (&deg;C)</th>
+                                <th>Pressure (hPa)</th>
+                                <th>Humidity (%)</th>
+                                <th>Wetness (raw)</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="db-tbody"></tbody>
+                    </table>
+                    <div class="db-empty" id="db-empty" hidden>No records.</div>
+                </div>
+
+                <div class="db-pager">
+                    <button type="button" id="db-prev" class="db-page-btn">&larr; Prev</button>
+                    <span class="db-page-info" id="db-page-info"></span>
+                    <button type="button" id="db-next" class="db-page-btn">Next &rarr;</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </section>
 </div>
 
 <script type="module" src="/js/config.js"></script>
+<script type="module" src="/js/database-view.js"></script>
 </body>
 </html>

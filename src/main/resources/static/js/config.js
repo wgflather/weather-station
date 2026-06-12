@@ -148,6 +148,19 @@ function initTabs() {
     });
 }
 
+// Top-level switch between the Configuration and Database sections.
+function initSections() {
+    const tabs = document.querySelectorAll('.section-tab');
+    const sections = document.querySelectorAll('.config-section');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.toggle('active', t === tab));
+            sections.forEach(s => { s.hidden = s.dataset.section !== tab.dataset.section; });
+        });
+    });
+}
+
 function initForms() {
     $('config-form-location')?.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -189,5 +202,6 @@ function initForms() {
 
 enhanceNumberInputs();
 initTabs();
+initSections();
 initForms();
 loadConfig();

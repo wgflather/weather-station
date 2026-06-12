@@ -686,6 +686,13 @@ const TOOLTIP_GAP = 10;
 // Whether the in-flight pointer gesture is touch (vs mouse/pen).
 let lastInteractionWasTouch = false;
 
+// Set for a short window after a finger lifts. While true the handler refuses
+// to paint, which defeats the two ways the tooltip re-appears after a lift:
+// Chart's deferred next-frame render of the last touchmove, and the synthetic
+// mouse events the browser emits after touchend. Cleared on the next touch.
+let tooltipSuppressed = false;
+let suppressTimer     = null;
+
 function getTooltipEl() {
     let el = document.getElementById('weather-chart-tooltip');
     if (!el) {
@@ -719,17 +726,24 @@ function installPointerHandlers(canvas) {
     // move flips back to mouse mode — safe because the touchend handler below
     // preventDefault()s the synthetic mouse events that would otherwise fire
     // after a finger lift.
-    canvas.addEventListener('touchstart', () => { lastInteractionWasTouch = true; }, { passive: true });
-    canvas.addEventListener('touchmove',  () => { lastInteractionWasTouch = true; }, { passive: true });
+    const beginTouch = () => {
+        lastInteractionWasTouch = true;
+        tooltipSuppressed = false;
+        if (suppressTimer) { clearTimeout(suppressTimer); suppressTimer = null; }
+    };
+    canvas.addEventListener('touchstart', beginTouch, { passive: true });
+    canvas.addEventListener('touchmove',  beginTouch, { passive: true });
     canvas.addEventListener('mousemove',  () => { lastInteractionWasTouch = false; });
 
-    // The reliable touch-end signal. preventDefault() on the real touchend
-    // suppresses the trailing synthetic mouse events the browser would
-    // otherwise fire (which were re-showing the tooltip), and we clear the
-    // tooltip so it can't linger or follow the page on scroll.
+    // The reliable touch-end signal. preventDefault() suppresses the trailing
+    // synthetic mouse events; the suppression window blocks any re-show (incl.
+    // Chart's deferred next-frame paint) until the next deliberate touch.
     const endTouch = (e) => {
         if (e.cancelable) e.preventDefault();
+        tooltipSuppressed = true;
         dismissTooltip(weatherChartInstance);
+        if (suppressTimer) clearTimeout(suppressTimer);
+        suppressTimer = setTimeout(() => { tooltipSuppressed = false; }, 600);
     };
     canvas.addEventListener('touchend',    endTouch, { passive: false });
     canvas.addEventListener('touchcancel', endTouch, { passive: false });
@@ -738,6 +752,12 @@ function installPointerHandlers(canvas) {
 function externalTooltipHandler(context) {
     const { chart, tooltip } = context;
     const el = getTooltipEl();
+
+    // Just-lifted: refuse to paint so nothing can re-surface the tooltip.
+    if (tooltipSuppressed) {
+        el.style.opacity = '0';
+        return;
+    }
 
     if (tooltip.opacity === 0) {
         el.style.opacity = '0';

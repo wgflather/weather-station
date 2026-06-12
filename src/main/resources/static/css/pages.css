@@ -16,20 +16,61 @@
 .back-to-dashboard {
     display: inline-block;
     margin-bottom: 18px;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-    font-weight: 700;
+    padding: 7px 16px;
+    font-size: 0.78rem;
+    font-weight: var(--fw-label);
     text-decoration: none;
-    color: #e2eeff;
-    background: rgba(30, 58, 138, 0.5);
-    border: 1px solid rgba(140, 190, 255, 0.3);
-    border-radius: 8px;
-    transition: background 0.15s ease, border-color 0.15s ease;
+    color: var(--text-secondary);
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .back-to-dashboard:hover {
-    background: rgba(30, 58, 138, 0.85);
-    border-color: rgba(125, 211, 252, 0.5);
+    background-color: rgba(32, 58, 112, 0.6);
+    border-color: rgba(150, 200, 255, 0.28);
+    color: var(--text-strong);
+}
+
+/* =========================================================
+   TOP-LEVEL SECTION SWITCH (Configuration / Database)
+========================================================= */
+.section-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.section-tab {
+    padding: 8px 18px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.section-tab:hover {
+    background-color: rgba(32, 58, 112, 0.6);
+    color: var(--text-secondary);
+}
+
+.section-tab.active {
+    background-color: rgba(32, 58, 112, 0.7);
+    color: var(--text-strong);
+    border-color: rgba(150, 200, 255, 0.3);
+}
+
+.config-section[hidden] {
+    display: none;
 }
 
 .configuration_block {
@@ -57,27 +98,27 @@
 .config-tab {
     padding: 7px 14px;
     font-family: 'Nunito', sans-serif;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    color: var(--text-secondary);
-    background: rgba(30, 58, 138, 0.5);
-    border: 1px solid rgba(140, 190, 255, 0.25);
-    border-radius: 8px;
+    color: var(--text-muted);
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .config-tab:hover {
-    background: rgba(30, 58, 138, 0.8);
-    color: #e2eeff;
+    background-color: rgba(32, 58, 112, 0.6);
+    color: var(--text-secondary);
 }
 
 .config-tab.active {
-    background: rgba(56, 189, 248, 0.22);
-    color: #e2eeff;
-    border-color: rgba(125, 211, 252, 0.5);
+    background-color: rgba(32, 58, 112, 0.7);
+    color: var(--text-strong);
+    border-color: rgba(150, 200, 255, 0.3);
 }
 
 .config-panel[hidden] {
@@ -91,9 +132,9 @@
 }
 
 .config-fieldset legend {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    color: #38bdf8;
+    color: var(--heading);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
@@ -121,27 +162,26 @@
 .config-field input {
     width: 100%;
     box-sizing: border-box;
-    background: rgba(30, 58, 138, 0.5);
-    border: 1px solid rgba(140, 190, 255, 0.3);
-    border-radius: 8px;
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
     padding: 7px 10px;
-    color: #ffffff;
+    color: var(--text-primary);
     font-family: 'Nunito', sans-serif;
     font-size: 0.9rem;
     font-weight: 600;
     outline: none;
-    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .config-field input:focus {
-    border-color: rgba(125, 211, 252, 0.6);
-    background: rgba(30, 58, 138, 0.8);
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+    border-color: rgba(160, 210, 255, 0.55);
+    background-color: rgba(32, 58, 112, 0.6);
 }
 
 .config-field input:read-only {
-    color: var(--text-secondary);
-    background: rgba(20, 42, 82, 0.5);
+    color: var(--text-muted);
+    background-color: rgba(20, 42, 82, 0.45);
     cursor: default;
 }
 
@@ -186,21 +226,21 @@
     font-family: 'Nunito', sans-serif;
     font-size: 7px;
     line-height: 1;
-    color: var(--text-secondary);
-    background: rgba(20, 42, 82, 0.6);
-    border: 1px solid rgba(140, 190, 255, 0.25);
+    color: var(--text-muted);
+    background-color: rgba(20, 42, 82, 0.55);
+    border: 1px solid var(--card-border);
     border-radius: 4px;
     cursor: pointer;
     transition: background 0.12s ease, color 0.12s ease;
 }
 
 .num-step:hover {
-    background: rgba(56, 189, 248, 0.22);
-    color: #e2f4ff;
+    background-color: rgba(32, 58, 112, 0.7);
+    color: var(--text-secondary);
 }
 
 .num-step:active {
-    background: rgba(56, 189, 248, 0.34);
+    background-color: rgba(40, 68, 125, 0.85);
 }
 
 .config-actions {
@@ -211,25 +251,27 @@
 }
 
 .config-save-btn {
-    padding: 8px 20px;
+    padding: 7px 18px;
     font-family: 'Nunito', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #e2eeff;
-    background: rgba(56, 189, 248, 0.22);
-    border: 1px solid rgba(125, 211, 252, 0.45);
-    border-radius: 8px;
+    font-size: 12px;
+    font-weight: var(--fw-label);
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
 .config-save-btn:hover {
-    background: rgba(56, 189, 248, 0.32);
-    border-color: rgba(125, 211, 252, 0.65);
+    background-color: rgba(32, 58, 112, 0.6);
+    border-color: rgba(150, 200, 255, 0.28);
+    color: var(--text-strong);
 }
 
 .config-save-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: default;
 }
 
@@ -250,6 +292,244 @@
     .config-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* =========================================================
+   RAW DATABASE VIEW (Database tab)
+========================================================= */
+.db-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.db-filter {
+    max-width: 220px;
+}
+
+.db-select {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 28px 7px 10px;
+    color: var(--text-secondary);
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 12px;
+    font-weight: var(--fw-label);
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%237aa6d4'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+}
+
+.db-select:hover:not(:disabled) {
+    background-color: rgba(32, 58, 112, 0.6);
+    border-color: rgba(150, 200, 255, 0.28);
+    color: var(--text-strong);
+}
+
+.db-select:focus-visible {
+    border-color: rgba(160, 210, 255, 0.55);
+}
+
+.db-select:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.db-select option {
+    background: #142a52;
+    color: #e2eeff;
+}
+
+.db-meta {
+    margin-left: auto;
+    font-size: 0.8rem;
+    font-weight: var(--fw-label);
+    color: var(--text-muted);
+}
+
+.db-meta.error {
+    color: #f87171;
+}
+
+.db-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+}
+
+.db-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+/* Quiet, monochrome header — a flat strip that recedes; the row data
+   and the status colours do the talking. */
+.db-table thead th {
+    position: sticky;
+    top: 0;
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    background: rgba(52, 84, 140, 0.97);
+    border-bottom: 1px solid var(--divider);
+}
+
+.db-table tbody td {
+    padding: 8px 12px;
+    color: var(--text-strong);
+    border-bottom: 1px solid var(--divider);
+    vertical-align: middle;
+}
+
+.db-table tbody tr:hover {
+    background: rgba(155, 188, 255, 0.07);
+}
+
+.db-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.db-id {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.db-time {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.db-metric {
+    font-variant-numeric: tabular-nums;
+}
+
+.db-metric .db-value {
+    display: inline-block;
+    min-width: 48px;
+}
+
+.db-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-radius: 999px;
+    vertical-align: middle;
+}
+
+.db-badge-ok {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.14);
+}
+
+.db-badge-spike {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.16);
+}
+
+.db-badge-anomaly {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.16);
+}
+
+.db-badge-missing {
+    color: #94a3b8;
+    background: rgba(148, 163, 184, 0.16);
+}
+
+.db-delete-btn {
+    padding: 4px 12px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fecaca;
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.db-delete-btn:hover {
+    background: rgba(248, 113, 113, 0.24);
+    border-color: rgba(248, 113, 113, 0.65);
+}
+
+.db-delete-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.db-empty {
+    padding: 20px 12px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.db-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.db-page-btn {
+    padding: 6px 16px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 12px;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.db-page-btn:hover:not(:disabled) {
+    background-color: rgba(32, 58, 112, 0.6);
+    border-color: rgba(150, 200, 255, 0.28);
+    color: var(--text-strong);
+}
+
+.db-page-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.db-page-info {
+    font-size: 0.8rem;
+    font-weight: var(--fw-label);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The records table needs more breathing room than the forms. */
+.config-page:has(.config-section[data-section="database"]:not([hidden])) {
+    width: 1100px;
 }
 
 /* =========================================================
