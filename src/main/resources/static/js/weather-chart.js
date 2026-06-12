@@ -673,12 +673,18 @@ Chart.register(minMaxLabelsPlugin);
 
 /* =========================================================
    EXTERNAL HTML TOOLTIP
-   Rendered outside the canvas so it can flip above/below the
-   chart line based on how much room is left to the chart's
-   top/bottom edge (the built-in canvas tooltip only flips
-   within a few pixels of the *canvas* edge, not the line).
+   Rendered outside the canvas. With a mouse it floats just above
+   the hovered point (flipping below near the top edge). On touch
+   it pins to the top edge of the plot area instead — so a finger
+   resting on the line never covers the reading — and is dismissed
+   the moment the finger lifts (Chart fires no "mouse-out" for
+   touch, so without this a position:fixed tooltip would linger and
+   appear to follow the page as you scroll away).
 ========================================================= */
 const TOOLTIP_GAP = 10;
+
+// Whether the in-flight pointer gesture is touch (vs mouse/pen).
+let lastInteractionWasTouch = false;
 
 function getTooltipEl() {
     let el = document.getElementById('weather-chart-tooltip');
@@ -689,6 +695,36 @@ function getTooltipEl() {
         document.body.appendChild(el);
     }
     return el;
+}
+
+// Hide the tooltip and clear Chart's active/hover state.
+function dismissTooltip(chart) {
+    const el = document.getElementById('weather-chart-tooltip');
+    if (el) el.style.opacity = '0';
+    if (!chart) return;
+    try {
+        chart.setActiveElements([]);
+        if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+        chart.update('none');
+    } catch (_) { /* chart may be mid-teardown */ }
+}
+
+// Bound once per canvas (the <canvas> is reused across chart rebuilds).
+// Tracks the pointer type and, for touch, dismisses on lift/cancel.
+function installPointerHandlers(canvas) {
+    if (canvas.dataset.tooltipPointerBound) return;
+    canvas.dataset.tooltipPointerBound = '1';
+
+    const markType = (e) => { lastInteractionWasTouch = e.pointerType === 'touch'; };
+    canvas.addEventListener('pointerdown', markType);
+    canvas.addEventListener('pointermove', markType);
+
+    const endTouch = (e) => {
+        if (e.pointerType === 'touch') dismissTooltip(weatherChartInstance);
+    };
+    canvas.addEventListener('pointerup',     endTouch);
+    canvas.addEventListener('pointercancel', endTouch);
+    canvas.addEventListener('pointerleave',  endTouch);
 }
 
 function externalTooltipHandler(context) {
@@ -720,15 +756,20 @@ function externalTooltipHandler(context) {
     el.style.opacity = '1';
     const elRect = el.getBoundingClientRect();
 
-    const caretX     = canvasRect.left + tooltip.caretX;
-    const caretY     = canvasRect.top  + tooltip.caretY;
-    const spaceAbove = tooltip.caretY - chartArea.top;
+    const caretX = canvasRect.left + tooltip.caretX;
+    const caretY = canvasRect.top  + tooltip.caretY;
 
-    // Default to above the point; flip below only when there isn't enough
-    // room above (i.e. the point sits close to the chart's top edge)
-    const top = (spaceAbove >= elRect.height + TOOLTIP_GAP)
-        ? caretY - elRect.height - TOOLTIP_GAP
-        : caretY + TOOLTIP_GAP;
+    let top;
+    if (lastInteractionWasTouch) {
+        // Pin to the top of the plot area, kept inside the chart block.
+        top = canvasRect.top + chartArea.top + 4;
+    } else {
+        // Float above the point; flip below only when it's near the top edge.
+        const spaceAbove = tooltip.caretY - chartArea.top;
+        top = (spaceAbove >= elRect.height + TOOLTIP_GAP)
+            ? caretY - elRect.height - TOOLTIP_GAP
+            : caretY + TOOLTIP_GAP;
+    }
 
     const minLeft = canvasRect.left + chartArea.left;
     const maxLeft = canvasRect.left + chartArea.right - elRect.width;
@@ -890,6 +931,7 @@ function buildDatasets(state) {
 ========================================================= */
 function createChart(canvasElement, state) {
     const ctx = canvasElement.getContext('2d');
+    installPointerHandlers(canvasElement);
 
     const chart = new Chart(ctx, {
         type: 'line',
