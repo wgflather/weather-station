@@ -387,22 +387,58 @@ function renderSystemHealth(systemHealth) {
 // RESOLUTION + METRIC CONTROLS
 // ==========================================
 
+// Matches the mobile breakpoint used for chart layout in weather-chart.js
+const MOBILE_BREAKPOINT       = 480;
+const MOBILE_MIN_RESOLUTION   = 30;
+
+function isMobileViewport() {
+    return window.innerWidth <= MOBILE_BREAKPOINT;
+}
+
+// Disables sub-30min options on mobile and forces the selection up to the
+// mobile minimum if needed. Returns true if the selected value changed.
+function syncResolutionOptions(select) {
+    const mobile = isMobileViewport();
+
+    Array.from(select.options).forEach(option => {
+        option.disabled = mobile && Number(option.value) < MOBILE_MIN_RESOLUTION;
+    });
+
+    if (mobile && Number(select.value) < MOBILE_MIN_RESOLUTION) {
+        select.value = String(MOBILE_MIN_RESOLUTION);
+        return true;
+    }
+    return false;
+}
+
+function restartChartWithCurrentResolution() {
+    state.charts[state.currentMetric] = [];
+    renderWeatherChart([], state.currentMetric, state.currentResolution);
+    startChart(state.currentMetric);
+}
+
 function initResolutionControls() {
     const select = document.getElementById('resolution-selector');
     if (!select) return;
 
     const saved = localStorage.getItem('chartResolution') ?? '10';
-    select.value            = saved;
-    state.currentResolution = Number(saved);
+    select.value = saved;
+
+    syncResolutionOptions(select);
+    state.currentResolution = Number(select.value);
 
     select.addEventListener('change', (e) => {
         const value = e.target.value;
         state.currentResolution = Number(value);
         localStorage.setItem('chartResolution', value);
+        restartChartWithCurrentResolution();
+    });
 
-        state.charts[state.currentMetric] = [];
-        renderWeatherChart([], state.currentMetric, state.currentResolution);
-        startChart(state.currentMetric);
+    window.addEventListener('resize', () => {
+        if (!syncResolutionOptions(select)) return;
+
+        state.currentResolution = Number(select.value);
+        restartChartWithCurrentResolution();
     });
 }
 

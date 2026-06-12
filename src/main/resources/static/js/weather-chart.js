@@ -417,10 +417,10 @@ const minMaxLabelsPlugin = {
         const maxIsNow = validMinMax && maxIndex === latestIndex;
 
         const { ctx, chartArea } = chart;
-        const hlFont   = isMobile ? '700 8px Nunito' : '700 11px Nunito';
-        const nowFont  = isMobile ? '700 8px Nunito' : '700 10px Nunito';
-        const gap      = isMobile ? 9 : 14;
-        const fixedGap = 14;
+        const hlFont   = isMobile ? '700 8px Nunito' : '700 13px Nunito';
+        const nowFont  = isMobile ? '700 8px Nunito' : '700 12px Nunito';
+        const gap      = isMobile ? 9 : 16;
+        const fixedGap = isMobile ? 14 : 16;
 
         let visible;
 
@@ -626,6 +626,73 @@ const minMaxLabelsPlugin = {
 Chart.register(minMaxLabelsPlugin);
 
 /* =========================================================
+   EXTERNAL HTML TOOLTIP
+   Rendered outside the canvas so it can flip above/below the
+   chart line based on how much room is left to the chart's
+   top/bottom edge (the built-in canvas tooltip only flips
+   within a few pixels of the *canvas* edge, not the line).
+========================================================= */
+const TOOLTIP_GAP = 10;
+
+function getTooltipEl() {
+    let el = document.getElementById('weather-chart-tooltip');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'weather-chart-tooltip';
+        el.className = 'chartjs-tooltip';
+        document.body.appendChild(el);
+    }
+    return el;
+}
+
+function externalTooltipHandler(context) {
+    const { chart, tooltip } = context;
+    const el = getTooltipEl();
+
+    if (tooltip.opacity === 0) {
+        el.style.opacity = '0';
+        return;
+    }
+
+    if (tooltip.body) {
+        let html = '';
+        (tooltip.title || []).forEach(line => {
+            html += `<div class="chartjs-tooltip-title">${line}</div>`;
+        });
+        tooltip.body.forEach((bodyItem, i) => {
+            const color = tooltip.labelTextColors?.[i] ?? '#e2e8f0';
+            bodyItem.lines.forEach(line => {
+                html += `<div class="chartjs-tooltip-body" style="color:${color}">${line}</div>`;
+            });
+        });
+        el.innerHTML = html;
+    }
+
+    const canvasRect = chart.canvas.getBoundingClientRect();
+    const { chartArea } = chart;
+
+    el.style.opacity = '1';
+    const elRect = el.getBoundingClientRect();
+
+    const caretX     = canvasRect.left + tooltip.caretX;
+    const caretY     = canvasRect.top  + tooltip.caretY;
+    const spaceAbove = tooltip.caretY - chartArea.top;
+
+    // Default to above the point; flip below only when there isn't enough
+    // room above (i.e. the point sits close to the chart's top edge)
+    const top = (spaceAbove >= elRect.height + TOOLTIP_GAP)
+        ? caretY - elRect.height - TOOLTIP_GAP
+        : caretY + TOOLTIP_GAP;
+
+    const minLeft = canvasRect.left + chartArea.left;
+    const maxLeft = canvasRect.left + chartArea.right - elRect.width;
+    const left    = Math.min(Math.max(caretX - elRect.width / 2, minLeft), maxLeft);
+
+    el.style.top  = `${top}px`;
+    el.style.left = `${left}px`;
+}
+
+/* =========================================================
    MAIN CHART RENDER ENGINE
 ========================================================= */
 export function renderWeatherChart(backendData, metric = 'temperature', resolutionMinutes = 10) {
@@ -826,17 +893,8 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
                     legend: { display: false },
 
                     tooltip: {
-                        backgroundColor:   'rgba(8, 14, 28, 0.7)',
-                        borderColor:       'rgba(148, 197, 255, 0.28)',
-                        borderWidth:       1,
-                        cornerRadius:      10,
-                        padding:           8,
-                        displayColors:     false,
-                        titleColor:        '#ffffff',
-                        bodyColor:         '#cbd5e1',
-                        titleFont: { size: 10, weight: '700' },
-                        bodyFont:  { size: 12, weight: '600' },
-                        titleMarginBottom: 4,
+                        enabled:  false,
+                        external: externalTooltipHandler,
 
                         filter: (item) => {
                             // hide null sentinel points from both datasets
