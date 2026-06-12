@@ -102,15 +102,22 @@ const scheduler = new FetchScheduler(
     (newChartPoints, metric) => {
         if (!state.charts[metric]) state.charts[metric] = [];
 
+        // Only repaint when the dataset actually changed — an unchanged poll
+        // would otherwise force a pointless chart redraw every cycle.
+        let changed = false;
         if (state.charts[metric].length === 0) {
             state.charts[metric] = newChartPoints;
+            changed = newChartPoints.length > 0;
         } else {
             const existingHours = new Set(state.charts[metric].map(p => p.hour));
             const uniqueDeltas  = newChartPoints.filter(p => !existingHours.has(p.hour));
-            state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
+            if (uniqueDeltas.length > 0) {
+                state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
+                changed = true;
+            }
         }
 
-        if (metric === state.currentMetric) {
+        if (changed && metric === state.currentMetric) {
             renderWeatherChart(state.charts[metric], metric, state.currentResolution);
         }
     },

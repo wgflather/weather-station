@@ -18,28 +18,23 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/login",
-                                "/",
-                                "/weather",
-                                "/api/weather/**",
-                                "/css/**",
-                                "/js/**"
-                        ).permitAll()
-
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                        .anyRequest().authenticated()
+                        // Admin area only: the config UI (static /admin/config.html)
+                        // and its write API both require the ADMIN role.
+                        .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
+                        // Everything else — dashboard, public API, static assets,
+                        // login page — is open to anyone.
+                        .anyRequest().permitAll()
                 )
 
                 .formLogin(form -> form
                         .loginPage("/login")
+                        .defaultSuccessUrl("/admin/config.html", true) // Forces redirection to "/" after login success
                         .permitAll()
                 );
 
@@ -53,9 +48,8 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        // Create an admin user
-        UserDetails admin = User.withUsername("flather")
-                .password(passwordEncoder.encode("23606"))
+        UserDetails admin = User.withUsername("admin") // Changed name to match intent
+                .password(passwordEncoder.encode("1234"))
                 .roles("USER", "ADMIN")
                 .build();
 

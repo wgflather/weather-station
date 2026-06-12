@@ -1,26 +1,47 @@
 let weatherChartInstance = null;
 
 /* =========================================================
-   TEMPERATURE COLOR SCALE
+   PER-METRIC VALUE -> COLOR SCALES
+   Drives the value-based gradient line (and area fill) for
+   every metric: cold->hot for temperature, dry->humid for
+   humidity, low->high for pressure. Stops are in each metric's
+   own unit (°C / % / hPa) and interpolated linearly.
 ========================================================= */
-const TEMP_COLOR_SCALE = [
-    { temp: -20, r:  59, g: 130, b: 246 },
-    { temp:  -5, r: 147, g: 197, b: 253 },
-    { temp:   5, r: 224, g: 242, b: 254 },
-    { temp:  15, r: 253, g: 230, b: 138 },
-    { temp:  25, r: 251, g: 146, b:  60 },
-    { temp:  35, r: 239, g:  68, b:  68 },
-];
+const COLOR_SCALES = {
+    temperature: [
+        { stop: -20, r:  59, g: 130, b: 246 },
+        { stop:  -5, r: 147, g: 197, b: 253 },
+        { stop:   5, r: 224, g: 242, b: 254 },
+        { stop:  15, r: 253, g: 230, b: 138 },
+        { stop:  25, r: 251, g: 146, b:  60 },
+        { stop:  35, r: 239, g:  68, b:  68 },
+    ],
+    // dry (pale slate) -> humid (deep blue)
+    humidity: [
+        { stop:  20, r: 226, g: 232, b: 240 },
+        { stop:  40, r: 165, g: 243, b: 252 },
+        { stop:  60, r:  56, g: 189, b: 248 },
+        { stop:  80, r:  14, g: 165, b: 233 },
+        { stop: 100, r:  37, g:  99, b: 235 },
+    ],
+    // low/stormy (indigo) -> normal (slate) -> high/fair (green->amber)
+    pressure: [
+        { stop:  985, r: 129, g: 140, b: 248 },
+        { stop: 1000, r: 148, g: 163, b: 184 },
+        { stop: 1013, r: 203, g: 213, b: 225 },
+        { stop: 1025, r: 110, g: 231, b: 183 },
+        { stop: 1040, r: 251, g: 191, b:  36 },
+    ],
+};
 
-function tempToRgb(temp) {
-    const scale = TEMP_COLOR_SCALE;
-    if (temp <= scale[0].temp) return { ...scale[0] };
-    if (temp >= scale[scale.length - 1].temp) return { ...scale[scale.length - 1] };
+function scaleToRgb(scale, value) {
+    if (value <= scale[0].stop) return { ...scale[0] };
+    if (value >= scale[scale.length - 1].stop) return { ...scale[scale.length - 1] };
     for (let i = 0; i < scale.length - 1; i++) {
         const lo = scale[i];
         const hi = scale[i + 1];
-        if (temp >= lo.temp && temp <= hi.temp) {
-            const t = (temp - lo.temp) / (hi.temp - lo.temp);
+        if (value >= lo.stop && value <= hi.stop) {
+            const t = (value - lo.stop) / (hi.stop - lo.stop);
             return {
                 r: Math.round(lo.r + t * (hi.r - lo.r)),
                 g: Math.round(lo.g + t * (hi.g - lo.g)),
@@ -31,8 +52,8 @@ function tempToRgb(temp) {
     return { r: 255, g: 255, b: 255 };
 }
 
-function tempToRgbString(temp, alpha = 1) {
-    const { r, g, b } = tempToRgb(temp);
+function scaleToRgbString(scale, value, alpha = 1) {
+    const { r, g, b } = scaleToRgb(scale, value);
     return alpha < 1 ? `rgba(${r},${g},${b},${alpha})` : `rgb(${r},${g},${b})`;
 }
 
@@ -207,17 +228,42 @@ function hasEnoughDataDuration(backendData) {
 }
 
 /* =========================================================
-   TEMPERATURE GRADIENT
+   VALUE-BASED LINE GRADIENT
+   Maps the visible y-axis range onto the metric's color scale,
+   so the line color tracks the reading's value at every height.
 ========================================================= */
-function createDynamicGradient(ctx, chartArea, yAxis) {
+function createDynamicGradient(ctx, chartArea, yAxis, scale) {
     const grad = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-    const maxT = yAxis.max;
-    const minT = yAxis.min;
+    const maxV = yAxis.max;
+    const minV = yAxis.min;
     for (let i = 0; i <= 10; i++) {
-        const pos         = i / 10;
-        const currentTemp = maxT - (pos * (maxT - minT));
-        grad.addColorStop(pos, tempToRgbString(currentTemp));
+        const pos   = i / 10;
+        const value = maxV - (pos * (maxV - minV));
+        grad.addColorStop(pos, scaleToRgbString(scale, value));
     }
+    return grad;
+}
+
+/* =========================================================
+   AREA FILL GRADIENT (follows the live canvas height)
+========================================================= */
+function buildAreaFill(ctx, chartArea, state) {
+    const grad = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+
+    if (state.metric === 'temperature') {
+        const real    = state.chartPoints.filter(p => p.y != null);
+        const avgTemp = real.length
+            ? real.reduce((s, p) => s + p.y, 0) / real.length
+            : 15;
+        grad.addColorStop(0,   scaleToRgbString(state.scale, avgTemp, 0.28));
+        grad.addColorStop(0.5, scaleToRgbString(state.scale, avgTemp, 0.07));
+        grad.addColorStop(1,   'rgba(255,255,255,0)');
+    } else {
+        grad.addColorStop(0,    state.config.fillTop);
+        grad.addColorStop(0.45, state.config.fillMid);
+        grad.addColorStop(1,    'rgba(255,255,255,0)');
+    }
+
     return grad;
 }
 
@@ -693,384 +739,464 @@ function externalTooltipHandler(context) {
 }
 
 /* =========================================================
+   CHART STATE
+   Recomputed on every render and stashed on the chart instance
+   (chart.$state) so dataset callbacks + plugins always read the
+   latest analytics — letting us update in place instead of
+   destroying/recreating the chart each poll cycle.
+========================================================= */
+function computeChartState(backendData, metric, resolutionMinutes) {
+    const config   = METRIC_CONFIG[metric] ?? METRIC_CONFIG.temperature;
+    const scale    = COLOR_SCALES[metric] ?? COLOR_SCALES.temperature;
+    const isMobile = window.innerWidth <= 480;
+
+    // ── Time range ──────────────────────────────────────────
+    const today      = new Date();
+    const startRange = new Date(today); startRange.setHours(0, 0, 0, 0);
+    const endRange   = new Date(today); endRange.setHours(23, 59, 59, 999);
+
+    // ── Build point arrays ──────────────────────────────────
+    const rawPoints = (backendData || []).map(item => ({
+        x: new Date(item.hour),
+        y: item.hourlyValue,
+    }));
+
+    const chartPoints = insertGapNulls(rawPoints, resolutionMinutes);
+    const gapPoints   = extractGapSegments(rawPoints, resolutionMinutes, startRange, today);
+
+    // ── Analytics ───────────────────────────────────────────
+    const yBounds                = getDynamicYBounds(chartPoints, metric);
+    const { minIndex, maxIndex } = getMinMaxPoints(chartPoints);
+    const showMinMax             = hasEnoughDataDuration(backendData);
+    const validMinMax            = showMinMax
+        && minIndex !== -1 && maxIndex !== -1
+        && minIndex !== maxIndex;
+
+    // Last non-null point index for "Now" marker + future overlay
+    let latestIndex = chartPoints.length - 1;
+    while (latestIndex > 0 && chartPoints[latestIndex]?.y == null) latestIndex--;
+
+    const scenario = resolveCollisionScenario(
+        metric, chartPoints, minIndex, maxIndex, latestIndex,
+        validMinMax, resolutionMinutes, config
+    );
+
+    return {
+        metric, resolutionMinutes, config, scale, isMobile,
+        today, startRange, endRange,
+        chartPoints, gapPoints, yBounds,
+        minIndex, maxIndex, latestIndex,
+        showMinMax, validMinMax, scenario,
+    };
+}
+
+/* =========================================================
+   DATASETS — every scriptable option reads chart.$state so a
+   plain chart.update() reflects new data without a rebuild
+========================================================= */
+function buildDatasets(state) {
+    const mainDataset = {
+        label:           state.config.label,
+        data:            state.chartPoints,
+        spanGaps:        false,
+        fill:            true,
+        tension:         0.5,
+        borderWidth:     2.8,
+        borderCapStyle:  'round',
+        borderJoinStyle: 'round',
+
+        backgroundColor: (context) => {
+            const chart = context.chart;
+            const { chartArea } = chart;
+            if (!chartArea) return 'rgba(0,0,0,0)';
+            return buildAreaFill(chart.ctx, chartArea, chart.$state);
+        },
+
+        borderColor: (context) => {
+            const chart = context.chart;
+            const { chartArea, scales } = chart;
+            const st = chart.$state;
+            if (!chartArea) return st.config.lineColor ?? '#7dd3fc';
+            return createDynamicGradient(chart.ctx, chartArea, scales.y, st.scale);
+        },
+
+        pointRadius: (context) => {
+            const st = context.chart.$state;
+            const i  = context.dataIndex;
+            const pt = st.chartPoints[i];
+            if (!pt || pt.y == null) return 0;
+            if (i === st.latestIndex || i === st.maxIndex || i === st.minIndex) {
+                return st.isMobile ? 3 : 3.5;
+            }
+            return 0;
+        },
+        pointHoverRadius: (context) => {
+            const st = context.chart.$state;
+            const pt = st.chartPoints[context.dataIndex];
+            return pt?.y != null ? 6 : 0;
+        },
+
+        pointBackgroundColor: (context) => {
+            const st = context.chart.$state;
+            const i  = context.dataIndex;
+            if (i === st.latestIndex) return '#ffffff';
+            if (i === st.maxIndex)    return st.config.maxNodeColor;
+            if (i === st.minIndex)    return st.config.minNodeColor;
+            return st.config.lineColor ?? '#7dd3fc';
+        },
+
+        pointBorderColor: (context) => {
+            const st = context.chart.$state;
+            const i  = context.dataIndex;
+            if (i === st.latestIndex) {
+                // Latest reading is also today's high/low — ring the
+                // "Now" pin in the H/L color to mark the overlap
+                if (st.showMinMax && i === st.maxIndex) return st.config.maxNodeColor;
+                if (st.showMinMax && i === st.minIndex) return st.config.minNodeColor;
+                return scaleToRgbString(st.scale, st.chartPoints[st.latestIndex].y);
+            }
+            if (i === st.maxIndex) return st.config.innerBorder;
+            if (i === st.minIndex) return st.config.innerBorder;
+            return st.config.lineColor ?? '#7dd3fc';
+        },
+
+        pointBorderWidth: 2,
+    };
+
+    const gapDataset = {
+        label:                    '__gap__',
+        data:                     state.gapPoints,
+        spanGaps:                 false,
+        fill:                     false,
+        tension:                  0,
+        borderWidth:              1.5,
+        borderDash:               [5, 5],
+        borderColor:              'rgba(148, 163, 184, 0.35)',
+        borderCapStyle:           'round',
+        pointRadius:              0,
+        pointHoverRadius:         8,
+        pointHoverBackgroundColor:'rgba(148, 163, 184, 0.15)',
+        pointHoverBorderColor:    'rgba(148, 163, 184, 0.5)',
+        pointHoverBorderWidth:    1,
+    };
+
+    return [mainDataset, gapDataset];
+}
+
+/* =========================================================
+   CREATE — fresh instance (first render, or metric/resolution
+   change). Static options close over `state`; scriptable
+   options + plugins read the live chart.$state.
+========================================================= */
+function createChart(canvasElement, state) {
+    const ctx = canvasElement.getContext('2d');
+
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets: buildDatasets(state) },
+
+        options: {
+            responsive:          true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+
+            animations: {
+                tension: {
+                    duration: 1200,
+                    easing:   'easeOutQuart',
+                    from:     0.3,
+                    to:       0.5,
+                }
+            },
+
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit:           'hour',
+                        displayFormats: { hour: 'H' },
+                        tooltipFormat:  'HH:mm',
+                    },
+                    min:    state.startRange,
+                    max:    state.endRange,
+                    ticks:  { stepSize: 3, color: '#94a3b8', font: { size: state.isMobile ? 9 : 11 } },
+                    grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
+                    border: { display: false },
+                },
+                y: {
+                    suggestedMin: state.yBounds.suggestedMin,
+                    suggestedMax: state.yBounds.suggestedMax,
+                    ticks: {
+                        stepSize: state.config.yStep,
+                        callback: (val) => `${val}${state.config.yAxisSuffix}`,
+                        color:    '#94a3b8',
+                        font:     { size: state.isMobile ? 9 : 11 },
+                    },
+                    grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
+                    border: { display: false },
+                }
+            },
+
+            plugins: {
+                legend: { display: false },
+
+                tooltip: {
+                    enabled:  false,
+                    external: externalTooltipHandler,
+
+                    filter: (item) => {
+                        // hide null sentinel points from both datasets
+                        return item.raw?.y != null;
+                    },
+
+                    callbacks: {
+                        title: (items) => {
+                            if (!items.length) return '';
+                            const isGap = items.some(i => i.dataset.label === '__gap__');
+                            if (isGap) return 'Missing data';
+                            return new Date(items[0].parsed.x).toLocaleTimeString([], {
+                                hour: '2-digit', minute: '2-digit',
+                            });
+                        },
+
+                        label: (context) => {
+                            const st = context.chart.$state;
+                            if (context.dataset.label === '__gap__') {
+                                // find the two endpoints of this gap segment
+                                const data  = context.dataset.data;
+                                const idx   = context.dataIndex;
+
+                                // walk to find segment start (y != null going backwards)
+                                let start = idx;
+                                while (start > 0 && data[start - 1]?.y != null) start--;
+
+                                // walk to find segment end
+                                let end = idx;
+                                while (end < data.length - 1 && data[end + 1]?.y != null) end++;
+
+                                if (data[start] && data[end] && start !== end) {
+                                    const from     = new Date(data[start].x)
+                                        .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    const to       = new Date(data[end].x)
+                                        .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    const diffMins = Math.round(
+                                        (data[end].x - data[start].x) / 60000
+                                    );
+                                    return ` ${from} → ${to}  (${diffMins} min)`;
+                                }
+                                return ' No data recorded';
+                            }
+
+                            let suffix = '';
+                            if (st.validMinMax) {
+                                const idx = context.dataIndex;
+                                if (st.scenario === 'triple'
+                                    && (idx === st.maxIndex || idx === st.minIndex || idx === st.latestIndex)) {
+                                    suffix = ' (Max/Min Peak)';
+                                } else if (idx === st.maxIndex) {
+                                    suffix = ' (Today Highest)';
+                                } else if (idx === st.minIndex) {
+                                    suffix = ' (Today Lowest)';
+                                }
+                            }
+
+                            return ` ${context.parsed.y.toFixed(1)}${st.config.tooltipSuffix}${suffix}`;
+                        },
+
+                        labelTextColor: (context) =>
+                            context.dataset.label === '__gap__'
+                                ? 'rgba(148, 163, 184, 0.8)'
+                                : '#e2e8f0',
+                    }
+                },
+
+                minMaxLabels: {
+                    minIndex:      state.minIndex,
+                    maxIndex:      state.maxIndex,
+                    latestIndex:   state.latestIndex,
+                    validMinMax:   state.validMinMax,
+                    scenario:      state.scenario,
+                    isMobile:      state.isMobile,
+                    maxLabelColor: state.config.maxNodeColor,
+                    minLabelColor: state.config.minNodeColor,
+                }
+            }
+        },
+
+        plugins: [
+            // ── State bootstrap ─────────────────────────────
+            // Chart.js resolves scriptable options during the constructor's
+            // first update — before any post-construction assignment runs —
+            // so seed chart.$state here, ahead of the first draw.
+            {
+                id: 'stateBootstrap',
+                beforeInit(chart) { chart.$state = state; },
+            },
+
+            // ── Future area overlay ─────────────────────────
+            {
+                id: 'futureAreaOverlay',
+                beforeDatasetsDraw(chart) {
+                    const st = chart.$state;
+                    if (!st.chartPoints.length) return;
+                    const { ctx, chartArea, scales } = chart;
+                    const lastReal = st.chartPoints[st.latestIndex];
+                    if (!lastReal) return;
+
+                    // Start the "future" shading at now — any gap between
+                    // the last reading and now is rendered as a missing-data
+                    // bridge instead (see extractGapSegments)
+                    const anchor       = Math.max(st.today.getTime(), lastReal.x.getTime());
+                    const latestX      = scales.x.getPixelForValue(new Date(anchor));
+                    const overlayStart = latestX + 3;
+
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(255,255,255,0.045)';
+                    ctx.fillRect(
+                        overlayStart, chartArea.top,
+                        chartArea.right - overlayStart,
+                        chartArea.bottom - chartArea.top
+                    );
+                    ctx.beginPath();
+                    ctx.moveTo(latestX, chartArea.top);
+                    ctx.lineTo(latestX, chartArea.bottom);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+                    ctx.lineWidth   = 1;
+                    ctx.setLineDash([4, 4]);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            },
+
+            // ── Line glow ───────────────────────────────────
+            {
+                id: 'lineGlow',
+                beforeDatasetDraw(chart, args) {
+                    // only glow the main dataset, not the gap line
+                    if (args.index !== 0) return;
+                    const { ctx } = chart;
+                    ctx.save();
+                    ctx.shadowColor   = chart.$state.config.shadowColor;
+                    ctx.shadowBlur    = 12;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                },
+                afterDatasetDraw(chart, args) {
+                    if (args.index !== 0) return;
+                    chart.ctx.restore();
+                }
+            },
+
+            // ── "No data" text labels on wide gaps ──────────
+            {
+                id: 'gapLabels',
+                afterDatasetsDraw(chart) {
+                    const gapMeta = chart.getDatasetMeta(1);
+                    if (!gapMeta?.data?.length) return;
+
+                    const { ctx, chartArea } = chart;
+                    const data = chart.data.datasets[1].data;
+                    const font = chart.$state.isMobile ? '500 9px Nunito' : '500 10px Nunito';
+
+                    ctx.save();
+                    ctx.fillStyle    = 'rgba(148, 163, 184, 0.4)';
+                    ctx.textAlign    = 'center';
+                    ctx.textBaseline = 'middle';
+                    const { halfW, halfH } = measureLabel(ctx, 'No data', font);
+
+                    for (let i = 0; i < data.length - 1; i++) {
+                        const a = data[i];
+                        const b = data[i + 1];
+                        if (!a || !b || a.y == null || b.y == null) continue;
+
+                        const aPoint = gapMeta.data[i];
+                        const bPoint = gapMeta.data[i + 1];
+                        if (!aPoint || !bPoint) continue;
+
+                        const gapPx = bPoint.x - aPoint.x;
+                        if (gapPx <= 50) continue;
+
+                        // follow the bridge's own height instead of the
+                        // chart's vertical center, clamped clear of the edges
+                        const midX = Math.min(Math.max((aPoint.x + bPoint.x) / 2, chartArea.left + halfW), chartArea.right - halfW);
+                        const midY = Math.min(Math.max((aPoint.y + bPoint.y) / 2, chartArea.top + halfH), chartArea.bottom - halfH);
+
+                        ctx.fillText('No data', midX, midY);
+                    }
+
+                    ctx.restore();
+                }
+            }
+        ]
+    });
+
+    chart.$state      = state;
+    chart.$metric     = state.metric;
+    chart.$resolution = state.resolutionMinutes;
+    return chart;
+}
+
+/* =========================================================
+   UPDATE — reuses the live instance: swap data + analytics and
+   repaint with no animation (no destroy/recreate, no replayed
+   tension animation on every poll)
+========================================================= */
+function updateChart(chart, state) {
+    chart.$state = state;
+
+    chart.data.datasets[0].data = state.chartPoints;
+    chart.data.datasets[1].data = state.gapPoints;
+
+    const y = chart.options.scales.y;
+    y.suggestedMin = state.yBounds.suggestedMin;
+    y.suggestedMax = state.yBounds.suggestedMax;
+
+    const x = chart.options.scales.x;
+    x.min = state.startRange;
+    x.max = state.endRange;
+
+    const p = chart.options.plugins.minMaxLabels;
+    p.minIndex      = state.minIndex;
+    p.maxIndex      = state.maxIndex;
+    p.latestIndex   = state.latestIndex;
+    p.validMinMax   = state.validMinMax;
+    p.scenario      = state.scenario;
+    p.isMobile      = state.isMobile;
+    p.maxLabelColor = state.config.maxNodeColor;
+    p.minLabelColor = state.config.minNodeColor;
+
+    chart.update('none');
+}
+
+/* =========================================================
    MAIN CHART RENDER ENGINE
+   Reuses the existing instance when only the data changed; a
+   full rebuild is paid only on metric/resolution change (or the
+   first render).
 ========================================================= */
 export function renderWeatherChart(backendData, metric = 'temperature', resolutionMinutes = 10) {
     try {
-        const config   = METRIC_CONFIG[metric] ?? METRIC_CONFIG.temperature;
-        const isTemp   = metric === 'temperature';
-        const isMobile = window.innerWidth <= 480;
-
-        // ── Time range ──────────────────────────────────────────
-        const today      = new Date();
-        const startRange = new Date(today); startRange.setHours(0, 0, 0, 0);
-        const endRange   = new Date(today); endRange.setHours(23, 59, 59, 999);
-
-        // ── Build point arrays ──────────────────────────────────
-        const rawPoints = (backendData || []).map(item => ({
-            x: new Date(item.hour),
-            y: item.hourlyValue,
-        }));
-
-        const chartPoints = insertGapNulls(rawPoints, resolutionMinutes);
-        const gapPoints   = extractGapSegments(rawPoints, resolutionMinutes, startRange, today);
-
-        // ── Analytics ───────────────────────────────────────────
-        const yBounds              = getDynamicYBounds(chartPoints, metric);
-        const { minIndex, maxIndex } = getMinMaxPoints(chartPoints);
-        const showMinMax           = hasEnoughDataDuration(backendData);
-        const validMinMax          = showMinMax
-            && minIndex !== -1 && maxIndex !== -1
-            && minIndex !== maxIndex;
-
-        // Last non-null point index for "Now" marker + future overlay
-        let latestIndex = chartPoints.length - 1;
-        while (latestIndex > 0 && chartPoints[latestIndex]?.y == null) latestIndex--;
-
-        const scenario = resolveCollisionScenario(
-            metric, chartPoints, minIndex, maxIndex, latestIndex,
-            validMinMax, resolutionMinutes, config
-        );
-
-        // ── Destroy previous instance ───────────────────────────
-        if (weatherChartInstance !== null) {
-            weatherChartInstance.destroy();
-            weatherChartInstance = null;
-        }
-
         const canvasElement = document.getElementById('weatherChart');
         if (!canvasElement) {
             console.error("Canvas 'weatherChart' not found.");
             return;
         }
 
-        const ctx = canvasElement.getContext('2d');
+        const state = computeChartState(backendData, metric, resolutionMinutes);
 
-        // ── Area fill gradient ──────────────────────────────────
-        const gradientFill = ctx.createLinearGradient(0, 0, 0, 350);
+        const canReuse = weatherChartInstance
+            && weatherChartInstance.$metric === metric
+            && weatherChartInstance.$resolution === resolutionMinutes;
 
-        if (isTemp) {
-            const realPoints = chartPoints.filter(p => p.y != null);
-            const avgTemp    = realPoints.length
-                ? realPoints.reduce((s, p) => s + p.y, 0) / realPoints.length
-                : 15;
-            gradientFill.addColorStop(0,   tempToRgbString(avgTemp, 0.28));
-            gradientFill.addColorStop(0.5, tempToRgbString(avgTemp, 0.07));
-            gradientFill.addColorStop(1,   'rgba(255,255,255,0)');
+        if (canReuse) {
+            updateChart(weatherChartInstance, state);
         } else {
-            gradientFill.addColorStop(0,    config.fillTop);
-            gradientFill.addColorStop(0.45, config.fillMid);
-            gradientFill.addColorStop(1,    'rgba(255,255,255,0)');
+            if (weatherChartInstance !== null) {
+                weatherChartInstance.destroy();
+                weatherChartInstance = null;
+            }
+            weatherChartInstance = createChart(canvasElement, state);
         }
-
-        // ── Main dataset ────────────────────────────────────────
-        const mainDataset = {
-            label:           config.label,
-            data:            chartPoints,
-            spanGaps:        false,
-            backgroundColor: gradientFill,
-            fill:            true,
-            tension:         0.5,
-            borderWidth:     2.8,
-            borderCapStyle:  'round',
-            borderJoinStyle: 'round',
-
-            borderColor: (context) => {
-                if (!isTemp) return config.lineColor;
-                const chart = context.chart;
-                const { ctx, chartArea, scales } = chart;
-                if (!chartArea) return '#7dd3fc';
-                return createDynamicGradient(ctx, chartArea, scales.y);
-            },
-
-            pointRadius: (context) => {
-                const i  = context.dataIndex;
-                const pt = chartPoints[i];
-                if (!pt || pt.y == null) return 0;
-                if (i === latestIndex || i === maxIndex || i === minIndex) {
-                    return isMobile ? 3 : 3.5;
-                }
-                return 0;
-            },
-            pointHoverRadius: (context) => {
-                const pt = chartPoints[context.dataIndex];
-                return pt?.y != null ? 6 : 0;
-            },
-
-            pointBackgroundColor: (context) => {
-                const i = context.dataIndex;
-                if (i === latestIndex) return '#ffffff';
-                if (i === maxIndex)    return config.maxNodeColor;
-                if (i === minIndex)    return config.minNodeColor;
-                return config.lineColor ?? '#7dd3fc';
-            },
-
-            pointBorderColor: (context) => {
-                const i = context.dataIndex;
-                if (i === latestIndex) {
-                    // Latest reading is also today's high/low — ring the
-                    // "Now" pin in the H/L color to mark the overlap
-                    if (showMinMax && i === maxIndex) return config.maxNodeColor;
-                    if (showMinMax && i === minIndex) return config.minNodeColor;
-                    return isTemp
-                        ? tempToRgbString(chartPoints[latestIndex].y)
-                        : config.lineColor;
-                }
-                if (i === maxIndex) return config.innerBorder;
-                if (i === minIndex) return config.innerBorder;
-                return config.lineColor ?? '#7dd3fc';
-            },
-
-            pointBorderWidth: 2,
-        };
-
-        // ── Gap bridge dataset ──────────────────────────────────
-        const gapDataset = {
-            label:                    '__gap__',
-            data:                     gapPoints,
-            spanGaps:                 false,
-            fill:                     false,
-            tension:                  0,
-            borderWidth:              1.5,
-            borderDash:               [5, 5],
-            borderColor:              'rgba(148, 163, 184, 0.35)',
-            borderCapStyle:           'round',
-            pointRadius:              0,
-            pointHoverRadius:         8,
-            pointHoverBackgroundColor:'rgba(148, 163, 184, 0.15)',
-            pointHoverBorderColor:    'rgba(148, 163, 184, 0.5)',
-            pointHoverBorderWidth:    1,
-        };
-
-        // ── Chart ───────────────────────────────────────────────
-        weatherChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: { datasets: [mainDataset, gapDataset] },
-
-            options: {
-                responsive:          true,
-                maintainAspectRatio: false,
-                interaction: { intersect: false, mode: 'index' },
-
-                animations: {
-                    tension: {
-                        duration: 1200,
-                        easing:   'easeOutQuart',
-                        from:     0.3,
-                        to:       0.5,
-                    }
-                },
-
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit:           'hour',
-                            displayFormats: { hour: 'H' },
-                            tooltipFormat:  'HH:mm',
-                        },
-                        min:    startRange,
-                        max:    endRange,
-                        ticks:  { stepSize: 3, color: '#94a3b8', font: { size: isMobile ? 9 : 11 } },
-                        grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
-                        border: { display: false },
-                    },
-                    y: {
-                        suggestedMin: yBounds.suggestedMin,
-                        suggestedMax: yBounds.suggestedMax,
-                        ticks: {
-                            stepSize: config.yStep,
-                            callback: (val) => `${val}${config.yAxisSuffix}`,
-                            color:    '#94a3b8',
-                            font:     { size: isMobile ? 9 : 11 },
-                        },
-                        grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
-                        border: { display: false },
-                    }
-                },
-
-                plugins: {
-                    legend: { display: false },
-
-                    tooltip: {
-                        enabled:  false,
-                        external: externalTooltipHandler,
-
-                        filter: (item) => {
-                            // hide null sentinel points from both datasets
-                            return item.raw?.y != null;
-                        },
-
-                        callbacks: {
-                            title: (items) => {
-                                if (!items.length) return '';
-                                const isGap = items.some(i => i.dataset.label === '__gap__');
-                                if (isGap) return 'Missing data';
-                                return new Date(items[0].parsed.x).toLocaleTimeString([], {
-                                    hour: '2-digit', minute: '2-digit',
-                                });
-                            },
-
-                            label: (context) => {
-                                if (context.dataset.label === '__gap__') {
-                                    // find the two endpoints of this gap segment
-                                    const data  = context.dataset.data;
-                                    const idx   = context.dataIndex;
-
-                                    // walk to find segment start (y != null going backwards)
-                                    let start = idx;
-                                    while (start > 0 && data[start - 1]?.y != null) start--;
-
-                                    // walk to find segment end
-                                    let end = idx;
-                                    while (end < data.length - 1 && data[end + 1]?.y != null) end++;
-
-                                    if (data[start] && data[end] && start !== end) {
-                                        const from     = new Date(data[start].x)
-                                            .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                        const to       = new Date(data[end].x)
-                                            .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                        const diffMins = Math.round(
-                                            (data[end].x - data[start].x) / 60000
-                                        );
-                                        return ` ${from} → ${to}  (${diffMins} min)`;
-                                    }
-                                    return ' No data recorded';
-                                }
-
-                                let suffix = '';
-                                if (validMinMax) {
-                                    const idx = context.dataIndex;
-                                    if (scenario === 'triple'
-                                        && (idx === maxIndex || idx === minIndex || idx === latestIndex)) {
-                                        suffix = ' (Max/Min Peak)';
-                                    } else if (idx === maxIndex) {
-                                        suffix = ' (Today Highest)';
-                                    } else if (idx === minIndex) {
-                                        suffix = ' (Today Lowest)';
-                                    }
-                                }
-
-                                return ` ${context.parsed.y.toFixed(1)}${config.tooltipSuffix}${suffix}`;
-                            },
-
-                            labelTextColor: (context) =>
-                                context.dataset.label === '__gap__'
-                                    ? 'rgba(148, 163, 184, 0.8)'
-                                    : '#e2e8f0',
-                        }
-                    },
-
-                    minMaxLabels: {
-                        minIndex,
-                        maxIndex,
-                        latestIndex,
-                        validMinMax,
-                        scenario,
-                        isMobile,
-                        maxLabelColor: config.maxNodeColor,
-                        minLabelColor: config.minNodeColor,
-                    }
-                }
-            },
-
-            plugins: [
-                // ── Future area overlay ─────────────────────────
-                {
-                    id: 'futureAreaOverlay',
-                    beforeDatasetsDraw(chart) {
-                        if (!chartPoints.length) return;
-                        const { ctx, chartArea, scales } = chart;
-                        const lastReal = chartPoints[latestIndex];
-                        if (!lastReal) return;
-
-                        // Start the "future" shading at now — any gap between
-                        // the last reading and now is rendered as a missing-data
-                        // bridge instead (see extractGapSegments)
-                        const anchor       = Math.max(today.getTime(), lastReal.x.getTime());
-                        const latestX      = scales.x.getPixelForValue(new Date(anchor));
-                        const overlayStart = latestX + 3;
-
-                        ctx.save();
-                        ctx.fillStyle = 'rgba(255,255,255,0.045)';
-                        ctx.fillRect(
-                            overlayStart, chartArea.top,
-                            chartArea.right - overlayStart,
-                            chartArea.bottom - chartArea.top
-                        );
-                        ctx.beginPath();
-                        ctx.moveTo(latestX, chartArea.top);
-                        ctx.lineTo(latestX, chartArea.bottom);
-                        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
-                        ctx.lineWidth   = 1;
-                        ctx.setLineDash([4, 4]);
-                        ctx.stroke();
-                        ctx.restore();
-                    }
-                },
-
-                // ── Line glow ───────────────────────────────────
-                {
-                    id: 'lineGlow',
-                    beforeDatasetDraw(chart, args) {
-                        // only glow the main dataset, not the gap line
-                        if (args.index !== 0) return;
-                        const { ctx } = chart;
-                        ctx.save();
-                        ctx.shadowColor   = config.shadowColor;
-                        ctx.shadowBlur    = 12;
-                        ctx.shadowOffsetX = 0;
-                        ctx.shadowOffsetY = 0;
-                    },
-                    afterDatasetDraw(chart, args) {
-                        if (args.index !== 0) return;
-                        chart.ctx.restore();
-                    }
-                },
-
-                // ── "No data" text labels on wide gaps ──────────
-                {
-                    id: 'gapLabels',
-                    afterDatasetsDraw(chart) {
-                        const gapMeta = chart.getDatasetMeta(1);
-                        if (!gapMeta?.data?.length) return;
-
-                        const { ctx, chartArea } = chart;
-                        const data = chart.data.datasets[1].data;
-                        const font = isMobile ? '500 9px Nunito' : '500 10px Nunito';
-
-                        ctx.save();
-                        ctx.fillStyle    = 'rgba(148, 163, 184, 0.4)';
-                        ctx.textAlign    = 'center';
-                        ctx.textBaseline = 'middle';
-                        const { halfW, halfH } = measureLabel(ctx, 'No data', font);
-
-                        for (let i = 0; i < data.length - 1; i++) {
-                            const a = data[i];
-                            const b = data[i + 1];
-                            if (!a || !b || a.y == null || b.y == null) continue;
-
-                            const aPoint = gapMeta.data[i];
-                            const bPoint = gapMeta.data[i + 1];
-                            if (!aPoint || !bPoint) continue;
-
-                            const gapPx = bPoint.x - aPoint.x;
-                            if (gapPx <= 50) continue;
-
-                            // follow the bridge's own height instead of the
-                            // chart's vertical center, clamped clear of the edges
-                            const midX = Math.min(Math.max((aPoint.x + bPoint.x) / 2, chartArea.left + halfW), chartArea.right - halfW);
-                            const midY = Math.min(Math.max((aPoint.y + bPoint.y) / 2, chartArea.top + halfH), chartArea.bottom - halfH);
-
-                            ctx.fillText('No data', midX, midY);
-                        }
-
-                        ctx.restore();
-                    }
-                }
-            ]
-        });
-
     } catch (error) {
         console.error('Error rendering weather chart:', error);
     }

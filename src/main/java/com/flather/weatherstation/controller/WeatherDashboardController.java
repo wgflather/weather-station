@@ -22,6 +22,6 @@ public class WeatherDashboardController {
     model.addAttribute("dashboard", weatherDashboard);
     log.info("Retrieved Weather Record Dashboard Object: {}", weatherDashboard);
 
-    return "weather_dashboard";
+    return "index";
   }
 }

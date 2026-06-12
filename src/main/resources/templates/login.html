@@ -43,11 +43,6 @@
                        required />
             </div>
 
-            <!-- Spring Security CSRF token (IMPORTANT) -->
-            <input type="hidden"
-                   th:name="${_csrf.parameterName}"
-                   th:value="${_csrf.token}" />
-
             <button type="submit">Login</button>
         </form>
 
