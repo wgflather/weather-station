@@ -1,11 +1,13 @@
 package com.flather.weatherstation.cache;
 
-import com.flather.weatherstation.config.LocationProperties;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import lombok.Getter;
@@ -29,9 +31,11 @@ public class SensorStateCache {
   private static final int METRICS_WINDOW_MINUTES = 60;
   public static final int SPIKE_REFERENCE_SIZE = 5;
 
-  private final LocationProperties locationProperties;
+  private final ConfigurationCache configurationCache;
 
   private final Map<Metric, Integer> consecutiveSpikes;
+
+  private volatile LocalDate lastProcessedDate;
 
   @Getter @Setter private volatile Double todayMaxTemp;
 
@@ -39,9 +43,13 @@ public class SensorStateCache {
 
   @Setter @Getter private volatile WeatherRecord lastSavedMeasurement;
 
-  public SensorStateCache(LocationProperties locationProperties) {
-    this.locationProperties = locationProperties;
+  @PostConstruct
+  void init() {
+    lastProcessedDate = LocalDate.now(configurationCache.getLocationContext().zoneId());
+  }
 
+  public SensorStateCache(ConfigurationCache configurationCache) {
+    this.configurationCache = configurationCache;
     metricsSpikeWindow =
         Map.of(
             Metric.TEMPERATURE, new ArrayDeque<>(),
@@ -56,10 +64,21 @@ public class SensorStateCache {
                 Metric.HUMIDITY, 0));
   }
 
-  @Scheduled(cron = "0 0 0 * * *", zone = "#{@locationProperties.zoneId}")
-  public void resetDailyExtremes() {
-    log.info("[DAILY_RESET] Resetting daily temperature extremes");
-    resetDailyTemperatureExtremes();
+  @Scheduled(fixedRate = 20_000)
+  public void checkDailyReset() {
+
+    ZoneId zone = configurationCache.getLocationContext().zoneId();
+
+    LocalDate currentDate = LocalDate.now(zone);
+
+    if (!currentDate.equals(lastProcessedDate)) {
+
+      log.info("[DAILY_RESET] Date changed from {} to {}", lastProcessedDate, currentDate);
+
+      resetDailyTemperatureExtremes();
+
+      lastProcessedDate = currentDate;
+    }
   }
 
   public synchronized List<Double> getSpikeWindowSnapshot(Metric metric) {
@@ -112,7 +131,7 @@ public class SensorStateCache {
         "[CACHE_UPDATE] New measurement received: temp={}, pressure={}, time={}",
         savedRecord.getTemperature(),
         savedRecord.getPressure(),
-        savedRecord.getMeasuredAt().atZone(locationProperties.getZoneId()));
+        savedRecord.getMeasuredAt().atZone(configurationCache.getLocationContext().zoneId()));
 
     updateMetricsWindow(savedRecord);
     if (savedRecord.getTemperature() != null) {

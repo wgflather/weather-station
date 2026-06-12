@@ -1,9 +1,8 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.HardwareConfig;
-import com.flather.weatherstation.config.LocationProperties;
-import com.flather.weatherstation.config.WeatherValidationProperties;
 import com.flather.weatherstation.domain.constant.*;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
@@ -23,29 +22,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AnalyticsService {
   private final WeatherReportRepository repository;
-  private final ZoneId zoneId;
   private final SensorStateCache sensorStateCache;
   private final MetricDataDetailsMapper metricDataDetailsMapper;
   private final HardwareConfig hardwareConfig;
-  private final WeatherValidationProperties weatherValidationProperties;
+  private final ConfigurationCache configurationCache;
 
   public AnalyticsService(
       WeatherReportRepository repository,
-      LocationProperties locationProperties,
+      ConfigurationCache configurationCache,
       SensorStateCache sensorStateCache,
       MetricDataDetailsMapper metricDataDetailsMapper,
-      HardwareConfig hardwareConfig,
-      WeatherValidationProperties weatherValidationProperties) {
+      HardwareConfig hardwareConfig) {
     this.repository = repository;
-    this.zoneId = locationProperties.getZoneId();
     this.sensorStateCache = sensorStateCache;
     this.metricDataDetailsMapper = metricDataDetailsMapper;
     this.hardwareConfig = hardwareConfig;
-    this.weatherValidationProperties = weatherValidationProperties;
+    this.configurationCache = configurationCache;
   }
 
   private DateRangeHelper.DateRange today() {
-    return DateRangeHelper.getDateRange(zoneId);
+    return DateRangeHelper.getDateRange(configurationCache.getLocationContext().zoneId());
   }
 
   public long findTodayRecordsCount() {
@@ -55,14 +51,19 @@ public class AnalyticsService {
 
   public ZonedDateTime findLastRecordTime() {
     if (sensorStateCache.getLastSavedMeasurement() != null) {
-      return sensorStateCache.getLastSavedMeasurement().getMeasuredAt().atZone(zoneId);
+      return sensorStateCache
+          .getLastSavedMeasurement()
+          .getMeasuredAt()
+          .atZone(configurationCache.getLocationContext().zoneId());
     }
 
     return null;
   }
 
   public long getLagMinutes(ZonedDateTime lastRecord) {
-    return Duration.between(lastRecord, Instant.now().atZone(zoneId)).toMinutes();
+    return Duration.between(
+            lastRecord, Instant.now().atZone(configurationCache.getLocationContext().zoneId()))
+        .toMinutes();
   }
 
   private Double averageOfFiveLastReadings(
@@ -139,8 +140,8 @@ public class AnalyticsService {
     double pctWetness =
         MeteoMath.rawToWetnessPct(
             rawAdc,
-            weatherValidationProperties.getSurfaceWetnessDryBaseline(),
-            weatherValidationProperties.getSurfaceWetnessWetBaseline());
+            configurationCache.getValidationConfig().surfaceWetnessDryBaseline(),
+            configurationCache.getValidationConfig().surfaceWetnessWetBaseline());
 
     return new SurfaceWetnessDto(
         pctWetness,
@@ -169,11 +170,14 @@ public class AnalyticsService {
     return dataPoints.stream()
         .map(
             projection ->
-                new HourlyChartAvgDto(projection.hour().atZone(zoneId), projection.value()))
+                new HourlyChartAvgDto(
+                    projection.hour().atZone(configurationCache.getLocationContext().zoneId()),
+                    projection.value()))
         .toList();
   }
 
   public ChartDto returnChart(Metric metric, String since, String resolution) {
+    ZoneId zoneId = configurationCache.getLocationContext().zoneId();
     Instant sinceInstant =
         (since == null)
             ? LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant()

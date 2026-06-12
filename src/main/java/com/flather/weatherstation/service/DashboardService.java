@@ -24,7 +24,7 @@ public class DashboardService {
         .build();
   }
 
-  public AstronomySnapshot getAstronomyBlock(){
+  public AstronomySnapshot getAstronomyBlock() {
     return new AstronomySnapshot(astronomySearchService.getSun(), astronomySearchService.getMoon());
   }
 
@@ -62,7 +62,7 @@ public class DashboardService {
     return WeatherDashboardDto.builder()
         .metricsDashboardDto(metricsDashboardDto)
         .systemHealthDashboardDto(systemHealthDashboardDto)
-            .astronomySnapshot(astronomyDashboardBlock)
+        .astronomySnapshot(astronomyDashboardBlock)
         .build();
   }
 }

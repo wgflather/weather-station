@@ -1,7 +1,7 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.cache.SensorStateCache;
-import com.flather.weatherstation.config.LocationProperties;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
@@ -25,7 +25,7 @@ public class WeatherService {
   private final WeatherReportRepository repository;
   private final DataQualityValidator qualityValidator;
   private final WeatherRecordMapper mapper;
-  private final LocationProperties locationProperties;
+  private final ConfigurationCache configurationCache;
   private final SensorStateCache sensorStateCache;
 
   private Double medianOf(Metric metric, Median median) {
@@ -135,7 +135,7 @@ public class WeatherService {
   @Transactional(readOnly = true)
   public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord() {
 
-    ZoneId zoneId = locationProperties.getZoneId();
+    ZoneId zoneId = configurationCache.getLocationContext().zoneId();
 
     LocalDate currentDate = LocalDate.now(zoneId);
 

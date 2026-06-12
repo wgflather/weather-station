@@ -1,6 +1,5 @@
 package com.flather.weatherstation.cache;
 
-import com.flather.weatherstation.config.LocationProperties;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
 import com.flather.weatherstation.repository.DateRangeHelper;
@@ -16,15 +15,15 @@ import org.springframework.stereotype.Component;
 public class SensorCacheInitializer implements ApplicationRunner {
   private final SensorStateCache sensorStateCache;
   private final WeatherReportRepository repository;
-  private final LocationProperties properties;
+  private final ConfigurationCache properties;
 
   public SensorCacheInitializer(
       SensorStateCache sensorStateCache,
       WeatherReportRepository repository,
-      LocationProperties properties) {
+      ConfigurationCache configurationCache) {
     this.sensorStateCache = sensorStateCache;
     this.repository = repository;
-    this.properties = properties;
+    this.properties = configurationCache;
   }
 
   @Override
@@ -37,7 +36,7 @@ public class SensorCacheInitializer implements ApplicationRunner {
             .toList();
 
     DateRangeHelper.DateRange todayZonedRange =
-        DateRangeHelper.getDateRange(properties.getZoneId());
+        DateRangeHelper.getDateRange(properties.getLocationContext().zoneId());
 
     ExtremesProjection extremesProjection =
         repository.temperatureExtremes(todayZonedRange.startTime(), todayZonedRange.endTime());

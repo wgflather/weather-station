@@ -1,6 +1,7 @@
 package com.flather.weatherstation.service;
 
-import com.flather.weatherstation.config.WeatherValidationProperties;
+import com.flather.weatherstation.cache.ConfigurationCache;
+import com.flather.weatherstation.config.WeatherValidationConfig;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.validation.ValidationResult;
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DataQualityValidator {
 
-  private final WeatherValidationProperties properties;
+  private final ConfigurationCache properties;
 
   private void validateMetric(
       Metric metric, Double value, double min, double max, Map<Metric, DataQuality> result) {
@@ -41,35 +42,38 @@ public class DataQualityValidator {
 
   public ValidationResult detectDataAnomaly(WeatherRecordCreatedDto anomalyDto) {
 
+    WeatherValidationConfig validation = properties.getValidationConfig();
+
     Map<Metric, DataQuality> dataQualityMap = new HashMap<>();
 
     validateMetric(
         Metric.TEMPERATURE,
         anomalyDto.getTemperature(),
-        properties.getTempMinimal(),
-        properties.getTempMaximum(),
+        validation.tempMinimal(),
+        validation.tempMaximum(),
         dataQualityMap);
 
     validateMetric(
         Metric.PRESSURE,
         anomalyDto.getPressure(),
-        properties.getPressureMinimal(),
-        properties.getPressureMaximum(),
+        validation.pressureMinimal(),
+        validation.pressureMaximum(),
         dataQualityMap);
 
     validateMetric(
         Metric.HUMIDITY,
         anomalyDto.getHumidity(),
-        properties.getHumidityMinimal(),
-        properties.getHumidityMaximum(),
+        validation.humidityMinimal(),
+        validation.humidityMaximum(),
         dataQualityMap);
 
     validateMetric(
         Metric.SURFACE_WETNESS,
         Optional.ofNullable(anomalyDto.getSurfaceWetness()).map(Long::doubleValue).orElse(null),
-        properties.getSurfaceWetnessWetBaseline(),
-        properties.getSurfaceWetnessDryBaseline(),
+        validation.surfaceWetnessWetBaseline(),
+        validation.surfaceWetnessDryBaseline(),
         dataQualityMap);
+    ;
 
     return new ValidationResult(
         dataQualityMap.get(Metric.TEMPERATURE),
@@ -80,9 +84,9 @@ public class DataQualityValidator {
 
   private double getSpikeLimit(Metric metric) {
     return switch (metric) {
-      case TEMPERATURE -> properties.getTempSpikeLimit();
-      case PRESSURE -> properties.getPressureSpikeLimit();
-      case HUMIDITY -> properties.getHumiditySpikeLimit();
+      case TEMPERATURE -> properties.getValidationConfig().tempSpikeLimit();
+      case PRESSURE -> properties.getValidationConfig().pressureSpikeLimit();
+      case HUMIDITY -> properties.getValidationConfig().humiditySpikeLimit();
       default -> throw new IllegalArgumentException("Unknown Metric");
     };
   }

@@ -5,33 +5,24 @@ import java.time.format.DateTimeFormatter;
 
 public class FormatUtil {
 
-    private static final DateTimeFormatter TIME_FORMAT =
-            DateTimeFormatter.ofPattern("HH:mm");
+  private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
-    public static String formatTime(
-            ZonedDateTime time
-    ) {
+  public static String formatTime(ZonedDateTime time) {
 
-        if (time == null) {
-            return "--:--";
-        }
-
-        return time.format(TIME_FORMAT);
+    if (time == null) {
+      return "--:--";
     }
 
-    public static String azimuthToDirection(
-            double azimuth
-    ) {
+    return time.format(TIME_FORMAT);
+  }
 
-        String[] dirs = {
-                "N","NE","E","SE",
-                "S","SW","W","NW"
-        };
+  public static String azimuthToDirection(double azimuth) {
 
-        return dirs[
-                (int)Math.round(azimuth / 45.0) % 8
-                ];
-    }
+    String[] dirs = {
+      "N", "NE", "E", "SE",
+      "S", "SW", "W", "NW"
+    };
 
-
+    return dirs[(int) Math.round(azimuth / 45.0) % 8];
+  }
 }
