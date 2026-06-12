@@ -86,7 +86,7 @@ body::before {
 .today_data_block,
 .weather_block, .pressure_block, .temperature_block,
 .min_max_block, .system_health_block, .chart_block,
-.humidity_block, .wetness_block {
+.humidity_block, .wetness_block, .configuration_block {
     position: relative;
     overflow: hidden;
     background: rgba(42, 74, 138, 0.75);
@@ -177,6 +177,8 @@ body::before {
     align-items: center;
     gap: clamp(8px, 2vw, 20px);
     margin: 0 auto 20px auto;
+    /* reserve a clear strip on the right for the admin gear */
+    padding-right: 52px;
 }
 
 .datetime-container {
@@ -1028,6 +1030,312 @@ h3 {
     font-size: 1.2rem;
     font-weight: bold;
     color: #ffffff;
+}
+
+/* =========================================================
+   ADMIN GATEWAY (gear icon + mobile FAB)
+========================================================= */
+.admin-gear {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    width: 26px;
+    height: 26px;
+    color: #9fc2f5;
+    text-decoration: none;
+    z-index: 5;
+    transition: color 0.15s ease, transform 0.2s ease;
+}
+
+.admin-gear:hover {
+    color: #38bdf8;
+    transform: rotate(45deg);
+}
+
+.admin-gear svg {
+    width: 100%;
+    height: 100%;
+}
+
+.admin-fab {
+    display: none;
+}
+
+/* Phones: hide the inline gear, show a floating action button instead */
+@media (max-width: 480px) {
+    .admin-gear {
+        display: none;
+    }
+
+    .admin-fab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: rgba(42, 74, 138, 0.92);
+        border: 1px solid rgba(170, 210, 255, 0.34);
+        color: #9fc2f5;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+        z-index: 500;
+    }
+
+    .admin-fab svg {
+        width: 26px;
+        height: 26px;
+    }
+}
+
+/* =========================================================
+   STATION CONFIGURATION PAGE
+========================================================= */
+.config-page {
+    width: 820px;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.back-to-dashboard {
+    display: inline-block;
+    margin-bottom: 18px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: #e2eeff;
+    background: rgba(30, 58, 138, 0.5);
+    border: 1px solid rgba(140, 190, 255, 0.3);
+    border-radius: 8px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.back-to-dashboard:hover {
+    background: rgba(30, 58, 138, 0.85);
+    border-color: rgba(125, 211, 252, 0.5);
+}
+
+.configuration_block {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.config-body {
+    margin-top: 15px;
+}
+
+.config-loading {
+    color: #9fc2f5;
+    font-size: 0.85rem;
+}
+
+.config-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.config-tab {
+    padding: 7px 14px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #9fc2f5;
+    background: rgba(30, 58, 138, 0.5);
+    border: 1px solid rgba(140, 190, 255, 0.25);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.config-tab:hover {
+    background: rgba(30, 58, 138, 0.8);
+    color: #e2eeff;
+}
+
+.config-tab.active {
+    background: rgba(56, 189, 248, 0.22);
+    color: #e2eeff;
+    border-color: rgba(125, 211, 252, 0.5);
+}
+
+.config-panel[hidden] {
+    display: none;
+}
+
+.config-fieldset {
+    margin: 0 0 18px 0;
+    padding: 0;
+    border: none;
+}
+
+.config-fieldset legend {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #38bdf8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding: 0;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px 16px;
+}
+
+.config-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.config-field label {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #9fc2f5;
+}
+
+.config-field input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(30, 58, 138, 0.5);
+    border: 1px solid rgba(140, 190, 255, 0.3);
+    border-radius: 8px;
+    padding: 7px 10px;
+    color: #ffffff;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.config-field input:focus {
+    border-color: rgba(125, 211, 252, 0.6);
+    background: rgba(30, 58, 138, 0.8);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+.config-field input:read-only {
+    color: #9fc2f5;
+    background: rgba(20, 42, 82, 0.5);
+    cursor: default;
+}
+
+/* ---- custom number steppers (replace native browser spinners) ---- */
+.config-field input[type="number"]::-webkit-inner-spin-button,
+.config-field input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.config-field input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.number-input {
+    position: relative;
+    display: flex;
+}
+
+.number-input input {
+    padding-right: 30px;
+}
+
+.number-steppers {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    right: 4px;
+    display: flex;
+    flex-direction: column;
+    width: 20px;
+    gap: 2px;
+}
+
+.num-step {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-family: 'Nunito', sans-serif;
+    font-size: 7px;
+    line-height: 1;
+    color: #9fc2f5;
+    background: rgba(20, 42, 82, 0.6);
+    border: 1px solid rgba(140, 190, 255, 0.25);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.num-step:hover {
+    background: rgba(56, 189, 248, 0.22);
+    color: #e2f4ff;
+}
+
+.num-step:active {
+    background: rgba(56, 189, 248, 0.34);
+}
+
+.config-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.config-save-btn {
+    padding: 8px 20px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #e2eeff;
+    background: rgba(56, 189, 248, 0.22);
+    border: 1px solid rgba(125, 211, 252, 0.45);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.config-save-btn:hover {
+    background: rgba(56, 189, 248, 0.32);
+    border-color: rgba(125, 211, 252, 0.65);
+}
+
+.config-save-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.config-status {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.config-status.success {
+    color: #4ade80;
+}
+
+.config-status.error {
+    color: #f87171;
+}
+
+@media (max-width: 600px) {
+    .config-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .dashboard-row.row-split {

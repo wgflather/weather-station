@@ -16,25 +16,4 @@ spring:
     max-lifetime: 1800000
     connection-timeout: 20000
 
-weather:
-  validation:
-    temp-minimal: -45
-    temp-maximum: 60
-    pressure-minimal: 940
-    pressure-maximum: 1060
-    humidity-minimal: 0
-    humidity-maximum: 100
-    humidity-spike-limit: 15
-    temp-spike-limit: 3.0
-    pressure-spike-limit: 1.5
-    surface-wetness-wet-baseline: 150
-    surface-wetness-dry-baseline: 3250
-
-hardware:
-  board: esp32-c6
-  temperature-sensor: DHT22
-  humidity-sensor: DHT22
-  pressure-sensor: BMP180
-  surface-wetness-sensor: HW-028
-
 

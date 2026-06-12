@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Station Configuration</title>
+    <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div class="safari-top-anchor"></div>
+<div class="safari-bottom-anchor"></div>
+
+<div class="config-page">
+    <a class="back-to-dashboard" href="/">&larr; Back to Dashboard</a>
+
+    <div class="configuration_block">
+        <h3>Station Configuration</h3>
+
+        <div class="config-body">
+            <div class="config-loading" id="config-loading">Loading configuration&hellip;</div>
+
+            <div class="config-tabs" id="config-tabs" hidden>
+                <button type="button" class="config-tab active" data-tab="location">Location</button>
+                <button type="button" class="config-tab" data-tab="validation">Validation</button>
+                <button type="button" class="config-tab" data-tab="hardware">Hardware</button>
+            </div>
+
+            <form class="config-panel" data-panel="location" id="config-form-location" hidden>
+                <div class="config-grid">
+                    <div class="config-field">
+                        <label for="cfg-latitude">Latitude</label>
+                        <input type="number" id="cfg-latitude" step="0.000001" min="-90" max="90" required>
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-longitude">Longitude</label>
+                        <input type="number" id="cfg-longitude" step="0.000001" min="-180" max="180" required>
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-elevation">Elevation (m)</label>
+                        <input type="number" id="cfg-elevation" step="0.1" min="-430" max="8850" required>
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-zoneid">Timezone</label>
+                        <input type="text" id="cfg-zoneid" readonly>
+                    </div>
+                </div>
+                <div class="config-actions">
+                    <button type="submit" class="config-save-btn">Save Location</button>
+                    <span class="config-status" data-status="location"></span>
+                </div>
+            </form>
+
+            <form class="config-panel" data-panel="validation" id="config-form-validation" hidden>
+                <fieldset class="config-fieldset">
+                    <legend>Temperature</legend>
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="cfg-temp-min">Min (&deg;C)</label>
+                            <input type="number" id="cfg-temp-min" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-temp-max">Max (&deg;C)</label>
+                            <input type="number" id="cfg-temp-max" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-temp-spike">Spike limit (&deg;C)</label>
+                            <input type="number" id="cfg-temp-spike" step="0.1" min="0" required>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="config-fieldset">
+                    <legend>Pressure</legend>
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="cfg-pressure-min">Min (hPa)</label>
+                            <input type="number" id="cfg-pressure-min" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-pressure-max">Max (hPa)</label>
+                            <input type="number" id="cfg-pressure-max" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-pressure-spike">Spike limit (hPa)</label>
+                            <input type="number" id="cfg-pressure-spike" step="0.1" min="0" required>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="config-fieldset">
+                    <legend>Humidity</legend>
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="cfg-humidity-min">Min (%)</label>
+                            <input type="number" id="cfg-humidity-min" step="0.1" min="0" max="100" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-humidity-max">Max (%)</label>
+                            <input type="number" id="cfg-humidity-max" step="0.1" min="0" max="100" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-humidity-spike">Spike limit (%)</label>
+                            <input type="number" id="cfg-humidity-spike" step="0.1" min="0" required>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="config-fieldset">
+                    <legend>Surface Wetness</legend>
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="cfg-wetness-wet">Wet baseline (raw)</label>
+                            <input type="number" id="cfg-wetness-wet" step="1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-wetness-dry">Dry baseline (raw)</label>
+                            <input type="number" id="cfg-wetness-dry" step="1" required>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <div class="config-actions">
+                    <button type="submit" class="config-save-btn">Save Validation</button>
+                    <span class="config-status" data-status="validation"></span>
+                </div>
+            </form>
+
+            <form class="config-panel" data-panel="hardware" id="config-form-hardware" hidden>
+                <div class="config-grid">
+                    <div class="config-field">
+                        <label for="cfg-board">Board</label>
+                        <input type="text" id="cfg-board" required>
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-temp-sensor">Temperature Sensor</label>
+                        <input type="text" id="cfg-temp-sensor">
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-humidity-sensor">Humidity Sensor</label>
+                        <input type="text" id="cfg-humidity-sensor">
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-pressure-sensor">Pressure Sensor</label>
+                        <input type="text" id="cfg-pressure-sensor">
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-wetness-sensor">Surface Wetness Sensor</label>
+                        <input type="text" id="cfg-wetness-sensor">
+                    </div>
+                </div>
+                <div class="config-actions">
+                    <button type="submit" class="config-save-btn">Save Hardware</button>
+                    <span class="config-status" data-status="hardware"></span>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="/js/config.js"></script>
+</body>
+</html>
