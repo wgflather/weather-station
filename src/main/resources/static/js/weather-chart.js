@@ -919,8 +919,8 @@ function createChart(canvasElement, state) {
                     },
                     min:    state.startRange,
                     max:    state.endRange,
-                    ticks:  { stepSize: 3, color: '#94a3b8', font: { size: state.isMobile ? 9 : 11 } },
-                    grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
+                    ticks:  { stepSize: 3, color: 'rgba(148, 163, 184, 0.6)', font: { size: state.isMobile ? 9 : 11 } },
+                    grid:   { color: 'rgba(255,255,255,0.028)', drawBorder: false },
                     border: { display: false },
                 },
                 y: {
@@ -929,10 +929,10 @@ function createChart(canvasElement, state) {
                     ticks: {
                         stepSize: state.config.yStep,
                         callback: (val) => `${val}${state.config.yAxisSuffix}`,
-                        color:    '#94a3b8',
+                        color:    'rgba(148, 163, 184, 0.6)',
                         font:     { size: state.isMobile ? 9 : 11 },
                     },
-                    grid:   { color: 'rgba(255,255,255,0.045)', drawBorder: false },
+                    grid:   { color: 'rgba(255,255,255,0.028)', drawBorder: false },
                     border: { display: false },
                 }
             },

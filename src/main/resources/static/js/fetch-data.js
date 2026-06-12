@@ -56,28 +56,45 @@ const SURFACE_WETNESS_CONFIG = {
 
 const DEW_POINT_RISK_INFO = {
     SATURATED: {
-        title:       'Condensation Imminent',
-        explanation: 'Air is nearly saturated. Water droplets will form on most surfaces.',
-        surfaces:    ['Metal objects', 'Glass windows', 'Car bodywork', 'Leaves and grass'],
-        tip:         'Fog or heavy dew is likely. Avoid leaving sensitive equipment outdoors.'
+        title: 'Condensation Imminent',
+        explanation: 'Air is nearly saturated. Moisture will form on exposed surfaces very easily.',
+        surfaces: [
+            'Camera lenses',
+            'Telescopes and optics',
+            'Car windows',
+            'Grass and outdoor furniture'
+        ],
+        tip: 'Heavy dew, fog, or wet equipment is likely. Protect optics and electronics.'
     },
+
     VERY_LIKELY: {
-        title:       'Condensation Likely',
-        explanation: 'Spread is very small. Cold or poorly insulated surfaces will collect moisture.',
-        surfaces:    ['Cold pipes', 'Single-pane windows', 'Metal tools', 'Outdoor furniture'],
-        tip:         'Morning dew expected. Cover or store moisture-sensitive items.'
+        title: 'Condensation Likely',
+        explanation: 'Humidity is very high. Surfaces that cool slightly below air temperature may become wet.',
+        surfaces: [
+            'Metal railings',
+            'Camera gear',
+            'Garden furniture',
+            'Vehicle windows'
+        ],
+        tip: 'Expect dew overnight. Outdoor equipment may need covers or heaters.'
     },
+
     POSSIBLE: {
-        title:       'Condensation Possible',
-        explanation: 'Moderate spread. Condensation may form on surfaces significantly cooler than air temperature.',
-        surfaces:    ['Cold drinks left outside', 'Underground pipes', 'Shaded metal surfaces'],
-        tip:         'Low risk for most surfaces. Watch for dew on exposed metal overnight.'
+        title: 'Condensation Possible',
+        explanation: 'Conditions are moderately humid. Condensation may appear on cooler surfaces.',
+        surfaces: [
+            'Metal surfaces in shade',
+            'Optical equipment',
+            'Parked vehicles'
+        ],
+        tip: 'Most surfaces stay dry, but dew can form after sunset.'
     },
+
     UNLIKELY: {
-        title:       'Condensation Unlikely',
-        explanation: 'Large spread between air and dew point. Air is relatively dry.',
-        surfaces:    [],
-        tip:         'Comfortable conditions. No condensation risk for typical outdoor surfaces.'
+        title: 'Condensation Unlikely',
+        explanation: 'The air is relatively dry and moisture formation is not expected.',
+        surfaces: [],
+        tip: 'Good conditions for outdoor activities and observing.'
     }
 };
 

@@ -1,6 +1,39 @@
+@import url("pages.css");
+
 @font-face {
     font-family: Nunito;
     src: url(fonts/Nunito-VariableFont_wght.ttf);
+}
+
+/* =========================================================
+   DESIGN TOKENS
+   One source of truth for the visual hierarchy. Brightness and
+   weight are deliberately rationed: only live values, alerts and
+   active indicators get the bright accent — everything else
+   recedes so the eye lands on the atmospheric conditions first.
+========================================================= */
+:root {
+    /* Type weight scale (Nunito is variable, so these are real) */
+    --fw-hero:    700;   /* the temperature hero value          */
+    --fw-value:   600;   /* other primary metric values         */
+    --fw-title:   600;   /* card titles                         */
+    --fw-label:   500;   /* supporting labels                   */
+    --fw-regular: 400;   /* secondary / helper data             */
+
+    /* Text — bright is reserved; supporting tiers step down */
+    --text-primary:   #f1f5f9;   /* hero / live numbers          */
+    --text-strong:    #dbe5f4;   /* secondary primary values     */
+    --text-secondary: #a4b6d4;   /* supporting labels            */
+    --text-muted:     #8197b9;   /* metadata / least important   */
+
+    /* Accents — the only saturated colors on the board */
+    --accent:         #38bdf8;   /* live values, active state    */
+    --heading:        #9cc2ea;   /* card titles — bright enough to lead */
+
+    /* Surfaces & lines — uniform across every card */
+    --card-bg:           rgba(45, 78, 143, 0.64);
+    --card-border:       rgba(162, 198, 248, 0.22);
+    --divider:           rgba(170, 205, 250, 0.16);
 }
 
 html {
@@ -55,30 +88,6 @@ body::before {
     bottom: 0;
     background-color: #3b629b;
 }
-/* =========================================================
-   SAFARI LIQUID GLASS CHROME TINTING ENGINE
-========================================================= */
-.safari-top-anchor,
-.safari-bottom-anchor {
-    position: fixed;
-    left: 0;
-
-    width: 100%;
-    height: 6px;
-
-    z-index: 9999;
-    pointer-events: none;
-}
-
-.safari-top-anchor {
-    top: 0;
-    background-color: #21376e;
-}
-
-.safari-bottom-anchor {
-    bottom: 0;
-    background-color: #3b629b;
-}
 
 /* =========================================================
    DASHBOARD LAYOUT & PANELS
@@ -89,8 +98,8 @@ body::before {
 .humidity_block, .wetness_block, .configuration_block {
     position: relative;
     overflow: hidden;
-    background: rgba(42, 74, 138, 0.75);
-    border: 1px solid rgba(170, 210, 255, 0.34);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
     border-radius: 14px;
     padding: 20px;
     box-sizing: border-box;
@@ -150,7 +159,7 @@ body::before {
 /* Fix date and time sizing */
 #date {
     font-size: 0.9rem;
-    color: #c3d7f3;
+    color: var(--text-secondary);
 }
 #fullDay {
     font-size: 1.2rem;
@@ -207,8 +216,9 @@ body::before {
 }
 
 #realTime {
-    color: #38bdf8;
+    color: var(--text-primary);
     font-size: clamp(1.1rem, 4.5vw, 1.75rem); /* Slightly larger accent for clock */
+    font-weight: 750;
     font-weight: 750;
     white-space: nowrap;
 }
@@ -277,7 +287,7 @@ body::before {
     justify-content: space-between;
     align-items: center;
     min-height: 24px;
-    border-bottom: 1px solid rgba(180, 220, 255, 0.22);
+    border-bottom: 1px solid var(--divider);
     padding-bottom: 10px;
     margin-bottom: 15px;
     flex-shrink: 0;
@@ -285,16 +295,40 @@ body::before {
 
 h3 {
     margin: 0;
-    color: #38bdf8;
+    color: var(--heading);
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.83rem;
     text-transform: uppercase;
-    letter-spacing: 0.75px;
+    letter-spacing: 0.7px;
     border-bottom: none;
     padding-bottom: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Card title + leading metric icon. The title text keeps its own
+   ellipsis on the inner <span>; the icon never shrinks. */
+.card-header h3 {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.card-header h3 > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Subtle monochrome glyph — tints with the heading, sits a shade
+   quieter so it reads as an accent, not a second focal point. */
+.card-icon {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    stroke: currentColor;
+    opacity: 0.6;
 }
 
 .info-icon {
@@ -305,7 +339,7 @@ h3 {
     height: 18px;
     border-radius: 50%;
     border: 1px solid rgba(140, 190, 255, 0.4);
-    color: #9fc2f5;
+    color: var(--text-secondary);
     font-size: 11px;
     font-weight: bold;
     font-family: monospace;
@@ -354,17 +388,22 @@ h3 {
     font-size: 2rem;
     display: flex;
     align-items: center;  /* center trend vertically with the number, not baseline */
-    color: #ffffff;
-    font-weight: 700;
+    color: var(--text-primary);
+    font-weight: var(--fw-value);
     line-height: 1.1;
     margin-bottom: 4px;
     white-space: nowrap;
 }
 
+/* Temperature is the hero number — give it the heaviest weight on the board. */
+.temp-section .main-value {
+    font-weight: var(--fw-hero);
+}
+
 .main-value .unit {
     font-size: 0.52em;
-    font-weight: 600;
-    color: #b4c9e8;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
     margin-left: 2px;
 }
 
@@ -381,14 +420,15 @@ h3 {
     line-height: 1;
 }
 
-/* Shared size tokens — used by both temp and pressure trends */
-.trend-arrow { font-size: 0.9rem;  font-weight: 700; line-height: 1; }
-.trend-val   { font-size: 0.75rem; font-weight: 700; line-height: 1; }
+/* Shared size tokens — used by both temp and pressure trends.
+   Trend is secondary signal: smaller and lighter than the value. */
+.trend-arrow { font-size: 0.8rem;  font-weight: var(--fw-title);   line-height: 1; }
+.trend-val   { font-size: 0.7rem;  font-weight: var(--fw-label);   line-height: 1; }
 
 /* Temperature trend colors */
 .trend-up,     .trend-up *     { color: #ffb088 !important; }
 .trend-down,   .trend-down *   { color: #7dd3fc !important; }
-.trend-stable, .trend-stable * { color: #b4c9e8 !important; }
+.trend-stable, .trend-stable * { color: var(--text-secondary) !important; }
 
 /* =========================================================
    PRESSURE TREND — row below main value: [↑ 0.3/h]  Slowly rising
@@ -479,13 +519,14 @@ h3 {
 }
 
 .extreme-item .label {
-    font-weight: 600;
-    color: #9fc2f5;
+    font-weight: var(--fw-label);
+    color: var(--text-muted);
     margin-right: 4px;
 }
 
-#min-temp { color: #7dd3fc; font-weight: 600; }
-#max-temp { color: #ffb088; font-weight: 600; }
+/* Min/Max are secondary detail — keep the hot/cold hue but mute weight. */
+#min-temp { color: #84c4ee; font-weight: var(--fw-label); }
+#max-temp { color: #efa98c; font-weight: var(--fw-label); }
 
 /* =========================================================
    DEW POINT SECTION & GAUGE
@@ -518,9 +559,9 @@ h3 {
 }
 
 .dew-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #9fc2f5;
+    font-size: 0.72rem;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -533,31 +574,34 @@ h3 {
     font-size: 0.9em;
 }
 
+/* Secondary hero: prominent, but a step below the temperature value. */
 .dew-main {
     font-size: 1.4rem;
-    font-weight: 700;
-    color: #facc15;
+    font-weight: var(--fw-value);
+    color: #f0cf6a;          /* slightly softened amber */
     white-space: nowrap;
     flex-shrink: 0;          /* never compress the value */
 }
 
+/* T / Td helper readout — least important number in the card. */
 .dew-sub {
-    font-size: 0.72rem;      /* slightly smaller so it fits */
-    color: #9fc2f5;
-    font-weight: 600;
+    font-size: 0.7rem;       /* slightly smaller so it fits */
+    color: var(--text-muted);
+    font-weight: var(--fw-regular);
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
 }
 
 
+/* Condensation indicator — kept visible, but lighter and quieter. */
 .dew-status-badge {
-    border: 1px solid #ffb088;
-    color: #ffb088;
+    border: 1px solid rgba(239, 169, 140, 0.55);
+    color: #e6b09a;
     border-radius: 12px;
     padding: 3px 10px;
-    font-size: 0.7rem;
-    font-weight: 700;
+    font-size: 0.68rem;
+    font-weight: var(--fw-label);
     text-transform: uppercase;
     white-space: nowrap;
     flex-shrink: 0;
@@ -627,7 +671,7 @@ h3 {
     display: flex;
     justify-content: space-between;
     font-size: 0.65rem;
-    color: #b4c9e8;
+    color: var(--text-secondary);
     font-weight: 600;
 }
 
@@ -665,8 +709,8 @@ h3 {
 
 .progress-label {
     font-size: 0.75rem;
-    font-weight: 700;
-    color: #9fc2f5;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
     white-space: nowrap;
     text-align: right;
 }
@@ -682,15 +726,15 @@ h3 {
 .humidity-dew-line .dew-label {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #9fc2f5;
+    color: var(--text-secondary);
     text-transform: none;
     letter-spacing: 0;
 }
 
 .humidity-dew-line .dew-value {
     font-size: 0.8rem;
-    font-weight: 700;
-    color: #9fc2f5;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
 }
 
 .humidity_block .main-value {
@@ -745,8 +789,8 @@ h3 {
 
 .wetness-pct {
     font-size: 0.8rem;
-    font-weight: 700;
-    color: #9fc2f5;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
 }
 
 .wetness-track {
@@ -829,70 +873,17 @@ h3 {
     gap: 8px;
     flex-wrap: nowrap;
 }
-/* =========================================================
-   BASE UI (BRIGHT FLAT DASHBOARD STYLE)
-========================================================= */
-.resolution-wrapper {
-    display: flex;
-    align-items: center;
-}
-
-.metric-selector {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: nowrap;
-}
-
-.metric-dropdown,
-.resolution-dropdown {
-    -webkit-appearance: none;
-    appearance: none;
-
-    /* Allow shrinking */
-    flex: 0 1 auto;
-    min-width: 0;
-    width: auto;
-
-    padding: 6px 28px 6px 10px;
-    font-family: 'Nunito', sans-serif;
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #ffffff;
-    background-color: rgba(30, 58, 138, 0.7);
-    border: 1px solid rgba(140, 190, 255, 0.4);
-    border-radius: 6px;
-    cursor: pointer;
-    outline: none;
-
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2338bdf8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    background-size: 11px;
-}
-
-.metric-dropdown:focus-visible,
-.resolution-dropdown:focus-visible {
-    background-color: rgba(42, 74, 138, 0.9);
-    border-color: #38bdf8;
-}
-
-.metric-dropdown option,
-.resolution-dropdown option {
-    background-color: #1e293b !important;
-    color: #ffffff !important;
-}
 
 /* =========================================================
-   LABELS (BRIGHTER, CLEANER)
+   CHART CONTROLS — kept low-weight so the chart line, not the
+   chrome around it, holds the eye.
 ========================================================= */
 .selector-label {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: var(--fw-label);
     letter-spacing: 0.04em;
     text-transform: uppercase;
-
-    color: rgba(190, 220, 255, 0.75);
+    color: var(--text-muted);
 }
 
 /* =========================================================
@@ -907,20 +898,21 @@ h3 {
     padding: 7px 28px 7px 10px;
 
     font-size: 12px;
-    font-weight: 600;
+    font-weight: var(--fw-label);
 
-    color: #e2eeff;
+    color: var(--text-secondary);
 
-    background-color: #1b3f7a;
+    background-color: rgba(28, 52, 102, 0.42);
+    border: 1px solid var(--card-border);
 
     border-radius: 10px;
 
     cursor: pointer;
     outline: none;
 
-    transition: background 0.15s ease, border-color 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239bbcff'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%237aa6d4'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 10px center;
     background-size: 12px;
@@ -929,8 +921,9 @@ h3 {
 /* hover = subtle brighten */
 .metric-dropdown:hover,
 .resolution-dropdown:hover {
-    background-color: #1a3566;
-    border-color: rgba(150, 200, 255, 0.35);
+    background-color: rgba(32, 58, 112, 0.6);
+    border-color: rgba(150, 200, 255, 0.28);
+    color: var(--text-strong);
 }
 
 /* focus = soft highlight */
@@ -949,11 +942,6 @@ h3 {
 .resolution-dropdown option:disabled {
     color: rgba(226, 238, 255, 0.35) !important;
 }
-
-/* =========================================================
-   MOBILE BUTTON (FLAT, CLEAN)
-========================================================= */
-
 
 /* =========================================================
    MOBILE PANEL (FLAT LIST STYLE)
@@ -1007,11 +995,6 @@ h3 {
 }
 
 /* =========================================================
-   MOBILE MODE
-========================================================= */
-
-
-/* =========================================================
    SYSTEM HEALTH
 ========================================================= */
 .system_health_block {
@@ -1028,15 +1011,15 @@ h3 {
 
 .health-item label {
     display: block;
-    font-size: 0.8rem;
-    font-weight: bold;
-    color: #9fc2f5;
+    font-size: 0.78rem;
+    font-weight: var(--fw-label);
+    color: var(--text-muted);
 }
 
 .health-item span {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: #ffffff;
+    font-size: 1.05rem;
+    font-weight: var(--fw-value);
+    color: var(--text-strong);
 }
 
 /* =========================================================
@@ -1048,7 +1031,7 @@ h3 {
     right: 16px;
     width: 26px;
     height: 26px;
-    color: #9fc2f5;
+    color: var(--text-secondary);
     text-decoration: none;
     z-index: 5;
     transition: color 0.15s ease, transform 0.2s ease;
@@ -1086,7 +1069,7 @@ h3 {
         border-radius: 50%;
         background: rgba(42, 74, 138, 0.92);
         border: 1px solid rgba(170, 210, 255, 0.34);
-        color: #9fc2f5;
+        color: var(--text-secondary);
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
         z-index: 500;
     }
@@ -1095,347 +1078,6 @@ h3 {
         width: 26px;
         height: 26px;
     }
-}
-
-/* =========================================================
-   STATION CONFIGURATION PAGE
-========================================================= */
-.config-page {
-    width: 820px;
-    max-width: 100%;
-    margin: 0 auto;
-}
-
-.back-to-dashboard {
-    display: inline-block;
-    margin-bottom: 18px;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-    font-weight: 700;
-    text-decoration: none;
-    color: #e2eeff;
-    background: rgba(30, 58, 138, 0.5);
-    border: 1px solid rgba(140, 190, 255, 0.3);
-    border-radius: 8px;
-    transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.back-to-dashboard:hover {
-    background: rgba(30, 58, 138, 0.85);
-    border-color: rgba(125, 211, 252, 0.5);
-}
-
-.configuration_block {
-    width: 100%;
-    max-width: 100%;
-    margin: 0 auto;
-}
-
-.config-body {
-    margin-top: 15px;
-}
-
-.config-loading {
-    color: #9fc2f5;
-    font-size: 0.85rem;
-}
-
-.config-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-}
-
-.config-tab {
-    padding: 7px 14px;
-    font-family: 'Nunito', sans-serif;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    color: #9fc2f5;
-    background: rgba(30, 58, 138, 0.5);
-    border: 1px solid rgba(140, 190, 255, 0.25);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.config-tab:hover {
-    background: rgba(30, 58, 138, 0.8);
-    color: #e2eeff;
-}
-
-.config-tab.active {
-    background: rgba(56, 189, 248, 0.22);
-    color: #e2eeff;
-    border-color: rgba(125, 211, 252, 0.5);
-}
-
-.config-panel[hidden] {
-    display: none;
-}
-
-.config-fieldset {
-    margin: 0 0 18px 0;
-    padding: 0;
-    border: none;
-}
-
-.config-fieldset legend {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #38bdf8;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    padding: 0;
-}
-
-.config-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px 16px;
-}
-
-.config-field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.config-field label {
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #9fc2f5;
-}
-
-.config-field input {
-    width: 100%;
-    box-sizing: border-box;
-    background: rgba(30, 58, 138, 0.5);
-    border: 1px solid rgba(140, 190, 255, 0.3);
-    border-radius: 8px;
-    padding: 7px 10px;
-    color: #ffffff;
-    font-family: 'Nunito', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 600;
-    outline: none;
-    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.config-field input:focus {
-    border-color: rgba(125, 211, 252, 0.6);
-    background: rgba(30, 58, 138, 0.8);
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
-}
-
-.config-field input:read-only {
-    color: #9fc2f5;
-    background: rgba(20, 42, 82, 0.5);
-    cursor: default;
-}
-
-/* ---- custom number steppers (replace native browser spinners) ---- */
-.config-field input[type="number"]::-webkit-inner-spin-button,
-.config-field input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-.config-field input[type="number"] {
-    -moz-appearance: textfield;
-    appearance: textfield;
-}
-
-.number-input {
-    position: relative;
-    display: flex;
-}
-
-.number-input input {
-    padding-right: 30px;
-}
-
-.number-steppers {
-    position: absolute;
-    top: 4px;
-    bottom: 4px;
-    right: 4px;
-    display: flex;
-    flex-direction: column;
-    width: 20px;
-    gap: 2px;
-}
-
-.num-step {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    font-family: 'Nunito', sans-serif;
-    font-size: 7px;
-    line-height: 1;
-    color: #9fc2f5;
-    background: rgba(20, 42, 82, 0.6);
-    border: 1px solid rgba(140, 190, 255, 0.25);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-
-.num-step:hover {
-    background: rgba(56, 189, 248, 0.22);
-    color: #e2f4ff;
-}
-
-.num-step:active {
-    background: rgba(56, 189, 248, 0.34);
-}
-
-.config-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 4px;
-}
-
-.config-save-btn {
-    padding: 8px 20px;
-    font-family: 'Nunito', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #e2eeff;
-    background: rgba(56, 189, 248, 0.22);
-    border: 1px solid rgba(125, 211, 252, 0.45);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
-}
-
-.config-save-btn:hover {
-    background: rgba(56, 189, 248, 0.32);
-    border-color: rgba(125, 211, 252, 0.65);
-}
-
-.config-save-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
-
-.config-status {
-    font-size: 0.8rem;
-    font-weight: 600;
-}
-
-.config-status.success {
-    color: #4ade80;
-}
-
-.config-status.error {
-    color: #f87171;
-}
-
-@media (max-width: 600px) {
-    .config-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* =========================================================
-   LOGIN PAGE
-========================================================= */
-.login-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: calc(100vh - 40px);
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.login-card {
-    width: 360px;
-    max-width: 100%;
-}
-
-.login-card h3 {
-    margin-top: 0;
-    text-align: center;
-}
-
-.login-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin-top: 4px;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.form-group label {
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #9fc2f5;
-}
-
-.form-group input {
-    width: 100%;
-    box-sizing: border-box;
-    background: rgba(30, 58, 138, 0.5);
-    border: 1px solid rgba(140, 190, 255, 0.3);
-    border-radius: 8px;
-    padding: 9px 12px;
-    color: #ffffff;
-    font-family: 'Nunito', sans-serif;
-    font-size: 0.95rem;
-    font-weight: 600;
-    outline: none;
-    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.form-group input:focus {
-    border-color: rgba(125, 211, 252, 0.6);
-    background: rgba(30, 58, 138, 0.8);
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
-}
-
-.login-form button {
-    margin-top: 4px;
-    padding: 10px 20px;
-    font-family: 'Nunito', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #e2eeff;
-    background: rgba(56, 189, 248, 0.22);
-    border: 1px solid rgba(125, 211, 252, 0.45);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.login-form button:hover {
-    background: rgba(56, 189, 248, 0.32);
-    border-color: rgba(125, 211, 252, 0.65);
-}
-
-.error-msg {
-    margin-bottom: 14px;
-    padding: 9px 12px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #fecaca;
-    background: rgba(248, 113, 113, 0.12);
-    border: 1px solid rgba(248, 113, 113, 0.4);
-    border-radius: 8px;
-    text-align: center;
 }
 
 .dashboard-row.row-split {
