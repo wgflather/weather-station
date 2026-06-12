@@ -1338,6 +1338,99 @@ h3 {
     }
 }
 
+/* =========================================================
+   LOGIN PAGE
+========================================================= */
+.login-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 40px);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.login-card {
+    width: 360px;
+    max-width: 100%;
+}
+
+.login-card h3 {
+    margin-top: 0;
+    text-align: center;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-group label {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #9fc2f5;
+}
+
+.form-group input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(30, 58, 138, 0.5);
+    border: 1px solid rgba(140, 190, 255, 0.3);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: #ffffff;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-group input:focus {
+    border-color: rgba(125, 211, 252, 0.6);
+    background: rgba(30, 58, 138, 0.8);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+.login-form button {
+    margin-top: 4px;
+    padding: 10px 20px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #e2eeff;
+    background: rgba(56, 189, 248, 0.22);
+    border: 1px solid rgba(125, 211, 252, 0.45);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.login-form button:hover {
+    background: rgba(56, 189, 248, 0.32);
+    border-color: rgba(125, 211, 252, 0.65);
+}
+
+.error-msg {
+    margin-bottom: 14px;
+    padding: 9px 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #fecaca;
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    border-radius: 8px;
+    text-align: center;
+}
+
 .dashboard-row.row-split {
     flex-wrap: nowrap;
 }
