@@ -18,13 +18,14 @@ public class MetricDataDetailsMapper {
 
   public MetricDataDetails from(WeatherRecord entity, Metric metric, HardwareConfig config) {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
+    config = configurationCache.getHardwareConfig();
     return switch (metric) {
       case TEMPERATURE ->
           new MetricDataDetails(
               entity.getTemperature(),
               entity.getMeasuredAt().atZone(zoneId),
               entity.getTemperatureDataQuality(),
-              config.getTemperatureSensor(),
+              config.temperatureSensor(),
               metric.getName());
 
       case PRESSURE ->
@@ -32,7 +33,7 @@ public class MetricDataDetailsMapper {
               entity.getPressure(),
               entity.getMeasuredAt().atZone(zoneId),
               entity.getPressureDataQuality(),
-              config.getPressureSensor(),
+              config.pressureSensor(),
               metric.getName());
 
       case HUMIDITY ->
@@ -40,7 +41,7 @@ public class MetricDataDetailsMapper {
               entity.getHumidity(),
               entity.getMeasuredAt().atZone(zoneId),
               entity.getHumidityDataQuality(),
-              config.getHumiditySensor(),
+              config.humiditySensor(),
               metric.getName());
 
       case SURFACE_WETNESS ->
@@ -48,7 +49,7 @@ public class MetricDataDetailsMapper {
               Optional.ofNullable(entity.getSurfaceWetness()).map(Long::doubleValue).orElse(null),
               entity.getMeasuredAt().atZone(zoneId),
               entity.getSurfaceWetnessDataQuality(),
-              config.getSurfaceWetnessSensor(),
+              config.surfaceWetnessSensor(),
               metric.getName());
     };
   }

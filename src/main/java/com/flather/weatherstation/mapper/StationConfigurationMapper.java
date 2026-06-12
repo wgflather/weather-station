@@ -1,5 +1,6 @@
 package com.flather.weatherstation.mapper;
 
+import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.config.LocationContext;
 import com.flather.weatherstation.config.WeatherValidationConfig;
 import com.flather.weatherstation.domain.entity.StationConfiguration;
@@ -46,5 +47,15 @@ public class StationConfigurationMapper {
         elevation,
         zoneId,
         new Observer(cfg.getLatitude(), cfg.getLongitude(), elevation));
+  }
+
+  public HardwareConfig toHardwareConfig(StationConfiguration cfg) {
+
+    return new HardwareConfig(
+        cfg.getBoard(),
+        cfg.getTemperatureSensor(),
+        cfg.getHumiditySensor(),
+        cfg.getPressureSensor(),
+        cfg.getSurfaceWetnessSensor());
   }
 }

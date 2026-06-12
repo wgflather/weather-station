@@ -2,7 +2,6 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.cache.SensorStateCache;
-import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.domain.constant.*;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
@@ -24,19 +23,16 @@ public class AnalyticsService {
   private final WeatherReportRepository repository;
   private final SensorStateCache sensorStateCache;
   private final MetricDataDetailsMapper metricDataDetailsMapper;
-  private final HardwareConfig hardwareConfig;
   private final ConfigurationCache configurationCache;
 
   public AnalyticsService(
       WeatherReportRepository repository,
       ConfigurationCache configurationCache,
       SensorStateCache sensorStateCache,
-      MetricDataDetailsMapper metricDataDetailsMapper,
-      HardwareConfig hardwareConfig) {
+      MetricDataDetailsMapper metricDataDetailsMapper) {
     this.repository = repository;
     this.sensorStateCache = sensorStateCache;
     this.metricDataDetailsMapper = metricDataDetailsMapper;
-    this.hardwareConfig = hardwareConfig;
     this.configurationCache = configurationCache;
   }
 
@@ -97,7 +93,9 @@ public class AnalyticsService {
         sensorStateCache.getTodayMinTemp(),
         sensorStateCache.getTodayMaxTemp(),
         metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(), Metric.TEMPERATURE, hardwareConfig));
+            sensorStateCache.getLastSavedMeasurement(),
+            Metric.TEMPERATURE,
+            configurationCache.getHardwareConfig()));
   }
 
   public PressureDto getPressure() {
@@ -107,7 +105,9 @@ public class AnalyticsService {
             WeatherRecord::getPressure, WeatherRecord::getPressureDataQuality),
         trendResult,
         metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(), Metric.PRESSURE, hardwareConfig),
+            sensorStateCache.getLastSavedMeasurement(),
+            Metric.PRESSURE,
+            configurationCache.getHardwareConfig()),
         PressureTrend.classify(trendResult));
   }
 
@@ -130,7 +130,9 @@ public class AnalyticsService {
     return new HumidityDto(
         humidity,
         metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(), Metric.HUMIDITY, hardwareConfig),
+            sensorStateCache.getLastSavedMeasurement(),
+            Metric.HUMIDITY,
+            configurationCache.getHardwareConfig()),
         dewPoint,
         dewPointRisk);
   }
@@ -146,7 +148,9 @@ public class AnalyticsService {
     return new SurfaceWetnessDto(
         pctWetness,
         metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(), Metric.SURFACE_WETNESS, hardwareConfig),
+            sensorStateCache.getLastSavedMeasurement(),
+            Metric.SURFACE_WETNESS,
+            configurationCache.getHardwareConfig()),
         SurfaceWetnessStatus.classify(pctWetness));
   }
 

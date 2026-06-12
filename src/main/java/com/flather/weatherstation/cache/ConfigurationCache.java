@@ -1,5 +1,6 @@
 package com.flather.weatherstation.cache;
 
+import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.config.LocationContext;
 import com.flather.weatherstation.config.WeatherValidationConfig;
 import com.flather.weatherstation.domain.entity.StationConfiguration;
@@ -20,6 +21,8 @@ public class ConfigurationCache {
 
   @Getter private volatile WeatherValidationConfig validationConfig;
 
+  @Getter private volatile HardwareConfig hardwareConfig;
+
   @PostConstruct
   void init() {
     reload();
@@ -34,5 +37,6 @@ public class ConfigurationCache {
   public void apply(StationConfiguration cfg) {
     locationContext = mapper.toLocationContext(cfg);
     validationConfig = mapper.toValidationConfig(cfg);
+    hardwareConfig = mapper.toHardwareConfig(cfg);
   }
 }
