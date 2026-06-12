@@ -9,10 +9,12 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "station_configuration")
 @Getter
+@Setter
 public class StationConfiguration {
   @Id private Long id = 1L;
 
