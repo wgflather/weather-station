@@ -710,21 +710,29 @@ function dismissTooltip(chart) {
 }
 
 // Bound once per canvas (the <canvas> is reused across chart rebuilds).
-// Tracks the pointer type and, for touch, dismisses on lift/cancel.
 function installPointerHandlers(canvas) {
     if (canvas.dataset.tooltipPointerBound) return;
     canvas.dataset.tooltipPointerBound = '1';
 
-    const markType = (e) => { lastInteractionWasTouch = e.pointerType === 'touch'; };
-    canvas.addEventListener('pointerdown', markType);
-    canvas.addEventListener('pointermove', markType);
+    // Pointer-type detection keyed off real touch events (Chart.js itself
+    // drives off touchstart/touchmove, so these always fire). A real mouse
+    // move flips back to mouse mode — safe because the touchend handler below
+    // preventDefault()s the synthetic mouse events that would otherwise fire
+    // after a finger lift.
+    canvas.addEventListener('touchstart', () => { lastInteractionWasTouch = true; }, { passive: true });
+    canvas.addEventListener('touchmove',  () => { lastInteractionWasTouch = true; }, { passive: true });
+    canvas.addEventListener('mousemove',  () => { lastInteractionWasTouch = false; });
 
+    // The reliable touch-end signal. preventDefault() on the real touchend
+    // suppresses the trailing synthetic mouse events the browser would
+    // otherwise fire (which were re-showing the tooltip), and we clear the
+    // tooltip so it can't linger or follow the page on scroll.
     const endTouch = (e) => {
-        if (e.pointerType === 'touch') dismissTooltip(weatherChartInstance);
+        if (e.cancelable) e.preventDefault();
+        dismissTooltip(weatherChartInstance);
     };
-    canvas.addEventListener('pointerup',     endTouch);
-    canvas.addEventListener('pointercancel', endTouch);
-    canvas.addEventListener('pointerleave',  endTouch);
+    canvas.addEventListener('touchend',    endTouch, { passive: false });
+    canvas.addEventListener('touchcancel', endTouch, { passive: false });
 }
 
 function externalTooltipHandler(context) {
@@ -759,21 +767,26 @@ function externalTooltipHandler(context) {
     const caretX = canvasRect.left + tooltip.caretX;
     const caretY = canvasRect.top  + tooltip.caretY;
 
-    let top;
+    let top, minLeft, maxLeft;
     if (lastInteractionWasTouch) {
-        // Pin to the top of the plot area, kept inside the chart block.
-        top = canvasRect.top + chartArea.top + 4;
+        // Touch: pin to the top of the whole chart card (over the header /
+        // controls strip) so it's clear of the finger and the plot entirely.
+        const block     = chart.canvas.closest('.chart_block');
+        const blockRect = block ? block.getBoundingClientRect() : canvasRect;
+        top     = blockRect.top + 8;
+        minLeft = blockRect.left + 8;
+        maxLeft = blockRect.right - elRect.width - 8;
     } else {
-        // Float above the point; flip below only when it's near the top edge.
+        // Mouse: float above the point; flip below only near the top edge.
         const spaceAbove = tooltip.caretY - chartArea.top;
         top = (spaceAbove >= elRect.height + TOOLTIP_GAP)
             ? caretY - elRect.height - TOOLTIP_GAP
             : caretY + TOOLTIP_GAP;
+        minLeft = canvasRect.left + chartArea.left;
+        maxLeft = canvasRect.left + chartArea.right - elRect.width;
     }
 
-    const minLeft = canvasRect.left + chartArea.left;
-    const maxLeft = canvasRect.left + chartArea.right - elRect.width;
-    const left    = Math.min(Math.max(caretX - elRect.width / 2, minLeft), maxLeft);
+    const left = Math.min(Math.max(caretX - elRect.width / 2, minLeft), maxLeft);
 
     el.style.top  = `${top}px`;
     el.style.left = `${left}px`;
