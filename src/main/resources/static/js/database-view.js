@@ -139,8 +139,52 @@ function updatePager(pageData) {
     $('db-next').disabled = pageData.last ?? true;
 }
 
+// Custom confirm modal — replaces window.confirm() because iOS Safari
+// can deadlock the page when confirm() is called from a delegated click
+// handler inside a horizontally scrolling container.
+function showConfirm(message, { okLabel = 'Delete' } = {}) {
+    return new Promise((resolve) => {
+        const modal   = $('confirm-modal');
+        const msgEl   = $('confirm-message');
+        const okBtn   = $('confirm-ok');
+        const cancel  = $('confirm-cancel');
+
+        msgEl.textContent = message;
+        okBtn.textContent = okLabel;
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        // Move focus off the triggering button so Enter doesn't re-fire it
+        okBtn.focus();
+
+        const cleanup = (result) => {
+            modal.hidden = true;
+            document.body.style.overflow = '';
+            okBtn.removeEventListener('click', onOk);
+            cancel.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdrop);
+            document.removeEventListener('keydown', onKey);
+            resolve(result);
+        };
+        const onOk     = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        const onBackdrop = (e) => {
+            if (e.target.dataset.confirmDismiss !== undefined) cleanup(false);
+        };
+        const onKey = (e) => {
+            if (e.key === 'Escape') cleanup(false);
+            else if (e.key === 'Enter') cleanup(true);
+        };
+
+        okBtn.addEventListener('click', onOk);
+        cancel.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
+        document.addEventListener('keydown', onKey);
+    });
+}
+
 async function deleteRecord(id, rowEl) {
-    if (!window.confirm(`Delete record #${id}? This cannot be undone.`)) return;
+    const ok = await showConfirm(`Delete record #${id}? This cannot be undone.`);
+    if (!ok) return;
 
     const btn = rowEl.querySelector('.db-delete-btn');
     if (btn) btn.disabled = true;
