@@ -1186,6 +1186,21 @@ h3 {
     text-align: right;
 }
 
+.popup-divider {
+    height: 1px;
+    background: rgba(140, 190, 255, 0.15);
+    margin: 8px 0 0;
+}
+
+.data-stale-hint {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    opacity: 0.75;
+    margin-top: 3px;
+}
+
 /* All three metric cards: equal flex column layout */
 .dashboard-row.row-metric .pressure_block,
 .dashboard-row.row-metric .humidity_block,

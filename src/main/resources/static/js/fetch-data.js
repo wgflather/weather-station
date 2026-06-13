@@ -30,6 +30,25 @@ const DATA_QUALITY_COLORS = {
     MISSING: '#111827',
 };
 
+const DATA_STATUS_COLORS = {
+    LIVE:    '#22c55e',
+    DELAYED: '#fcd34d',
+    STALE:   '#f97316',
+    OFFLINE: '#ef4444',
+    EMPTY:   '#6b7280',
+};
+
+const DATA_STATUS_INFO = {
+    LIVE:    { label: 'Live',    description: 'Data is current and updating normally.' },
+    DELAYED: { label: 'Delayed', description: 'Data is slightly behind — last update was 5–10 minutes ago. Current conditions may differ slightly.' },
+    STALE:   { label: 'Stale',   description: 'Data has not updated in over 10 minutes. Readings may not reflect current conditions.' },
+    OFFLINE: { label: 'Offline', description: 'No data received for over a day. The station may be offline or unreachable.' },
+    EMPTY:   { label: 'No data', description: 'No data is available.' },
+};
+
+const QUALITY_SEVERITY = { OK: 0, SPIKE: 1, ANOMALY: 2, MISSING: 3 };
+const STATUS_SEVERITY  = { LIVE: 0, DELAYED: 1, STALE: 2, OFFLINE: 3, EMPTY: 3 };
+
 const PRESSURE_TREND_CONFIG = {
     RISING_FAST:  { arrow: '↑', label: 'Rapidly rising',  color: '#fca5a5' },
     RISING:       { arrow: '↑', label: 'Rising',           color: '#fcd34d' },
@@ -350,7 +369,7 @@ function renderSurfaceWetness(wetness) {
 // MAIN RENDER
 // ==========================================
 
-function renderMetrics(dto) {
+function renderMetrics(dto, dataStatus) {
     const temp     = dto?.temperature;
     const pressure = dto?.pressure;
     const humidity = dto?.humidity;
@@ -361,15 +380,17 @@ function renderMetrics(dto) {
     renderHumidity(humidity);
     renderSurfaceWetness(wetness);
 
-    populatePopup('temperature-card', temp?.dataDetails);
-    populatePopup('pressure-card',    pressure?.dataDetails);
-    populatePopup('humidity-card',    humidity?.dataDetails);
-    populatePopup('wetness-card',     wetness?.dataDetails);
+    populatePopup('temperature-card', temp?.dataDetails,     dataStatus);
+    populatePopup('pressure-card',    pressure?.dataDetails, dataStatus);
+    populatePopup('humidity-card',    humidity?.dataDetails, dataStatus);
+    populatePopup('wetness-card',     wetness?.dataDetails,  dataStatus);
 
-    setStatusCircleColor(document.querySelector('#temperature-card .status-circle'), temp?.dataDetails?.quality);
-    setStatusCircleColor(document.querySelector('#pressure-card .status-circle'),    pressure?.dataDetails?.quality);
-    setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality);
-    setStatusCircleColor(document.querySelector('#wetness-card .status-circle'),     wetness?.dataDetails?.quality);
+    setStatusCircleColor(document.querySelector('#temperature-card .status-circle'), temp?.dataDetails?.quality,     dataStatus);
+    setStatusCircleColor(document.querySelector('#pressure-card .status-circle'),    pressure?.dataDetails?.quality, dataStatus);
+    setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality, dataStatus);
+    setStatusCircleColor(document.querySelector('#wetness-card .status-circle'),     wetness?.dataDetails?.quality,  dataStatus);
+
+    updateStalenessHints(dataStatus);
 }
 
 async function updateDashboard() {
@@ -379,7 +400,7 @@ async function updateDashboard() {
         state.systemHealth = data.systemHealthDashboardDto;
         state.astronomy    = data.astronomySnapshot;
 
-        renderMetrics(state.metrics);
+        renderMetrics(state.metrics, state.systemHealth?.status);
         renderSystemHealth(state.systemHealth);
         renderAstronomy(state.astronomy);
     } catch (error) {
@@ -491,10 +512,26 @@ function initEventListeners() {
 
 const globalPopup = document.getElementById('global-popup');
 
-function populatePopup(cardId, details) {
+function populatePopup(cardId, details, dataStatus) {
     const card = document.getElementById(cardId);
     if (!card || !details) return;
     card._popupDetails = details;
+    card._dataStatus   = dataStatus ?? null;
+}
+
+function formatTimeSince(isoString) {
+    if (!isoString) return null;
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return null;
+    const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+    if (minutes < 1)   return 'less than a minute';
+    if (minutes === 1) return '1 minute';
+    if (minutes < 60)  return `${minutes} minutes`;
+    const hours = Math.floor(minutes / 60);
+    if (hours === 1)   return '1 hour';
+    if (hours < 24)    return `${hours} hours`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days > 1 ? 's' : ''}`;
 }
 
 function formatArrivedAt(value) {
@@ -507,8 +544,30 @@ function formatArrivedAt(value) {
     });
 }
 
-function buildPopupHTML(details) {
-    const qColor = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
+function buildPopupHTML(details, dataStatus) {
+    const qColor    = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
+    const dsColor   = DATA_STATUS_COLORS[dataStatus] ?? '#6b7280';
+    const dsInfo    = DATA_STATUS_INFO[dataStatus];
+    const timeSince = formatTimeSince(details.arrivedAt);
+
+    const freshnessSection = (dataStatus && dataStatus !== 'LIVE') ? `
+        <div class="popup-divider"></div>
+        <div class="popup-heading" style="margin-top:8px;">Data Freshness</div>
+        <div class="popup-row">
+            <span class="popup-key">Status</span>
+            <span class="popup-val" style="color:${dsColor}; font-weight:700;">${dsInfo?.label ?? dataStatus}</span>
+        </div>
+        ${timeSince ? `
+        <div class="popup-row">
+            <span class="popup-key">Not updated for</span>
+            <span class="popup-val">${timeSince}</span>
+        </div>` : ''}
+        <div class="popup-row" style="flex-direction:column; align-items:flex-start; gap:3px;">
+            <span class="popup-key">Note</span>
+            <span class="popup-val" style="text-align:left; line-height:1.5; font-weight:400;">${dsInfo?.description ?? ''}</span>
+        </div>
+    ` : '';
+
     return `
         <div class="popup-heading">${details.metricName ?? '--'} — Last Measurement</div>
         <div class="popup-row">
@@ -527,6 +586,7 @@ function buildPopupHTML(details) {
             <span class="popup-key">Arrived</span>
             <span class="popup-val">${formatArrivedAt(details.arrivedAt)}</span>
         </div>
+        ${freshnessSection}
     `;
 }
 
@@ -557,12 +617,47 @@ function buildDewRiskPopupHTML(risk) {
     `;
 }
 
-function setStatusCircleColor(circleEl, quality) {
+function setStatusCircleColor(circleEl, quality, dataStatus) {
     if (!circleEl) return;
-    const color = DATA_QUALITY_COLORS[quality] ?? DATA_QUALITY_COLORS.MISSING;
+    const qSev  = QUALITY_SEVERITY[quality]   ?? 0;
+    const dSev  = STATUS_SEVERITY[dataStatus] ?? 0;
+    const color = (dSev >= qSev)
+        ? (DATA_STATUS_COLORS[dataStatus]  ?? DATA_QUALITY_COLORS.MISSING)
+        : (DATA_QUALITY_COLORS[quality]    ?? DATA_QUALITY_COLORS.MISSING);
+
     circleEl.style.backgroundColor = color;
     circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
-    circleEl.classList.toggle('pulsing', quality === 'OK');
+    circleEl.classList.toggle('pulsing', quality === 'OK' && (!dataStatus || dataStatus === 'LIVE'));
+}
+
+function updateStalenessHints(dataStatus) {
+    const isStale = dataStatus && dataStatus !== 'LIVE';
+    const HINT_TARGETS = [
+        '#temperature-card .main-value',
+        '#pressure-card .main-value',
+        '#humidity-card .main-value',
+        '#wetness-card .wetness-meta',
+    ];
+    const HINT_LABELS = { DELAYED: '~ delayed', STALE: '~ stale', OFFLINE: '~ offline', EMPTY: '~ no data' };
+    const HINT_COLORS = { DELAYED: '#fcd34d',   STALE: '#f97316',  OFFLINE: '#ef4444',   EMPTY: '#6b7280'   };
+
+    HINT_TARGETS.forEach(selector => {
+        const target = document.querySelector(selector);
+        if (!target) return;
+        const parent = target.parentElement;
+        let hint = parent.querySelector('.data-stale-hint');
+        if (isStale) {
+            if (!hint) {
+                hint = document.createElement('span');
+                hint.className = 'data-stale-hint';
+                target.insertAdjacentElement('afterend', hint);
+            }
+            hint.textContent = HINT_LABELS[dataStatus] ?? '~ outdated';
+            hint.style.color = HINT_COLORS[dataStatus] ?? '#6b7280';
+        } else if (hint) {
+            hint.remove();
+        }
+    });
 }
 
 function positionPopup(anchor) {
@@ -596,13 +691,14 @@ function initStatusCircles() {
     document.querySelectorAll('.status-circle').forEach(circle => {
         circle.addEventListener('click', (e) => {
             e.stopPropagation();
-            const card    = circle.closest('[id$="-card"]');
-            const details = card?._popupDetails;
-            const isOpen  = globalPopup.classList.contains('open')
-                         && globalPopup._sourceEl === circle;
+            const card       = circle.closest('[id$="-card"]');
+            const details    = card?._popupDetails;
+            const dataStatus = card?._dataStatus;
+            const isOpen     = globalPopup.classList.contains('open')
+                            && globalPopup._sourceEl === circle;
 
             globalPopup.classList.remove('open');
-            if (!isOpen && details) openPopup(buildPopupHTML(details), circle);
+            if (!isOpen && details) openPopup(buildPopupHTML(details, dataStatus), circle);
         });
     });
 }
