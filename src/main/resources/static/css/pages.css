@@ -978,3 +978,243 @@ span.flatpickr-weekday {
     text-align: center;
 }
 
+/* =========================================================
+   MOBILE — Database tab + Flatpickr
+   Acknowledged trade-off: the records table stays horizontally
+   scrollable on small screens; this pass is about making it
+   *readable* and stopping iOS Safari from zooming on focus.
+========================================================= */
+@media (max-width: 600px) {
+
+    /* Override the 1100px fixed width that the database section forces */
+    .config-page:has(.config-section[data-section="database"]:not([hidden])) {
+        width: 100%;
+    }
+
+    /* Constrain every container in the chain so nothing inside (especially
+       the wide records table) can stretch the whole page horizontally.
+       Flex containers in particular need explicit min-width: 0 — otherwise
+       they refuse to shrink below their children's intrinsic content size. */
+    .configuration_block,
+    .config-body,
+    .db-panel,
+    .db-toolbar,
+    .db-date-group,
+    .db-date-group-body,
+    .db-range-inputs {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    /* Table scroll container — force a real scroll context */
+    .db-table-wrap {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* ----- Toolbar / filters ----- */
+    .db-toolbar {
+        gap: 8px 10px;
+        align-items: stretch;
+    }
+
+    /* Quality + Metric sit 2-per-row — they're related controls and
+       this keeps the toolbar compact. */
+    .db-filter {
+        flex: 1 1 calc(50% - 5px);
+        max-width: none;
+        min-width: 0;
+    }
+
+    /* Date filter is a multi-control widget — needs its own full row. */
+    .db-date-group {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+
+    /* Tighter labels above each filter */
+    .config-field label,
+    .db-date-group-label {
+        font-size: 0.68rem;
+    }
+
+    /* Selects can stay native-text-size — iOS only zooms on text inputs.
+       This keeps the 2-per-row layout from getting bulky. */
+    .db-select {
+        font-size: 13px;
+        padding: 7px 24px 7px 10px;
+    }
+
+    .db-date-group-body {
+        width: 100%;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    /* Single date input — natural ~150px width next to the toggle */
+    .db-date-group-body > #db-single-date {
+        flex: 0 1 150px;
+        min-width: 0;
+    }
+
+    /* Range wrap takes its own full row so both inputs have room */
+    .db-range-inputs {
+        flex: 1 1 100%;
+        min-width: 0;
+        gap: 4px;
+    }
+
+    /* Within the range row, both inputs share the width equally */
+    .db-range-inputs .db-date-input {
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto;
+    }
+
+    /* iOS Safari auto-zooms when focusing text inputs with font-size < 16px.
+       Keep font-size at 16px (zoom prevention) but tighten padding so the
+       inputs aren't visually bulky on small screens. */
+    .db-date-input {
+        font-size: 16px;
+        padding: 5px 8px;
+    }
+
+    .db-range-sep {
+        font-size: 13px;
+        padding: 0 2px;
+    }
+
+    .db-meta {
+        margin-left: 0;
+        width: 100%;
+        text-align: right;
+    }
+
+    /* ----- Records table — denser, with one column dropped ----- */
+    .db-table {
+        font-size: 0.7rem;
+    }
+
+    .db-table thead th,
+    .db-table tbody td {
+        padding: 6px 8px;
+    }
+
+    /* The Device column is almost always the same fixed sensor id —
+       dropping it on mobile reclaims a lot of horizontal space. */
+    .db-table thead th:nth-child(2),
+    .db-table tbody td:nth-child(2) {
+        display: none;
+    }
+
+    .db-badge {
+        display: block;
+        margin-left: 0;
+        margin-top: 2px;
+        font-size: 0.55rem;
+        padding: 1px 5px;
+    }
+
+    .db-metric .db-value {
+        min-width: 0;
+    }
+
+    .db-delete-btn {
+        padding: 4px 8px;
+        font-size: 0.65rem;
+    }
+
+    /* Make the horizontal scroll affordance visible — users need a hint
+       that more columns live to the right. */
+    .db-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .db-table-wrap::-webkit-scrollbar {
+        height: 5px;
+    }
+
+    .db-table-wrap::-webkit-scrollbar-thumb {
+        background: rgba(162, 198, 248, 0.35);
+        border-radius: 3px;
+    }
+
+    /* ----- Pager ----- */
+    .db-pager {
+        gap: 10px;
+    }
+
+    .db-page-btn {
+        padding: 7px 12px;
+        font-size: 13px;
+    }
+
+    /* ----- Flatpickr calendar — bottom-sheet style on mobile -----
+       Flatpickr positions the calendar inline (absolute, anchored to the
+       input). On narrow screens that puts it partially off-viewport when
+       the input sits near an edge. Detaching it as a fixed bottom sheet
+       guarantees it always opens fully visible regardless of which input
+       was tapped.
+    ========================================================= */
+    .flatpickr-calendar.open {
+        position: fixed !important;
+        top: auto !important;
+        bottom: 16px !important;
+        left: 12px !important;
+        right: 12px !important;
+        width: auto !important;
+        max-width: none !important;
+        margin: 0 !important;
+        z-index: 1000;
+    }
+
+    /* The little arrow only makes sense when anchored to the input */
+    .flatpickr-calendar.open:before,
+    .flatpickr-calendar.open:after {
+        display: none !important;
+    }
+
+    /* Let the day grid grow with the sheet width */
+    .flatpickr-rContainer,
+    .flatpickr-days {
+        width: 100% !important;
+    }
+
+    .dayContainer {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+
+    .flatpickr-day {
+        max-width: none;
+        height: 38px;
+        line-height: 36px;
+        font-size: 0.9rem;
+        margin: 1px 0;
+    }
+
+    /* Larger month/year controls for finger taps */
+    .flatpickr-current-month {
+        font-size: 1rem;
+    }
+
+    .flatpickr-current-month .flatpickr-monthDropdown-months,
+    .flatpickr-current-month input.cur-year {
+        font-size: 1rem;
+        padding: 6px 10px;
+    }
+
+    .flatpickr-current-month input.cur-year {
+        width: 72px;
+    }
+
+    .flatpickr-months .flatpickr-prev-month,
+    .flatpickr-months .flatpickr-next-month {
+        height: 36px;
+        width: 36px;
+    }
+}
+
