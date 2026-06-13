@@ -8,7 +8,13 @@ import { FetchScheduler } from './FetchScheduler.js';
 const state = {
     metrics:           null,
     systemHealth:      null,
-    astronomy:         null,
+    astronomyDaily:    null,   // sun/moon rise/set/twilights — fetched once + on rollover
+    sunSnapshot:       null,   // continuously-changing solar state
+    moonSnapshot:      null,   // continuously-changing lunar state
+    dailyKey:          null,   // key the cached daily payload was computed under
+    openModal:         null,   // 'sun' | 'moon' | null — which detail modal is open
+    modalReturnFocus:  null,   // element to restore focus to when modal closes
+    scrollLockY:       null,   // scroll position frozen while modal is open
     currentMetric:     'temperature',
     currentResolution: Number(localStorage.getItem('chartResolution')) || 10,
 
@@ -169,9 +175,15 @@ function startChart(metric) {
 // DASHBOARD FETCH
 // ==========================================
 
-async function fetchDashboard() {
-    const response = await fetch('/api/weather/dashboard');
-    if (!response.ok) throw new Error('Dashboard fetch failed');
+async function fetchDashboardDaily() {
+    const response = await fetch('/api/weather/dashboard/daily');
+    if (!response.ok) throw new Error('Daily dashboard fetch failed');
+    return await response.json();
+}
+
+async function fetchDashboardLive() {
+    const response = await fetch('/api/weather/dashboard/live');
+    if (!response.ok) throw new Error('Live dashboard fetch failed');
     return await response.json();
 }
 
@@ -228,26 +240,396 @@ function renderPressure(pressure) {
 // ASTRONOMY
 // ==========================================
 
-function renderAstronomy(astronomy) {
-    if (!astronomy) return;
+// Eight named lunar phases → inline SVG content drawn inside .moon-disk.
+// Lit area is yellow (#fcd34d), unlit is dark (#1a2842). The crescent /
+// gibbous shapes use two arcs of differing horizontal radii so the
+// terminator looks like a real ellipse rather than a straight line.
+const MOON_PHASE_SVG = {
+    'New Moon':        `<circle cx="50" cy="50" r="48" fill="#1a2842" stroke="#3a4d72" stroke-width="1"/>`,
+    'Waxing Crescent': `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
+                        <path d="M50 2 A48 48 0 0 1 50 98 A22 48 0 0 0 50 2 Z" fill="#fcd34d"/>`,
+    'First Quarter':   `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
+                        <path d="M50 2 A48 48 0 0 1 50 98 Z" fill="#fcd34d"/>`,
+    'Waxing Gibbous':  `<circle cx="50" cy="50" r="48" fill="#fcd34d"/>
+                        <path d="M50 2 A22 48 0 0 1 50 98 A48 48 0 0 1 50 2 Z" fill="#1a2842"/>`,
+    'Full Moon':       `<circle cx="50" cy="50" r="48" fill="#fcd34d"/>`,
+    'Waning Gibbous':  `<circle cx="50" cy="50" r="48" fill="#fcd34d"/>
+                        <path d="M50 2 A48 48 0 0 0 50 98 A22 48 0 0 1 50 2 Z" fill="#1a2842"/>`,
+    'Last Quarter':    `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
+                        <path d="M50 2 A48 48 0 0 0 50 98 Z" fill="#fcd34d"/>`,
+    'Waning Crescent': `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
+                        <path d="M50 2 A22 48 0 0 1 50 98 A48 48 0 0 0 50 2 Z" fill="#fcd34d"/>`,
+};
 
-    const formatTime = (isoString) => {
-        if (!isoString) return '--:--';
-        const date = new Date(isoString);
-        return isNaN(date.getTime())
-            ? '--:--'
-            : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+function formatTimeOfDay(isoString) {
+    if (!isoString) return '--:--';
+    const date = new Date(isoString);
+    return isNaN(date.getTime())
+        ? '--:--'
+        : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDuration(totalSeconds) {
+    if (totalSeconds == null) return '--';
+    const seconds = Math.abs(totalSeconds);
+    const hours   = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+}
+
+function renderAstronomyDaily(daily) {
+    if (!daily) return;
+    renderSunCard(daily.sunDailyEvents);
+    renderMoonCard(daily.moonDailyEvents);
+    // If a modal is open while daily refreshes (midnight rollover or
+    // zone change), keep its contents in sync.
+    if (state.openModal) renderActiveModal();
+}
+
+function renderSunCard(sun) {
+    if (!sun) return;
+
+    document.getElementById('sun-card-rise').textContent = formatTimeOfDay(sun.rise);
+    document.getElementById('sun-card-set').textContent  = formatTimeOfDay(sun.set);
+    document.getElementById('sun-card-noon').textContent = formatTimeOfDay(sun.solarNoon?.time);
+
+    const noonAltEl = document.getElementById('sun-card-noon-alt');
+    const noonAlt   = sun.solarNoon?.alt;
+    noonAltEl.textContent = (noonAlt != null) ? `${Math.round(noonAlt)}°` : '--°';
+
+    document.getElementById('sun-day-length').textContent = formatDuration(sun.dayLengthSeconds);
+}
+
+function renderMoonCard(moon) {
+    if (!moon) return;
+
+    document.getElementById('moon-card-rise').textContent = formatTimeOfDay(moon.rise);
+    document.getElementById('moon-card-set').textContent  = formatTimeOfDay(moon.set);
+    // The moon phase itself isn't on the daily-events DTO — it lives on
+    // the live snapshot (which is the correct cadence since phase drifts
+    // continuously). renderAstronomyLive handles it.
+}
+
+function renderAstronomyLive(sunSnapshot, moonSnapshot) {
+    setPositionPill('sun-position',  sunSnapshot?.currentAltitude);
+    setPositionPill('moon-position', moonSnapshot?.currentAltitude);
+
+    if (moonSnapshot?.phase) {
+        renderMoonPhase(moonSnapshot.phase);
+    }
+
+    // Keep the open modal's live fields in sync on every poll tick.
+    if (state.openModal) renderActiveModal();
+}
+
+function setPositionPill(elementId, altitudeDeg) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    if (altitudeDeg == null) {
+        el.textContent     = '--';
+        el.dataset.state   = 'below';
+        return;
+    }
+    const isUp         = altitudeDeg > 0;
+    el.textContent     = isUp ? `Up · ${Math.round(altitudeDeg)}°` : 'Below horizon';
+    el.dataset.state   = isUp ? 'up' : 'below';
+}
+
+// ==========================================
+// ASTRONOMY MODAL
+// ==========================================
+
+// Twilight transitions, in chronological order through a normal day.
+// Each entry maps a SunTimesDto field → display label + colour band.
+const TWILIGHT_LADDER = [
+    { field: 'astronomicalNightEnd',   label: 'Astronomical twilight begins', band: 'astronomical' },
+    { field: 'nauticalDawn',           label: 'Nautical twilight begins',      band: 'nautical'     },
+    { field: 'civilDawn',              label: 'Civil twilight begins',         band: 'civil'        },
+    { field: 'sunrise',                label: 'Sunrise',                       band: 'daylight'     },
+    { field: 'sunset',                 label: 'Sunset',                        band: 'daylight'     },
+    { field: 'civilDusk',              label: 'Civil twilight ends',           band: 'civil'        },
+    { field: 'nauticalDusk',           label: 'Nautical twilight ends',        band: 'nautical'     },
+    { field: 'astronomicalNightStart', label: 'Astronomical twilight ends',    band: 'astronomical' },
+];
+
+function openAstroModal(which, trigger) {
+    state.openModal        = which;
+    state.modalReturnFocus = trigger ?? null;
+
+    const modal = document.getElementById('astro-modal');
+    document.getElementById('astro-modal-title').textContent =
+        which === 'sun' ? 'Sun details' : 'Moon details';
+
+    renderActiveModal();
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    lockBodyScroll();
+
+    // Focus the close button so keyboard users land somewhere sensible.
+    modal.querySelector('.astro-modal-close')?.focus();
+}
+
+function closeAstroModal() {
+    if (!state.openModal) return;
+    const modal = document.getElementById('astro-modal');
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    unlockBodyScroll();
+    state.openModal = null;
+    state.modalReturnFocus?.focus?.();
+    state.modalReturnFocus = null;
+}
+
+// iOS Safari + Android Chrome ignore `overflow: hidden` on <body> for touch
+// scrolling, so the page underneath would still scroll while the modal is
+// open — that's what produces the flicker (the URL bar collapses, the
+// viewport reflows, the fixed backdrop appears to jump). The reliable fix
+// is to pin <body> to a fixed position offset by the current scroll, then
+// restore the offset on close so the user lands back where they were.
+function lockBodyScroll() {
+    if (state.scrollLockY != null) return;
+    const scrollY = window.scrollY;
+    state.scrollLockY = scrollY;
+    const body = document.body;
+    body.style.position = 'fixed';
+    body.style.top      = `-${scrollY}px`;
+    body.style.left     = '0';
+    body.style.right    = '0';
+    body.style.width    = '100%';
+}
+
+function unlockBodyScroll() {
+    if (state.scrollLockY == null) return;
+    const y = state.scrollLockY;
+    const body = document.body;
+    body.style.position = '';
+    body.style.top      = '';
+    body.style.left     = '';
+    body.style.right    = '';
+    body.style.width    = '';
+    window.scrollTo(0, y);
+    state.scrollLockY = null;
+}
+
+function renderActiveModal() {
+    const body = document.getElementById('astro-modal-body');
+    if (!body) return;
+    if (state.openModal === 'sun')  body.innerHTML = buildSunModalHTML();
+    if (state.openModal === 'moon') body.innerHTML = buildMoonModalHTML();
+}
+
+function buildSunModalHTML() {
+    const daily    = state.astronomyDaily?.sunDailyEvents;
+    const snapshot = state.sunSnapshot;
+    const times    = daily?.times;
+
+    const condition = times?.solarCondition;
+    const polarBanner = (condition && condition !== 'NORMAL')
+        ? `<div class="polar-banner">${
+              condition === 'POLAR_DAY'
+                  ? 'Polar day — the sun stays above the horizon all day.'
+                  : 'Polar night — the sun stays below the horizon all day.'
+          }</div>`
+        : '';
+
+    const ladderRows = TWILIGHT_LADDER.map(({ field, label, band }) => {
+        const iso = times?.[field];
+        const display = iso ? formatTimeOfDay(iso) : '—';
+        const nullCls = iso ? '' : ' is-null';
+        return `
+            <div class="twilight-row ${band}">
+                <span class="twilight-label">${label}</span>
+                <span class="twilight-time${nullCls}">${display}</span>
+            </div>`;
+    }).join('');
+
+    const altDeg = snapshot?.currentAltitude;
+    const altStr = altDeg != null ? `${altDeg.toFixed(1)}°` : '--';
+    const positionText = altDeg == null
+        ? '--'
+        : (altDeg > 0 ? `Above horizon (${altStr})` : `Below horizon (${altStr})`);
+
+    const noonAltStr = daily?.solarNoon?.alt != null
+        ? `${daily.solarNoon.alt.toFixed(1)}°`
+        : '--';
+
+    return `
+        <div class="modal-section">
+            <div class="modal-section-title">Position</div>
+            <div class="modal-grid">
+                <div class="modal-row">
+                    <span class="label">Current altitude</span>
+                    <span class="value">${positionText}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Solar noon altitude</span>
+                    <span class="value">${noonAltStr}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-section">
+            <div class="modal-section-title">Today</div>
+            <div class="modal-grid">
+                <div class="modal-row">
+                    <span class="label">Sunrise</span>
+                    <span class="value">${formatTimeOfDay(daily?.rise)}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Sunset</span>
+                    <span class="value">${formatTimeOfDay(daily?.set)}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Day length</span>
+                    <span class="value">${formatDuration(daily?.dayLengthSeconds)}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Night length</span>
+                    <span class="value">${formatDuration(daily?.nightLengthSeconds)}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-section">
+            <div class="modal-section-title">Twilight transitions</div>
+            <div class="twilight-ladder">${ladderRows}</div>
+        </div>
+
+        ${polarBanner}
+    `;
+}
+
+function buildMoonModalHTML() {
+    const daily    = state.astronomyDaily?.moonDailyEvents;
+    const snapshot = state.moonSnapshot;
+    const phase    = snapshot?.phase;
+
+    const phaseSvg = phase?.phaseName
+        ? (MOON_PHASE_SVG[phase.phaseName] ?? MOON_PHASE_SVG['New Moon'])
+        : MOON_PHASE_SVG['New Moon'];
+
+    const illumPct = phase?.illuminationPercent != null
+        ? `${phase.illuminationPercent.toFixed(1)}%`
+        : '--';
+    const ageDays = phase?.ageDays != null
+        ? `${phase.ageDays.toFixed(1)} days`
+        : '--';
+
+    const altDeg = snapshot?.currentAltitude;
+    const altStr = altDeg != null ? `${altDeg.toFixed(1)}°` : '--';
+    const positionText = altDeg == null
+        ? '--'
+        : (altDeg > 0 ? `Above horizon (${altStr})` : `Below horizon (${altStr})`);
+
+    const peakAltStr = daily?.peak?.alt != null ? `${daily.peak.alt.toFixed(1)}°` : '--';
+    const distanceKm = snapshot?.distanceKm != null
+        ? `${Math.round(snapshot.distanceKm).toLocaleString('en-US')} km`
+        : '--';
+
+    return `
+        <div class="modal-section">
+            <div class="modal-moon-hero">
+                <svg class="moon-disk" viewBox="0 0 100 100" aria-hidden="true">${phaseSvg}</svg>
+                <div class="moon-phase-meta">
+                    <span class="phase-name">${phase?.phaseName ?? '--'}</span>
+                    <span class="phase-illum">${illumPct} illuminated · ${ageDays} old</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-section">
+            <div class="modal-section-title">Position</div>
+            <div class="modal-grid">
+                <div class="modal-row">
+                    <span class="label">Current altitude</span>
+                    <span class="value">${positionText}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Constellation</span>
+                    <span class="value">${snapshot?.constellation ?? '--'}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Distance</span>
+                    <span class="value">${distanceKm}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Peak altitude</span>
+                    <span class="value">${peakAltStr}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-section">
+            <div class="modal-section-title">Today</div>
+            <div class="modal-grid">
+                <div class="modal-row">
+                    <span class="label">Moonrise</span>
+                    <span class="value">${formatTimeOfDay(daily?.rise)}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Moonset</span>
+                    <span class="value">${formatTimeOfDay(daily?.set)}</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">Lunar transit</span>
+                    <span class="value">${formatTimeOfDay(daily?.peak?.time)}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function initAstroModal() {
+    const modal   = document.getElementById('astro-modal');
+    const sunEl   = document.getElementById('sun-card');
+    const moonEl  = document.getElementById('moon-card');
+    if (!modal || !sunEl || !moonEl) return;
+
+    const openHandler = (which) => (e) => {
+        e.preventDefault();
+        openAstroModal(which, e.currentTarget);
     };
+    sunEl.addEventListener('click', openHandler('sun'));
+    moonEl.addEventListener('click', openHandler('moon'));
 
-    const sunRiseEl  = document.getElementById('sun-rise');
-    const sunSetEl   = document.getElementById('sun-set');
-    const moonRiseEl = document.getElementById('moon-rise');
-    const moonSetEl  = document.getElementById('moon-set');
+    // Keyboard activation — Enter/Space on the card.
+    [sunEl, moonEl].forEach((card) => {
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openAstroModal(card === sunEl ? 'sun' : 'moon', card);
+            }
+        });
+    });
 
-    if (sunRiseEl)  sunRiseEl.textContent  = formatTime(astronomy.sunDailyEvents?.rise);
-    if (sunSetEl)   sunSetEl.textContent   = formatTime(astronomy.sunDailyEvents?.set);
-    if (moonRiseEl) moonRiseEl.textContent = formatTime(astronomy.moonDailyEvents?.rise);
-    if (moonSetEl)  moonSetEl.textContent  = formatTime(astronomy.moonDailyEvents?.set);
+    // Backdrop and close button both carry data-modal-dismiss.
+    modal.addEventListener('click', (e) => {
+        if (e.target?.dataset?.modalDismiss === 'true') closeAstroModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && state.openModal) closeAstroModal();
+    });
+}
+
+function renderMoonPhase(phase) {
+    const disk = document.getElementById('moon-disk');
+    const name = document.getElementById('moon-phase-name');
+    const pct  = document.getElementById('moon-phase-illum');
+    if (!disk || !name || !pct) return;
+
+    const svg = MOON_PHASE_SVG[phase.phaseName] ?? MOON_PHASE_SVG['New Moon'];
+    // Only redraw if the phase name actually changed — saves DOM churn
+    // on every live tick (phase name only flips every few days).
+    if (disk.dataset.phase !== phase.phaseName) {
+        disk.innerHTML     = svg;
+        disk.dataset.phase = phase.phaseName;
+    }
+
+    name.textContent = phase.phaseName ?? '--';
+    pct.textContent  = (phase.illuminationPercent != null)
+        ? phase.illuminationPercent.toFixed(0)
+        : '--';
 }
 
 function renderPressureTrend(pressureTrend, changeValue) {
@@ -393,18 +775,35 @@ function renderMetrics(dto, dataStatus) {
     updateStalenessHints(dataStatus);
 }
 
-async function updateDashboard() {
+async function loadDaily() {
     try {
-        const data         = await fetchDashboard();
-        state.metrics      = data.metricsDashboardDto;
-        state.systemHealth = data.systemHealthDashboardDto;
-        state.astronomy    = data.astronomySnapshot;
+        const daily            = await fetchDashboardDaily();
+        state.astronomyDaily   = daily;
+        state.dailyKey         = daily.dailyKey;
+        renderAstronomyDaily(daily);
+    } catch (error) {
+        console.error('Daily dashboard load failed:', error);
+    }
+}
+
+async function updateLive() {
+    try {
+        const live          = await fetchDashboardLive();
+        state.metrics       = live.metrics;
+        state.systemHealth  = live.systemHealth;
+        state.sunSnapshot   = live.sunSnapshot;
+        state.moonSnapshot  = live.moonSnapshot;
+
+        // Re-fetch daily events on midnight rollover or runtime timezone change.
+        if (state.dailyKey && live.dailyKey && live.dailyKey !== state.dailyKey) {
+            await loadDaily();
+        }
 
         renderMetrics(state.metrics, state.systemHealth?.status);
         renderSystemHealth(state.systemHealth);
-        renderAstronomy(state.astronomy);
+        renderAstronomyLive(state.sunSnapshot, state.moonSnapshot);
     } catch (error) {
-        console.error('Dashboard update failed:', error);
+        console.error('Live dashboard update failed:', error);
     }
 }
 
@@ -754,4 +1153,6 @@ window.addEventListener('resize', () => {
 initEventListeners();
 initStatusCircles();
 initDewRiskBadge();
-startPolling(updateDashboard, 30000);
+initAstroModal();
+loadDaily();
+startPolling(updateLive, 30000);

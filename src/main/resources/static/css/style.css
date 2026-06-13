@@ -95,7 +95,8 @@ body::before {
 .today_data_block,
 .weather_block, .pressure_block, .temperature_block,
 .min_max_block, .system_health_block, .chart_block,
-.humidity_block, .wetness_block, .configuration_block {
+.humidity_block, .wetness_block, .configuration_block,
+.sun_block, .moon_block {
     position: relative;
     overflow: hidden;
     background: var(--card-bg);
@@ -221,42 +222,6 @@ body::before {
     font-weight: 750;
     font-weight: 750;
     white-space: nowrap;
-}
-
-/* Right side alignment: 2x2 Clean Grid */
-.astro-grid {
-    display: grid;
-    grid-template-columns: repeat(2, auto);
-    gap: clamp(4px, 1vw, 8px) clamp(8px, 2vw, 16px);
-}
-
-.astro-item {
-    display: flex;
-    align-items: center;
-    gap: clamp(5px, 1vw, 8px);
-}
-
-.astro-icon {
-    /* Scales smoothly between 14px and 18px */
-    width: clamp(14px, 2vw, 18px);
-    height: clamp(14px, 2vw, 18px);
-    flex-shrink: 0;
-}
-
-.astro-sun {
-    stroke: #facc15;
-}
-
-.astro-moon {
-    stroke: #93c5fd;
-}
-
-.astro-time {
-    /* Scales smoothly between 0.78rem and 0.95rem */
-    font-size: clamp(0.78rem, 2vw, 0.95rem);
-    font-weight: 600;
-    color: #f1f5f9;
-    font-variant-numeric: tabular-nums;
 }
 
 /* Fallback breakpoint only for wrapping orientation on extremely small devices if needed */
@@ -992,6 +957,476 @@ h3 {
 .resolution-panel button:hover {
     background: rgba(155, 188, 255, 0.12);
     color: #ffffff;
+}
+
+/* =========================================================
+   SUN & MOON CARDS
+   Sit between the chart and the System Health block. Share the
+   .unified-card surface with the rest of the dashboard, but use
+   their own internal layout because the data is event-driven
+   (times, phase) rather than a single hero number.
+========================================================= */
+.sun_block,
+.moon_block {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.row-astro {
+    flex-wrap: nowrap;
+}
+
+.astro-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 4px;
+}
+
+/* Row of 2 or 3 time events (rise / set, or rise / noon / set).
+   Uses grid so the columns stay aligned regardless of label length. */
+.astro-event-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    align-items: end;
+}
+
+.astro-event-row-pair {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.astro-event {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+.astro-event .event-label {
+    font-size: 0.7rem;
+    font-weight: var(--fw-label);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.astro-event .event-time {
+    font-size: 1.25rem;
+    font-weight: var(--fw-value);
+    color: var(--text-primary);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.astro-event .event-sub {
+    font-size: 0.7rem;
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Solar noon is the centerpiece of the sun card — bump it up subtly. */
+.astro-event-peak .event-time {
+    font-size: 1.45rem;
+    color: #fcd34d;
+}
+
+/* Footer line: light secondary information, divider above. */
+.astro-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-top: 10px;
+    border-top: 1px solid var(--divider);
+    font-size: 0.78rem;
+}
+
+.astro-footer-label {
+    color: var(--text-muted);
+    font-weight: var(--fw-label);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.astro-footer-value {
+    color: var(--text-strong);
+    font-weight: var(--fw-value);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Moon phase visual + meta sit on one row, glyph on the left. */
+.moon-phase-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.moon-disk {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 6px rgba(252, 211, 77, 0.18));
+}
+
+.moon-phase-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.phase-name {
+    font-size: 1.05rem;
+    font-weight: var(--fw-value);
+    color: var(--text-primary);
+    line-height: 1.15;
+}
+
+.phase-illum {
+    font-size: 0.78rem;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Above/below horizon pill — lives where status-circle sits on
+   metric cards. Tinted by data-state so the live snapshot has a
+   visible footprint even when nothing else on the card moves. */
+.position-pill {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.position-pill[data-state="up"] {
+    color: #fcd34d;
+    border-color: rgba(252, 211, 77, 0.55);
+    background: rgba(252, 211, 77, 0.10);
+}
+
+.position-pill[data-state="below"] {
+    color: var(--text-muted);
+    border-color: rgba(162, 198, 248, 0.25);
+    background: rgba(162, 198, 248, 0.06);
+}
+
+/* Cards are clickable — open a detail modal. Subtle hover/focus
+   states signal interactivity without being noisy. */
+.astro-card {
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.astro-card:hover {
+    border-color: rgba(162, 198, 248, 0.42);
+    background: rgba(45, 78, 143, 0.78);
+}
+
+.astro-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.astro-card:active {
+    transform: scale(0.995);
+}
+
+/* On narrow screens stack sun and moon vertically so neither
+   gets crushed; collapse the phase row to keep the glyph readable. */
+@media (max-width: 520px) {
+    .row-astro {
+        flex-wrap: wrap;
+    }
+
+    .sun_block,
+    .moon_block {
+        flex: 1 1 100%;
+    }
+
+    .astro-event .event-time { font-size: 1.15rem; }
+    .astro-event-peak .event-time { font-size: 1.3rem; }
+    .moon-disk { width: 48px; height: 48px; }
+}
+
+/* =========================================================
+   ASTRONOMY DETAIL MODAL
+   Single shared overlay re-populated by JS per card. The backdrop
+   uses a soft blur and the panel matches the dashboard card surface
+   so it feels like the card itself zoomed in.
+========================================================= */
+.astro-modal {
+    /* iOS Safari quirk: `position: fixed; inset: 0` anchors to the layout
+       viewport, which extends *behind* the URL bar and bottom toolbar —
+       so the modal would center itself relative to an area taller than
+       what's actually visible. Sizing to 100dvh (dynamic viewport height)
+       fixes it; 100vh is kept as a fallback for very old browsers. The
+       safe-area-inset padding then keeps content clear of the iPhone
+       camera island and home indicator in landscape. */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding-top:    max(24px, env(safe-area-inset-top));
+    padding-right:  max(24px, env(safe-area-inset-right));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    padding-left:   max(24px, env(safe-area-inset-left));
+    box-sizing: border-box;
+}
+
+.astro-modal.open {
+    display: flex;
+}
+
+.astro-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 14, 28, 0.66);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    /* Swallow touch-drag gestures so the page underneath can't be
+       scrolled by dragging the backdrop on iOS / Android. */
+    touch-action: none;
+}
+
+.astro-modal-panel {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    /* 100% resolves against the modal container's content box (already
+       constrained to the visual viewport above), so the panel can never
+       exceed the visible area regardless of URL bar state. */
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, rgba(45, 78, 143, 0.92), rgba(35, 60, 115, 0.92));
+    border: 1px solid rgba(162, 198, 248, 0.32);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    animation: astro-modal-enter 0.18s ease-out;
+}
+
+@keyframes astro-modal-enter {
+    from { transform: translateY(8px); opacity: 0; }
+    to   { transform: translateY(0);   opacity: 1; }
+}
+
+.astro-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--divider);
+}
+
+.astro-modal-header h2 {
+    margin: 0;
+    color: var(--heading);
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+}
+
+.astro-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    line-height: 1;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.astro-modal-close:hover {
+    background: rgba(162, 198, 248, 0.12);
+    color: var(--text-primary);
+}
+
+.astro-modal-body {
+    padding: 18px 20px 22px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    /* Stop scroll-chaining: when the user reaches the top or bottom
+       of the modal contents, don't propagate the gesture to <body>. */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Section: titled grouping of label/value rows. */
+.modal-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.modal-section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+}
+
+.modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 16px;
+}
+
+.modal-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.modal-row .label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: var(--fw-label);
+}
+
+.modal-row .value {
+    font-size: 0.98rem;
+    color: var(--text-primary);
+    font-weight: var(--fw-value);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.modal-row .value-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: var(--fw-regular);
+    margin-left: 4px;
+}
+
+/* Moon modal hero: phase glyph + name. */
+.modal-moon-hero {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 6px 0 4px 0;
+}
+
+.modal-moon-hero .moon-disk {
+    width: 84px;
+    height: 84px;
+}
+
+.modal-moon-hero .phase-name {
+    font-size: 1.35rem;
+    color: var(--text-primary);
+}
+
+.modal-moon-hero .phase-illum {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+/* Sun twilight ladder — vertical list of altitude crossings in
+   chronological order. The marker dot is tinted by twilight band:
+   night = dark, astronomical/nautical/civil get progressively
+   warmer, sunrise/noon/sunset use the warm sun tone. */
+.twilight-ladder {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--divider);
+    padding-left: 14px;
+    gap: 8px;
+}
+
+.twilight-row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+
+.twilight-row::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--marker-color, var(--text-muted));
+    box-shadow: 0 0 0 2px rgba(8, 14, 28, 0.8);
+    margin-left: -19px;
+}
+
+.twilight-row.night        { --marker-color: #4c5b7f; }
+.twilight-row.astronomical { --marker-color: #6b7fa8; }
+.twilight-row.nautical     { --marker-color: #8aa3d0; }
+.twilight-row.civil        { --marker-color: #c9d8f5; }
+.twilight-row.daylight     { --marker-color: #fcd34d; }
+
+.twilight-row.is-now {
+    background: rgba(252, 211, 77, 0.08);
+    margin: -4px -8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.twilight-label {
+    font-size: 0.85rem;
+    color: var(--text-strong);
+}
+
+.twilight-time {
+    font-size: 0.9rem;
+    font-weight: var(--fw-value);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.twilight-time.is-null {
+    color: var(--text-muted);
+    font-weight: var(--fw-regular);
+}
+
+.polar-banner {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: rgba(162, 198, 248, 0.08);
+    border: 1px solid var(--divider);
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+@media (max-width: 480px) {
+    .astro-modal {
+        padding-top:    max(12px, env(safe-area-inset-top));
+        padding-right:  max(12px, env(safe-area-inset-right));
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+        padding-left:   max(12px, env(safe-area-inset-left));
+    }
+    .modal-grid  { grid-template-columns: 1fr; gap: 8px; }
+    .modal-moon-hero .moon-disk { width: 68px; height: 68px; }
+    .modal-moon-hero .phase-name { font-size: 1.2rem; }
 }
 
 /* =========================================================

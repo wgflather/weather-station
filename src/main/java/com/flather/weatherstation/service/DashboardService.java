@@ -2,10 +2,10 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.constant.DataStatus;
-import com.flather.weatherstation.dto.dashboard.AstronomySnapshot;
+import com.flather.weatherstation.dto.dashboard.AstronomyDailyEventsDto;
+import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
-import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import lombok.RequiredArgsConstructor;
@@ -25,15 +25,6 @@ public class DashboardService {
         .surfaceWetness(analyticsService.getSurfaceWetness())
         .humidity(analyticsService.getHumidity())
         .build();
-  }
-
-  public AstronomySnapshot getAstronomyBlock() {
-    ZonedDateTime time = Instant.now().atZone(configurationCache.getLocationContext().zoneId());
-    return new AstronomySnapshot(
-        astronomySearchService.getSunSnapshot(time),
-        astronomySearchService.getSunDailyEvents(),
-        astronomySearchService.getMoonSnapshot(time),
-        astronomySearchService.getMoonDailyEvents());
   }
 
   public SystemHealthDashboardDto getSystemHealth() {
@@ -59,18 +50,36 @@ public class DashboardService {
         .build();
   }
 
-  public WeatherDashboardDto getWeatherDashboard() {
-    SystemHealthDashboardDto systemHealthDashboardDto = getSystemHealth();
-    AstronomySnapshot astronomyDashboardBlock = getAstronomyBlock();
-    MetricsDashboardDto metricsDashboardDto =
-        (systemHealthDashboardDto.getStatus() == DataStatus.EMPTY)
+  /**
+   * Builds the once-per-day astronomy payload. The two underlying methods are {@code @Cacheable}
+   * and keyed by {@code dailyKey()}, so this call is essentially free after the first hit of the
+   * day (or after a runtime timezone change).
+   */
+  public AstronomyDailyEventsDto getAstronomyDailyEvents() {
+    return new AstronomyDailyEventsDto(
+        astronomySearchService.getSunDailyEvents(),
+        astronomySearchService.getMoonDailyEvents(),
+        astronomySearchService.dailyKey());
+  }
+
+  /**
+   * Builds the live polling payload: metrics + system health + continuously-changing solar/lunar
+   * state, plus the current {@code dailyKey} so the client can detect a midnight or timezone
+   * rollover and re-fetch the daily endpoint.
+   */
+  public DashboardLiveDto getDashboardLive() {
+    SystemHealthDashboardDto systemHealth = getSystemHealth();
+    MetricsDashboardDto metrics =
+        (systemHealth.getStatus() == DataStatus.EMPTY)
             ? MetricsDashboardDto.empty()
             : getMetricsDashboard();
 
-    return WeatherDashboardDto.builder()
-        .metricsDashboardDto(metricsDashboardDto)
-        .systemHealthDashboardDto(systemHealthDashboardDto)
-        .astronomySnapshot(astronomyDashboardBlock)
-        .build();
+    ZonedDateTime time = Instant.now().atZone(configurationCache.getLocationContext().zoneId());
+    return new DashboardLiveDto(
+        metrics,
+        systemHealth,
+        astronomySearchService.getSunSnapshot(time),
+        astronomySearchService.getMoonSnapshot(time),
+        astronomySearchService.dailyKey());
   }
 }

@@ -11,6 +11,7 @@ import io.github.cosinekitty.astronomy.*;
 import java.time.*;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -44,6 +45,7 @@ public class AstronomySearch {
   }
 
   /** Today's solar events: rise/set, solar noon transit, twilight times, day/night length. */
+  @Cacheable(value = "sunDailyEvents", key = "#root.target.dailyKey()")
   public SunDailyEvents getSunDailyEvents() {
     ZonedDateTime sunRise = calculateRiseSet(Body.Sun, Direction.Rise);
     ZonedDateTime sunSet = calculateRiseSet(Body.Sun, Direction.Set);
@@ -74,6 +76,7 @@ public class AstronomySearch {
   }
 
   /** Today's lunar events: rise, set, and the peak (transit) of the moon. */
+  @Cacheable(value = "moonDailyEvents", key = "#root.target.dailyKey()")
   public MoonDailyEvents getMoonDailyEvents() {
     ZonedDateTime moonRise = calculateRiseSet(Body.Moon, Direction.Rise);
     ZonedDateTime moonSet = calculateRiseSet(Body.Moon, Direction.Set);
@@ -85,6 +88,17 @@ public class AstronomySearch {
   /** Returns a copy of the transit with its altitude rounded to two decimal places. */
   private static TransitDto roundTransit(TransitDto transit) {
     return new TransitDto(round2(transit.alt()), transit.time());
+  }
+
+  /**
+   * Cache key for the "daily events" caches: today's date in the currently-configured zone, plus
+   * the zone id itself. Recomputed on every cache lookup, so a zone change at runtime — or the
+   * clock rolling past midnight — produces a fresh key and triggers recomputation. Must be public
+   * for the SpEL expression {@code #root.target.dailyKey()} to invoke it through the Spring proxy.
+   */
+  public String dailyKey() {
+    ZoneId zone = zoneId();
+    return LocalDate.now(zone) + "@" + zone.getId();
   }
 
   // ────────────────────────────────────────────────────────────────────────────

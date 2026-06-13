@@ -28,39 +28,6 @@
         </div>
         <span id="realTime">19:50</span>
     </div>
-
-    <div class="astro-grid">
-        <div class="astro-item">
-            <svg class="astro-icon astro-sun" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="4"></circle>
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
-            </svg>
-            <span id="sun-rise" class="astro-time">--:--</span>
-        </div>
-
-        <div class="astro-item">
-            <svg class="astro-icon astro-sun" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v2M4.93 4.93l1.41 1.41M2 12h2M20 12h2M19.07 4.93l-1.41 1.41"></path>
-                <path d="M22 22H2M16 14a4 4 0 0 0-8 0"></path>
-            </svg>
-            <span id="sun-set" class="astro-time">--:--</span>
-        </div>
-
-        <div class="astro-item">
-            <svg class="astro-icon astro-moon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
-            </svg>
-            <span id="moon-rise" class="astro-time">--:--</span>
-        </div>
-
-        <div class="astro-item">
-            <svg class="astro-icon astro-moon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" opacity="0.6"></path>
-                <path d="M22 22H2"></path>
-            </svg>
-            <span id="moon-set" class="astro-time">--:--</span>
-        </div>
-    </div>
 </div>
 
 <div class="dashboard-row row-full">
@@ -212,6 +179,76 @@
     </div>
 
 </div>
+
+<div class="dashboard-row row-astro">
+    <div class="sun_block unified-card astro-card" id="sun-card" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Open sun details">
+        <div class="card-header">
+            <h3>
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4"></circle>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                </svg>
+                <span>Sun</span>
+            </h3>
+            <div class="position-pill" id="sun-position" data-state="below">--</div>
+        </div>
+        <div class="astro-card-content">
+            <div class="astro-event-row">
+                <div class="astro-event">
+                    <span class="event-label">Rise</span>
+                    <span class="event-time" id="sun-card-rise">--:--</span>
+                </div>
+                <div class="astro-event astro-event-peak">
+                    <span class="event-label">Solar noon</span>
+                    <span class="event-time" id="sun-card-noon">--:--</span>
+                    <span class="event-sub" id="sun-card-noon-alt">--°</span>
+                </div>
+                <div class="astro-event">
+                    <span class="event-label">Set</span>
+                    <span class="event-time" id="sun-card-set">--:--</span>
+                </div>
+            </div>
+            <div class="astro-footer">
+                <span class="astro-footer-label">Day length</span>
+                <span class="astro-footer-value" id="sun-day-length">--</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="moon_block unified-card astro-card" id="moon-card" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Open moon details">
+        <div class="card-header">
+            <h3>
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+                </svg>
+                <span>Moon</span>
+            </h3>
+            <div class="position-pill" id="moon-position" data-state="below">--</div>
+        </div>
+        <div class="astro-card-content">
+            <div class="moon-phase-row">
+                <svg class="moon-disk" id="moon-disk" viewBox="0 0 100 100" aria-hidden="true">
+                    <circle cx="50" cy="50" r="48" fill="#1a2842"></circle>
+                </svg>
+                <div class="moon-phase-meta">
+                    <span class="phase-name" id="moon-phase-name">--</span>
+                    <span class="phase-illum"><span id="moon-phase-illum">--</span>% lit</span>
+                </div>
+            </div>
+            <div class="astro-event-row astro-event-row-pair">
+                <div class="astro-event">
+                    <span class="event-label">Rise</span>
+                    <span class="event-time" id="moon-card-rise">--:--</span>
+                </div>
+                <div class="astro-event">
+                    <span class="event-label">Set</span>
+                    <span class="event-time" id="moon-card-set">--:--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="system_health_block">
     <h3>System Health</h3>
     <div class="health-grid">
@@ -240,6 +277,17 @@
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path>
     </svg>
 </a>
+
+<div class="astro-modal" id="astro-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="astro-modal-title">
+    <div class="astro-modal-backdrop" data-modal-dismiss="true"></div>
+    <div class="astro-modal-panel" role="document">
+        <div class="astro-modal-header">
+            <h2 id="astro-modal-title">Details</h2>
+            <button class="astro-modal-close" type="button" aria-label="Close" data-modal-dismiss="true">&times;</button>
+        </div>
+        <div class="astro-modal-body" id="astro-modal-body"></div>
+    </div>
+</div>
 
 <script th:src="@{/js/realtime-script.js}"></script>
 <script type="module" th:src="@{/js/fetch-data.js}"></script>
