@@ -1,10 +1,12 @@
 package com.flather.weatherstation.service;
 
+import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.constant.DataStatus;
 import com.flather.weatherstation.dto.dashboard.AstronomySnapshot;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
 import com.flather.weatherstation.dto.dashboard.WeatherDashboardDto;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 public class DashboardService {
   private final AnalyticsService analyticsService;
   private final AstronomySearch astronomySearchService;
+  private final ConfigurationCache configurationCache;
 
   public MetricsDashboardDto getMetricsDashboard() {
     return MetricsDashboardDto.builder()
@@ -25,7 +28,12 @@ public class DashboardService {
   }
 
   public AstronomySnapshot getAstronomyBlock() {
-    return new AstronomySnapshot(astronomySearchService.getSun(), astronomySearchService.getMoon());
+    ZonedDateTime time = Instant.now().atZone(configurationCache.getLocationContext().zoneId());
+    return new AstronomySnapshot(
+        astronomySearchService.getSunSnapshot(time),
+        astronomySearchService.getSunDailyEvents(),
+        astronomySearchService.getMoonSnapshot(time),
+        astronomySearchService.getMoonDailyEvents());
   }
 
   public SystemHealthDashboardDto getSystemHealth() {

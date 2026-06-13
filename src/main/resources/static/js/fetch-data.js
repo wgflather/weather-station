@@ -244,10 +244,10 @@ function renderAstronomy(astronomy) {
     const moonRiseEl = document.getElementById('moon-rise');
     const moonSetEl  = document.getElementById('moon-set');
 
-    if (sunRiseEl)  sunRiseEl.textContent  = formatTime(astronomy.sun?.rise);
-    if (sunSetEl)   sunSetEl.textContent   = formatTime(astronomy.sun?.set);
-    if (moonRiseEl) moonRiseEl.textContent = formatTime(astronomy.moon?.rise);
-    if (moonSetEl)  moonSetEl.textContent  = formatTime(astronomy.moon?.set);
+    if (sunRiseEl)  sunRiseEl.textContent  = formatTime(astronomy.sunDailyEvents?.rise);
+    if (sunSetEl)   sunSetEl.textContent   = formatTime(astronomy.sunDailyEvents?.set);
+    if (moonRiseEl) moonRiseEl.textContent = formatTime(astronomy.moonDailyEvents?.rise);
+    if (moonSetEl)  moonSetEl.textContent  = formatTime(astronomy.moonDailyEvents?.set);
 }
 
 function renderPressureTrend(pressureTrend, changeValue) {
