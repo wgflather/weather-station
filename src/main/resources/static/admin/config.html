@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Station Configuration</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" />
     <link rel="stylesheet" href="/css/style.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/plugins/rangePlugin.js"></script>
 </head>
 <body>
 
@@ -190,6 +193,22 @@
                             <option value="humidity">Humidity</option>
                             <option value="surfaceWetness">Surface Wetness</option>
                         </select>
+                    </div>
+                    <div class="db-date-group">
+                        <span class="db-date-group-label">Date filter</span>
+                        <div class="db-date-group-body">
+                            <div class="db-mode-toggle" id="db-mode-toggle">
+                                <button type="button" class="db-mode-btn active" data-mode="date">Date</button>
+                                <button type="button" class="db-mode-btn" data-mode="range">Range</button>
+                            </div>
+                            <input type="text" id="db-single-date" class="db-date-input" placeholder="Pick a date" readonly>
+                            <div class="db-range-inputs" id="db-range-wrap" hidden>
+                                <input type="text" id="db-start-date" class="db-date-input" placeholder="From" readonly>
+                                <span class="db-range-sep">&#8594;</span>
+                                <input type="text" id="db-end-date" class="db-date-input" placeholder="To" readonly>
+                            </div>
+                            <button type="button" id="db-clear-dates" class="config-save-btn" hidden>Clear</button>
+                        </div>
                     </div>
                     <button type="button" id="db-refresh" class="config-save-btn">Refresh</button>
                     <span class="db-meta" id="db-meta"></span>
