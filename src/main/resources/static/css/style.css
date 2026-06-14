@@ -30,6 +30,11 @@
     --accent:         #38bdf8;   /* live values, active state    */
     --heading:        #9cc2ea;   /* card titles — bright enough to lead */
 
+    /* Material standard easing — used by every short (hover/press/modal)
+       transition. Reads as more premium than the keyword `ease` while
+       being a one-line swap. */
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
     /* Surfaces & lines — uniform across every card */
     --card-bg:           rgba(45, 78, 143, 0.64);
     --card-border:       rgba(162, 198, 248, 0.22);
@@ -705,7 +710,7 @@ h3 {
     border-radius: 50%;
     background-color: #ffffff;
     border: 3px solid #38bdf8;
-    transition: left 0.3s ease;
+    transition: left 0.3s var(--ease-standard);
     cursor: pointer;
     box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
 }
@@ -766,7 +771,7 @@ h3 {
 .progress-bar {
     height: 100%;
     background-color: #38bdf8;
-    transition: width 0.4s ease;
+    transition: width 0.4s var(--ease-standard);
 }
 
 .progress-label {
@@ -867,7 +872,7 @@ h3 {
     height: 100%;
     border-radius: 3px;
     background-color: #4ade80;   /* updated by JS to match state colour */
-    transition: width 0.4s ease, background-color 0.3s ease;
+    transition: width 0.4s var(--ease-standard), background-color 0.3s var(--ease-standard);
 }
 .chart_block {
     width: 100%;
@@ -905,7 +910,7 @@ h3 {
     pointer-events: none;
     z-index: 1000;
     opacity: 0;
-    transition: opacity 0.1s ease;
+    transition: opacity 0.1s var(--ease-standard);
 
     background-color: rgba(8, 14, 28, 0.85);
     border: 1px solid rgba(148, 197, 255, 0.28);
@@ -972,7 +977,7 @@ h3 {
     cursor: pointer;
     outline: none;
 
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    transition: background 0.15s var(--ease-standard), border-color 0.15s var(--ease-standard), color 0.15s var(--ease-standard);
 
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%237aa6d4'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -1048,7 +1053,7 @@ h3 {
 
     cursor: pointer;
 
-    transition: background 0.15s ease;
+    transition: background 0.15s var(--ease-standard);
 }
 
 .resolution-panel button:hover {
@@ -1218,7 +1223,7 @@ h3 {
    states signal interactivity without being noisy. */
 .astro-card {
     cursor: pointer;
-    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    transition: transform 0.15s var(--ease-standard), border-color 0.15s var(--ease-standard), background 0.15s var(--ease-standard);
 }
 
 .astro-card:hover {
@@ -1281,18 +1286,39 @@ h3 {
     padding-bottom: max(24px, env(safe-area-inset-bottom));
     padding-left:   max(24px, env(safe-area-inset-left));
     box-sizing: border-box;
+
+    /* allow-discrete lets `display` participate in the transition: on
+       close, the modal fades out and *then* flips to display:none. On
+       open, @starting-style provides the initial opacity:0 / translateY
+       state so the entrance also animates. Browsers without @starting-style
+       support (older Safari/Firefox) snap to the shown state — acceptable
+       fallback. */
+    opacity: 0;
+    transition:
+        opacity 0.18s var(--ease-standard),
+        display 0.18s var(--ease-standard) allow-discrete;
 }
 
 .astro-modal.open {
     display: flex;
+    opacity: 1;
+
+    @starting-style {
+        opacity: 0;
+    }
 }
 
 .astro-modal-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(8, 14, 28, 0.66);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    /* Light tint + strong blur instead of a heavy black dim. The blur
+       provides the focus separation (page becomes abstract atmosphere)
+       while the low alpha keeps the sky color alive — so the safe-area
+       strip around the panel reads as the same sky the URL bar and
+       status bar are tinted with, rather than a black band. */
+    background: rgba(8, 14, 28, 0.28);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
     /* Swallow touch-drag gestures so the page underneath can't be
        scrolled by dragging the backdrop on iOS / Android. */
     touch-action: none;
@@ -1308,21 +1334,36 @@ h3 {
     max-height: 100%;
     display: flex;
     flex-direction: column;
-    /* color-mix gives the panel a subtle vertical fade (top brighter,
-       bottom slightly darker) while still riding on the dynamic palette. */
+    /* Tinted glass instead of a flat opaque panel. The semi-transparent
+       card-bg-strong (kept at 0.92 alpha for text contrast) gets layered
+       over its own backdrop-filter — so the panel reads as the same
+       atmospheric material as the dashboard cards, just denser. The
+       vertical color-mix fade keeps the slight top-brighter / bottom-
+       darker depth from the previous solid version. */
     background: linear-gradient(180deg,
         var(--card-bg-strong),
         color-mix(in srgb, var(--card-bg-strong) 85%, #000 15%));
+    backdrop-filter: blur(12px) saturate(1.3);
+    -webkit-backdrop-filter: blur(12px) saturate(1.3);
     border: 1px solid var(--card-border-strong);
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
     overflow: hidden;
-    animation: astro-modal-enter 0.18s ease-out;
+    /* Shown state. The matching .astro-modal.open .astro-modal-panel rule
+       below uses @starting-style to provide an off-screen + transparent
+       initial frame, which then transitions into this state. */
+    transform: translateY(0);
+    opacity: 1;
+    transition:
+        transform 0.18s var(--ease-standard),
+        opacity   0.18s var(--ease-standard);
 }
 
-@keyframes astro-modal-enter {
-    from { transform: translateY(8px); opacity: 0; }
-    to   { transform: translateY(0);   opacity: 1; }
+.astro-modal.open .astro-modal-panel {
+    @starting-style {
+        transform: translateY(8px);
+        opacity: 0;
+    }
 }
 
 .astro-modal-header {
@@ -1355,7 +1396,7 @@ h3 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s var(--ease-standard), color 0.15s var(--ease-standard);
 }
 
 .astro-modal-close:hover {
@@ -1525,6 +1566,17 @@ h3 {
         padding-bottom: max(12px, env(safe-area-inset-bottom));
         padding-left:   max(12px, env(safe-area-inset-left));
     }
+    .astro-modal-panel {
+        /* On phones, deliberately constrain to ~2/3 of the viewport so a
+           generous strip of the dashboard stays visible around the modal.
+           This reads as "a sheet floated over the page" instead of "a new
+           page that happens to have rounded corners". .astro-modal-body
+           already has overflow-y: auto, so anything that doesn't fit
+           scrolls inside. 65vh is the fallback for browsers without dvh. */
+        max-height: 65vh;
+        max-height: 65dvh;
+        max-width: 420px;
+    }
     .modal-grid  { grid-template-columns: 1fr; gap: 8px; }
     .modal-moon-hero .moon-disk { width: 68px; height: 68px; }
     .modal-moon-hero .phase-name { font-size: 1.2rem; }
@@ -1570,7 +1622,7 @@ h3 {
     color: var(--text-secondary);
     text-decoration: none;
     z-index: 5;
-    transition: color 0.15s ease, transform 0.2s ease;
+    transition: color 0.15s var(--ease-standard), transform 0.2s var(--ease-standard);
 }
 
 .admin-gear:hover {
@@ -1613,7 +1665,7 @@ h3 {
     background-color: #64748b;
     flex-shrink: 0;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s var(--ease-standard), box-shadow 0.15s var(--ease-standard);
     box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
 }
 
@@ -1641,7 +1693,7 @@ h3 {
 .details-popup.open {
     display: block;
     visibility: visible;
-    animation: popup-in 0.15s ease forwards;
+    animation: popup-in 0.15s var(--ease-standard) forwards;
 }
 
 @keyframes popup-in {
