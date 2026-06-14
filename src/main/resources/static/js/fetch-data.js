@@ -314,12 +314,196 @@ function renderAstronomyLive(sunSnapshot, moonSnapshot) {
     setPositionPill('sun-position',  sunSnapshot?.currentAltitude);
     setPositionPill('moon-position', moonSnapshot?.currentAltitude);
 
+    renderSkyBackground(sunSnapshot?.currentAltitude);
+
     if (moonSnapshot?.phase) {
         renderMoonPhase(moonSnapshot.phase);
     }
 
     // Keep the open modal's live fields in sync on every poll tick.
     if (state.openModal) renderActiveModal();
+}
+
+// ==========================================
+// DYNAMIC SKY BACKGROUND & CARD COLORS
+// ==========================================
+//
+// Anchor table: each row defines, for a given sun altitude (degrees),
+// the top/bottom sky gradient colors plus the card surface and accent
+// (border + divider) colors. The current altitude is linearly
+// interpolated between bracketing anchors and the results are written
+// into CSS custom properties; @property + a 12s transition do the
+// smooth animation between values.
+//
+// Card colors stay cool/blue across all phases so light text remains
+// readable; they shift just enough in brightness and saturation to
+// harmonise with the sky rather than fight it. The +30° anchor matches
+// the original static palette so the daytime "baseline" is unchanged.
+//
+// Symmetric in altitude — dawn and dusk render identically because they
+// hit the same altitude values on the way up vs the way down.
+const SKY_ANCHORS = [
+    // alt   sky top              sky bottom            card bg              card accent (border + divider)
+    { alt: -18, top: [  8,  13,  26], bottom: [ 19,  26,  46], cardBg: [ 22,  30,  56], cardAcc: [125, 145, 195] },  // astronomical night
+    { alt: -12, top: [ 14,  26,  54], bottom: [ 29,  42,  82], cardBg: [ 28,  40,  75], cardAcc: [138, 158, 210] },  // nautical twilight
+    { alt:  -6, top: [ 29,  38,  73], bottom: [ 61,  58, 110], cardBg: [ 40,  52, 102], cardAcc: [148, 168, 222] },  // civil twilight
+    { alt:  -1, top: [ 42,  59, 106], bottom: [196, 122,  82], cardBg: [ 52,  72, 125], cardAcc: [165, 188, 235] },  // horizon (rise/set)
+    { alt:   5, top: [ 62,  90, 142], bottom: [232, 160, 106], cardBg: [ 55,  92, 152], cardAcc: [172, 200, 240] },  // golden hour
+    { alt:  15, top: [ 38,  85, 155], bottom: [100, 160, 200], cardBg: [ 55,  95, 160], cardAcc: [168, 202, 245] },  // morning / late afternoon
+    { alt:  30, top: [ 25,  95, 175], bottom: [ 80, 160, 205], cardBg: [ 52,  92, 162], cardAcc: [165, 200, 248] },  // mid-day blue
+    { alt:  50, top: [ 22,  90, 170], bottom: [ 65, 145, 210], cardBg: [ 50,  90, 160], cardAcc: [175, 210, 252] },  // bright midday
+];
+
+// Alpha channels for the card surface and accent vars. Kept constant
+// across phases so only the hue/value shifts — the apparent solidity
+// of cards doesn't change with the sky.
+const CARD_BG_ALPHA           = 0.64;
+const CARD_BORDER_ALPHA       = 0.22;
+const DIVIDER_ALPHA           = 0.16;
+// Stronger variants for elements that need to feel solid against the
+// page (FAB, modal panel, astro-card hover state).
+const CARD_BG_STRONG_ALPHA     = 0.92;
+const CARD_BORDER_STRONG_ALPHA = 0.32;
+
+function lerpChannel(a, b, t) {
+    return Math.round(a + (b - a) * t);
+}
+
+function lerpTriplet(a, b, t) {
+    return [lerpChannel(a[0], b[0], t), lerpChannel(a[1], b[1], t), lerpChannel(a[2], b[2], t)];
+}
+
+function rgbString([r, g, b])          { return `rgb(${r}, ${g}, ${b})`; }
+function rgbaString([r, g, b], alpha)  { return `rgba(${r}, ${g}, ${b}, ${alpha})`; }
+function rgbHex([r, g, b])             { return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join(''); }
+
+function buildSkyState(lo, hi, t) {
+    const topRgb    = lerpTriplet(lo.top,     hi.top,     t);
+    const bottomRgb = lerpTriplet(lo.bottom,  hi.bottom,  t);
+    const cardBgRgb = lerpTriplet(lo.cardBg,  hi.cardBg,  t);
+    const accRgb    = lerpTriplet(lo.cardAcc, hi.cardAcc, t);
+
+    return {
+        top:              rgbString(topRgb),
+        bottom:           rgbString(bottomRgb),
+        cardBg:           rgbaString(cardBgRgb, CARD_BG_ALPHA),
+        cardBorder:       rgbaString(accRgb,    CARD_BORDER_ALPHA),
+        divider:          rgbaString(accRgb,    DIVIDER_ALPHA),
+        // Solid-feeling variants — same hue, higher alpha. Used by FAB,
+        // modal panel, and card hover so they harmonise with the cards
+        // but read as a layer above the page.
+        cardBgStrong:     rgbaString(cardBgRgb, CARD_BG_STRONG_ALPHA),
+        cardBorderStrong: rgbaString(accRgb,    CARD_BORDER_STRONG_ALPHA),
+        // Hex forms for <meta name="theme-color"> — some older browsers
+        // only accept hex there, even though modern ones happily take
+        // rgb() / rgba(). The bottom color tracks the iOS Safari URL bar
+        // (which sits at the bottom of the viewport); the top is kept
+        // available for browsers with a top-mounted URL bar.
+        topHex:           rgbHex(topRgb),
+        bottomHex:        rgbHex(bottomRgb),
+    };
+}
+
+// iOS Safari caches the <meta name="theme-color"> value from initial page
+// load and ignores subsequent `setAttribute('content', ...)` updates — the
+// URL bar (and the bottom liquid-glass toolbar it feeds) keeps the old tint
+// until a navigation forces a re-read. The workaround is to replace the
+// element entirely each tick, which Safari treats as a fresh signal.
+//
+// On Chrome / Edge / Android Chrome, in-place mutation does work — but
+// replacing the element works too, and the cost is one DOM op every 30s.
+function setBrowserChromeColor(hex) {
+    const old = document.head.querySelector('meta[name="theme-color"]');
+    if (old && old.getAttribute('content') === hex) return;
+    const fresh = document.createElement('meta');
+    fresh.setAttribute('name', 'theme-color');
+    fresh.setAttribute('content', hex);
+    if (old) {
+        old.replaceWith(fresh);
+    } else {
+        document.head.appendChild(fresh);
+    }
+}
+
+function computeSkyColors(altitudeDeg) {
+    if (altitudeDeg == null) return null;
+
+    const first = SKY_ANCHORS[0];
+    const last  = SKY_ANCHORS[SKY_ANCHORS.length - 1];
+
+    if (altitudeDeg <= first.alt) return buildSkyState(first, first, 0);
+    if (altitudeDeg >= last.alt)  return buildSkyState(last,  last,  0);
+
+    for (let i = 0; i < SKY_ANCHORS.length - 1; i++) {
+        const lo = SKY_ANCHORS[i];
+        const hi = SKY_ANCHORS[i + 1];
+        if (altitudeDeg >= lo.alt && altitudeDeg <= hi.alt) {
+            const t = (altitudeDeg - lo.alt) / (hi.alt - lo.alt);
+            return buildSkyState(lo, hi, t);
+        }
+    }
+    return null;
+}
+
+let skyBackgroundPrimed = false;
+
+function renderSkyBackground(sunAltitudeDeg) {
+    const colors = computeSkyColors(sunAltitudeDeg);
+    // No altitude data → leave the CSS custom properties at their
+    // initial values, which match the original static palette.
+    if (!colors) return;
+    const root = document.documentElement;
+
+    // First successful render snaps directly to the correct sky instead
+    // of animating in from the static deep-blue defaults. Subsequent
+    // ticks use the 12s transition defined on :root.
+    const snap = !skyBackgroundPrimed;
+    if (snap) root.style.transition = 'none';
+
+    root.style.setProperty('--bg-grad-top',        colors.top);
+    root.style.setProperty('--bg-grad-bottom',     colors.bottom);
+    root.style.setProperty('--card-bg',            colors.cardBg);
+    root.style.setProperty('--card-border',        colors.cardBorder);
+    root.style.setProperty('--divider',            colors.divider);
+    root.style.setProperty('--card-bg-strong',     colors.cardBgStrong);
+    root.style.setProperty('--card-border-strong', colors.cardBorderStrong);
+
+    if (snap) {
+        // Flush the no-transition styles, then clear the inline override
+        // so the stylesheet's transition rule applies to the next update.
+        void root.offsetWidth;
+        root.style.transition = '';
+        skyBackgroundPrimed = true;
+    }
+
+    // Browser chrome (URL bar on Chrome / Android / iOS Safari 15+) reads
+    // the <meta name="theme-color"> tag. We track the *bottom* of the sky
+    // gradient because the iOS Safari URL bar — the main consumer of this
+    // signal — sits at the bottom of the viewport; tracking the top would
+    // leave a visible color seam between the toolbar tint and the page
+    // above it. setBrowserChromeColor replaces the element to work around
+    // iOS Safari's caching of the initial value.
+    setBrowserChromeColor(colors.bottomHex);
+
+    // Persist the resolved palette so the inline <head> script can apply
+    // it before first paint on the *next* load. Safari (iOS + macOS) only
+    // samples theme-color / page colors once at initial paint and ignores
+    // subsequent JS updates, so the only way to make the URL bar / toolbar
+    // tint match reality is to have the right values already present in
+    // the document when Safari samples it. After one successful tick this
+    // cache is the most accurate snapshot available.
+    try {
+        localStorage.setItem('skyColors', JSON.stringify({
+            top:              colors.top,
+            bottom:           colors.bottom,
+            cardBg:           colors.cardBg,
+            cardBorder:       colors.cardBorder,
+            divider:          colors.divider,
+            cardBgStrong:     colors.cardBgStrong,
+            cardBorderStrong: colors.cardBorderStrong,
+            bottomHex:        colors.bottomHex,
+        }));
+    } catch (e) { /* private mode / quota — fall back to defaults next load */ }
 }
 
 function setPositionPill(elementId, altitudeDeg) {

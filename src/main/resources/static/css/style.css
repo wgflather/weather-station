@@ -34,10 +34,104 @@
     --card-bg:           rgba(45, 78, 143, 0.64);
     --card-border:       rgba(162, 198, 248, 0.22);
     --divider:           rgba(170, 205, 250, 0.16);
+
+    /* Higher-opacity surface variants used by elements that need to look
+       solid against the page (FAB, modal panel, card hover state). Same
+       hue as --card-bg, just denser — so they harmonise with cards but
+       read as "above the page" rather than "part of it". iOS Safari's
+       liquid glass toolbar samples whatever's at the bottom edge of the
+       viewport, so the FAB color in particular has to be dynamic, not
+       hardcoded, or the toolbar tint freezes at the static blue. */
+    --card-bg-strong:     rgba(45, 78, 143, 0.92);
+    --card-border-strong: rgba(162, 198, 248, 0.32);
+
+    /* Sky gradient — driven by sun altitude from JS (see renderSkyBackground).
+       Defaults match the original static palette so the page looks right
+       before the first live snapshot arrives, or if altitude data is
+       unavailable for any reason. */
+    --bg-grad-top:    #21376e;
+    --bg-grad-bottom: #3b629b;
+
+    /* 12s transition feels deliberate without becoming a constant
+       animation between the 30s poll ticks. Cards drift in unison
+       with the sky so the surface always harmonises with the gradient. */
+    transition:
+        --bg-grad-top        12s ease,
+        --bg-grad-bottom     12s ease,
+        --card-bg            12s ease,
+        --card-border        12s ease,
+        --divider            12s ease,
+        --card-bg-strong     12s ease,
+        --card-border-strong 12s ease;
+}
+
+/* `@property` makes the custom properties typed colors so CSS can
+   interpolate between them instead of snapping. Supported in Safari
+   16.4+, Chrome 85+, Firefox 128+. Older browsers ignore the rule and
+   the values simply snap on each update — still correct, just less
+   smooth. */
+@property --bg-grad-top {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #21376e;
+}
+
+@property --bg-grad-bottom {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #3b629b;
+}
+
+@property --card-bg {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(45, 78, 143, 0.64);
+}
+
+@property --card-border {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(162, 198, 248, 0.22);
+}
+
+@property --divider {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(170, 205, 250, 0.16);
+}
+
+@property --card-bg-strong {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(45, 78, 143, 0.92);
+}
+
+@property --card-border-strong {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(162, 198, 248, 0.32);
+}
+
+/* Respect user motion preference: skip the long gradient transition
+   for anyone who's set "Reduce motion" in their OS. */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        transition: none;
+    }
 }
 
 html {
-    background-color: #1e3e7a;
+    /* The browser propagates the html background to the canvas — it fills
+       overscroll bounce regions and the strip exposed under a mobile
+       bottom URL bar when it slides up. The bottom of the gradient is
+       what's adjacent to that strip, so the solid fallback matches that
+       region; the gradient layered on top handles the rest. Using
+       background-color as the fallback (rather than the shorthand, which
+       resets it to transparent) guarantees no white flash if the gradient
+       image fails to paint on a given browser. */
+    background-color: var(--bg-grad-bottom);
+    background-image: linear-gradient(180deg, var(--bg-grad-top) 0%, var(--bg-grad-bottom) 100%);
+    background-attachment: fixed;
 }
 
 body {
@@ -60,7 +154,7 @@ body::before {
     position: fixed;
     inset: 0;
     z-index: -1;
-    background: linear-gradient(180deg, #21376e 0%, #1e3e7a 50%, #3b629b 100%);
+    background: linear-gradient(180deg, var(--bg-grad-top) 0%, var(--bg-grad-bottom) 100%);
 }
 
 
@@ -81,12 +175,12 @@ body::before {
 
 .safari-top-anchor {
     top: 0;
-    background-color: #21376e;
+    background-color: var(--bg-grad-top);
 }
 
 .safari-bottom-anchor {
     bottom: 0;
-    background-color: #3b629b;
+    background-color: var(--bg-grad-bottom);
 }
 
 /* =========================================================
@@ -1125,8 +1219,8 @@ h3 {
 }
 
 .astro-card:hover {
-    border-color: rgba(162, 198, 248, 0.42);
-    background: rgba(45, 78, 143, 0.78);
+    border-color: var(--card-border-strong);
+    background: var(--card-bg-strong);
 }
 
 .astro-card:focus-visible {
@@ -1211,8 +1305,12 @@ h3 {
     max-height: 100%;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgba(45, 78, 143, 0.92), rgba(35, 60, 115, 0.92));
-    border: 1px solid rgba(162, 198, 248, 0.32);
+    /* color-mix gives the panel a subtle vertical fade (top brighter,
+       bottom slightly darker) while still riding on the dynamic palette. */
+    background: linear-gradient(180deg,
+        var(--card-bg-strong),
+        color-mix(in srgb, var(--card-bg-strong) 85%, #000 15%));
+    border: 1px solid var(--card-border-strong);
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
     overflow: hidden;
@@ -1502,8 +1600,11 @@ h3 {
         width: 52px;
         height: 52px;
         border-radius: 50%;
-        background: rgba(42, 74, 138, 0.92);
-        border: 1px solid rgba(170, 210, 255, 0.34);
+        /* Dynamic palette — also drives the iOS Safari liquid-glass
+           toolbar tint, since the FAB sits at the bottom of the viewport
+           in the area Safari samples. */
+        background: var(--card-bg-strong);
+        border: 1px solid var(--card-border-strong);
         color: var(--text-secondary);
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
         z-index: 500;

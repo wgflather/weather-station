@@ -2,9 +2,47 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- Initial value matches the static-palette bottom color; JS updates
+         this on every live tick (see renderSkyBackground). The bottom is
+         what the iOS Safari URL bar (at the page bottom) is adjacent to,
+         so tracking the bottom avoids a visible color seam there. -->
+    <meta name="theme-color" content="#3b629b">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Weather Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
+    <!-- Apply last-known sky colors *before* first paint. Safari (both iOS
+         and macOS) reads <meta theme-color> once during initial sampling
+         and caches it for the URL bar / toolbar tint — the JS-driven
+         dynamic updates that run later are silently ignored. By stamping
+         the most recent values into the document head synchronously, the
+         cached snapshot Safari grabs is already close to the actual sky
+         instead of the static-palette default. fetch-data.js writes this
+         cache after every successful sky render. -->
+    <script>
+        (function applyCachedSky() {
+            let cached;
+            try { cached = JSON.parse(localStorage.getItem('skyColors')); } catch (e) { return; }
+            if (!cached) return;
+            const root = document.documentElement;
+            const vars = [
+                ['--bg-grad-top',        cached.top],
+                ['--bg-grad-bottom',     cached.bottom],
+                ['--card-bg',            cached.cardBg],
+                ['--card-border',        cached.cardBorder],
+                ['--divider',            cached.divider],
+                ['--card-bg-strong',     cached.cardBgStrong],
+                ['--card-border-strong', cached.cardBorderStrong],
+            ];
+            for (const [name, value] of vars) {
+                if (typeof value === 'string') root.style.setProperty(name, value);
+            }
+            if (typeof cached.bottomHex === 'string') {
+                const meta = document.head.querySelector('meta[name="theme-color"]');
+                if (meta) meta.setAttribute('content', cached.bottomHex);
+            }
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 </head>
