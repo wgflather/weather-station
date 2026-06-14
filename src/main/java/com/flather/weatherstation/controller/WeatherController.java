@@ -30,10 +30,6 @@ public class WeatherController {
   private final AnalyticsService analyticsService;
   private final DashboardService dashboardService;
 
-  @GetMapping(LATEST_WEATHER_PATH)
-  public ResponseEntity<WeatherRecordResponseDto> getLatestWeatherRecord() {
-    return ResponseEntity.ok(service.getLatestTodayWeatherRecord().orElse(null));
-  }
 
   @PostMapping(BASE_PATH)
   public ResponseEntity<WeatherRecordResponseDto> createNewWeatherRecord(

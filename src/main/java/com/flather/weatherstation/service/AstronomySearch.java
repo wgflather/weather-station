@@ -221,7 +221,7 @@ public class AstronomySearch {
   public long getDayDuration() {
     ZonedDateTime sunriseTime = engine.findWhenAtAltitude(Body.Sun, Direction.Rise, HORIZON_DEG);
     ZonedDateTime sunsetTime = engine.findWhenAtAltitude(Body.Sun, Direction.Set, HORIZON_DEG);
-    Duration duration = Duration.between(sunsetTime, sunriseTime);
+    Duration duration = Duration.between(sunriseTime, sunsetTime);
     return duration.getSeconds();
   }
 

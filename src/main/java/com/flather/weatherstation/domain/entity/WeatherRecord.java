@@ -30,7 +30,7 @@ public class WeatherRecord {
 
   private Double humidity;
 
-  private Long surfaceWetness;
+  private Double surfaceWetness;
 
   @Column(name = "humidity_data_quality")
   @Enumerated(EnumType.STRING)

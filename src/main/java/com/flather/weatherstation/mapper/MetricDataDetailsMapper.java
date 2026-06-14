@@ -6,7 +6,6 @@ import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.dashboard.MetricDataDetails;
 import java.time.ZoneId;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -46,7 +45,7 @@ public class MetricDataDetailsMapper {
 
       case SURFACE_WETNESS ->
           new MetricDataDetails(
-              Optional.ofNullable(entity.getSurfaceWetness()).map(Long::doubleValue).orElse(null),
+              entity.getSurfaceWetness(),
               entity.getMeasuredAt().atZone(zoneId),
               entity.getSurfaceWetnessDataQuality(),
               config.surfaceWetnessSensor(),

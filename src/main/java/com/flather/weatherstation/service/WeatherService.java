@@ -99,26 +99,23 @@ public class WeatherService {
         validateIfOk(
             Metric.HUMIDITY, anomalyAndMissingValidationResult, weatherRecordDto.getHumidity());
 
-    updateCache(tempQuality, Metric.TEMPERATURE, record.getTemperature());
+
 
     record.setTemperatureDataQuality(tempQuality);
-
-    updateCache(pressureQuality, Metric.PRESSURE, record.getPressure());
-
     record.setPressureDataQuality(pressureQuality);
-
-    updateCache(humidityQuality, Metric.HUMIDITY, record.getHumidity());
-
     record.setHumidityDataQuality(humidityQuality);
-
     record.setSurfaceWetnessDataQuality(
-        anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
+            anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
 
     // ============================
     // persist
     // ============================
 
     WeatherRecord savedRecord = repository.save(record);
+
+    updateCache(pressureQuality, Metric.PRESSURE, record.getPressure());
+    updateCache(tempQuality, Metric.TEMPERATURE, record.getTemperature());
+    updateCache(humidityQuality, Metric.HUMIDITY, record.getHumidity());
 
     // ============================
     // metadata update
@@ -130,22 +127,5 @@ public class WeatherService {
     sensorStateCache.updateCachedMeasurements(savedRecord);
 
     return mapper.weatherEntityToDto(savedRecord);
-  }
-
-  @Transactional(readOnly = true)
-  public Optional<WeatherRecordResponseDto> getLatestTodayWeatherRecord() {
-
-    ZoneId zoneId = configurationCache.getLocationContext().zoneId();
-
-    LocalDate currentDate = LocalDate.now(zoneId);
-
-    Instant startOfTheCurrentDate = currentDate.atStartOfDay(zoneId).toInstant();
-
-    Instant endOfTheCurrentDate = currentDate.plusDays(1).atStartOfDay(zoneId).toInstant();
-
-    return repository
-        .findFirstByMeasuredAtBetweenOrderByMeasuredAtDesc(
-            startOfTheCurrentDate, endOfTheCurrentDate)
-        .map(mapper::weatherEntityToDto);
   }
 }

@@ -85,7 +85,7 @@ public class MeteoMath {
     return new TrendResult(hourlyChange, direction);
   }
 
-  public static double rawToWetnessPct(long raw, int dryBaseline, int wetBaseline) {
+  public static double rawToWetnessPct(double raw, int dryBaseline, int wetBaseline) {
     double range = dryBaseline - wetBaseline;
     double clamped = Math.min(dryBaseline, Math.max(wetBaseline, raw));
     return ((dryBaseline - clamped) / range) * 100.0;

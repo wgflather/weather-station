@@ -6,6 +6,7 @@ import com.flather.weatherstation.domain.constant.*;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
+import com.flather.weatherstation.dto.dashboard.MetricDataDetails;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
 import com.flather.weatherstation.repository.DateRangeHelper;
@@ -138,20 +139,29 @@ public class AnalyticsService {
   }
 
   public SurfaceWetnessDto getSurfaceWetness() {
-    long rawAdc = sensorStateCache.getMetricsWindow().getLast().getSurfaceWetness();
-    double pctWetness =
-        MeteoMath.rawToWetnessPct(
-            rawAdc,
-            configurationCache.getValidationConfig().surfaceWetnessDryBaseline(),
-            configurationCache.getValidationConfig().surfaceWetnessWetBaseline());
+    List<WeatherRecord> window = sensorStateCache.getMetricsWindow();
+    if (window.isEmpty()) {
+      return new SurfaceWetnessDto(null, null, SurfaceWetnessStatus.DRY);
+    }
 
-    return new SurfaceWetnessDto(
-        pctWetness,
+    Double raw = window.getLast().getSurfaceWetness();
+    MetricDataDetails dataDetails =
         metricDataDetailsMapper.from(
             sensorStateCache.getLastSavedMeasurement(),
             Metric.SURFACE_WETNESS,
-            configurationCache.getHardwareConfig()),
-        SurfaceWetnessStatus.classify(pctWetness));
+            configurationCache.getHardwareConfig());
+
+    if (raw == null) {
+      return new SurfaceWetnessDto(null, dataDetails, SurfaceWetnessStatus.DRY);
+    }
+
+    double pctWetness =
+        MeteoMath.rawToWetnessPct(
+            raw,
+            configurationCache.getValidationConfig().surfaceWetnessDryBaseline(),
+            configurationCache.getValidationConfig().surfaceWetnessWetBaseline());
+
+    return new SurfaceWetnessDto(pctWetness, dataDetails, SurfaceWetnessStatus.classify(pctWetness));
   }
 
   public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric, String resolution) {

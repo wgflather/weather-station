@@ -16,7 +16,7 @@ public class WeatherRecordResponseDto {
 
   private Double humidity;
 
-  private Long surfaceWetness;
+  private Double surfaceWetness;
 
   private ZonedDateTime measuredAtTimeZoned;
 }

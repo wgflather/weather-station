@@ -10,7 +10,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,7 +68,7 @@ public class DataQualityValidator {
 
     validateMetric(
         Metric.SURFACE_WETNESS,
-        Optional.ofNullable(anomalyDto.getSurfaceWetness()).map(Long::doubleValue).orElse(null),
+        anomalyDto.getSurfaceWetness(),
         validation.surfaceWetnessWetBaseline(),
         validation.surfaceWetnessDryBaseline(),
         dataQualityMap);
