@@ -116,7 +116,6 @@ public class AstronomyEngine {
   public Time searchAltitudeRaw(Body body, Direction direction, double altitudeDeg) {
     return Astronomy.searchAltitude(
         body, observer(), direction, todayMidnight(), SEARCH_LIMIT_DAYS, altitudeDeg);
-    Astronomy.illumination()
   }
 
   /**
