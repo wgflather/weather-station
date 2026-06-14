@@ -4,12 +4,12 @@ import lombok.Getter;
 
 @Getter
 public enum DailyCurveResolution {
-    CARD(10),
-    FULL_CHART(1);
+  CARD(10),
+  FULL_CHART(1);
 
-    private final int stepSize;
+  private final int stepSize;
 
-    DailyCurveResolution(int stepSize){
-        this.stepSize = stepSize;
-    }
+  DailyCurveResolution(int stepSize) {
+    this.stepSize = stepSize;
+  }
 }

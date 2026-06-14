@@ -46,15 +46,11 @@ public class AnalyticsService {
     return repository.findRecordsBetween(range.startTime(), range.endTime());
   }
 
-  public ZonedDateTime findLastRecordTime() {
-    if (sensorStateCache.getLastSavedMeasurement() != null) {
-      return sensorStateCache
+  public Optional<ZonedDateTime> findLastRecordTime() {
+      return Optional.of(sensorStateCache
           .getLastSavedMeasurement()
           .getMeasuredAt()
-          .atZone(configurationCache.getLocationContext().zoneId());
-    }
-
-    return null;
+          .atZone(configurationCache.getLocationContext().zoneId()));
   }
 
   public long getLagMinutes(ZonedDateTime lastRecord) {
@@ -161,10 +157,11 @@ public class AnalyticsService {
             configurationCache.getValidationConfig().surfaceWetnessDryBaseline(),
             configurationCache.getValidationConfig().surfaceWetnessWetBaseline());
 
-    return new SurfaceWetnessDto(pctWetness, dataDetails, SurfaceWetnessStatus.classify(pctWetness));
+    return new SurfaceWetnessDto(
+        pctWetness, dataDetails, SurfaceWetnessStatus.classify(pctWetness));
   }
 
-  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric, String resolution) {
+  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric, int resolution) {
     String bucketInterval = resolution + "minutes";
     switch (metric) {
       case TEMPERATURE -> {
@@ -190,7 +187,7 @@ public class AnalyticsService {
         .toList();
   }
 
-  public ChartDto returnChart(Metric metric, String since, String resolution) {
+  public ChartDto returnChart(Metric metric, String since, int resolution) {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
     Instant sinceInstant =
         (since == null)
@@ -203,7 +200,7 @@ public class AnalyticsService {
 
     if (!dtos.isEmpty()) {
       nextBucketExpectedAt =
-          getNextExpectedBucketEpochMillis(dtos.getLast().hour(), Integer.parseInt(resolution));
+          getNextExpectedBucketEpochMillis(dtos.getLast().hour(), resolution);
     }
 
     return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt);

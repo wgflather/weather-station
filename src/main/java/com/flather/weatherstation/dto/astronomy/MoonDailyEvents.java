@@ -11,4 +11,5 @@ import java.util.List;
  * @param set moonset — moment the moon's upper limb crosses the horizon going down.
  * @param peak today's lunar transit: peak altitude (degrees) and the time it occurs.
  */
-public record MoonDailyEvents(ZonedDateTime rise, ZonedDateTime set, TransitDto peak, List<AstronomyPoint> moonCurve) {}
+public record MoonDailyEvents(
+    ZonedDateTime rise, ZonedDateTime set, TransitDto peak, List<AstronomyPoint> moonCurve) {}

@@ -8,6 +8,8 @@ import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.Optional;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,8 +30,9 @@ public class DashboardService {
   }
 
   public SystemHealthDashboardDto getSystemHealth() {
-    ZonedDateTime lastUpdate = analyticsService.findLastRecordTime();
-    if (lastUpdate == null) {
+    Optional<ZonedDateTime> lastUpdateOptional = analyticsService.findLastRecordTime();
+
+    if (lastUpdateOptional.isEmpty()) {
       return SystemHealthDashboardDto.builder()
           .status(DataStatus.EMPTY)
           .lagMinutes(0)
@@ -37,6 +40,8 @@ public class DashboardService {
           .lastMeasuredAt(null)
           .build();
     }
+
+    ZonedDateTime lastUpdate = lastUpdateOptional.get();
 
     long todayRecordsCount = analyticsService.findTodayRecordsCount();
     long lagMinutes = analyticsService.getLagMinutes(lastUpdate);

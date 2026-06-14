@@ -22,7 +22,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -34,8 +33,8 @@ import org.springframework.stereotype.Service;
  * display rounding, polar-condition classification, the Spring caching strategy keyed by {@link
  * #dailyKey()}, and altitude-curve downsampling via {@link #getLowResPoints}.
  *
- * <p>Contains no direct calls into the cosinekitty library — every position, illumination, or
- * event search is delegated to {@link AstronomyEngine}.
+ * <p>Contains no direct calls into the cosinekitty library — every position, illumination, or event
+ * search is delegated to {@link AstronomyEngine}.
  */
 @Service
 @RequiredArgsConstructor
@@ -70,13 +69,14 @@ public class AstronomySearch {
     long nightLength = getNightLength();
     List<AstronomyPoint> sunCurve = engine.generateWholeDayCurve(Body.Sun);
 
-    return new SunDailyEvents(sunRise, sunSet, solarNoon, sunTimes, dayLength, nightLength, sunCurve);
+    return new SunDailyEvents(
+        sunRise, sunSet, solarNoon, sunTimes, dayLength, nightLength, sunCurve);
   }
 
   /**
    * Thins a full-resolution altitude curve by keeping every {@code step}-th point. The first point
-   * is always included; the last may be dropped if {@code points.size()} is not divisible by
-   * {@code step} — acceptable for display use.
+   * is always included; the last may be dropped if {@code points.size()} is not divisible by {@code
+   * step} — acceptable for display use.
    */
   private List<AstronomyPoint> downsample(List<AstronomyPoint> points, int step) {
     List<AstronomyPoint> downsampledPoints = new ArrayList<>();
@@ -95,19 +95,21 @@ public class AstronomySearch {
 
   /**
    * Returns the altitude curve for the given body at the requested resolution. The full
-   * 1-minute-resolution curve is read from the daily-events cache (computed once per day),
-   * then downsampled in-memory to the number of points implied by {@code resolution}.
+   * 1-minute-resolution curve is read from the daily-events cache (computed once per day), then
+   * downsampled in-memory to the number of points implied by {@code resolution}.
    */
-  private List<AstronomyPoint> getLowResPoints(CelestialBody body, DailyCurveResolution resolution) {
+  private List<AstronomyPoint> getLowResPoints(
+      CelestialBody body, DailyCurveResolution resolution) {
     return downsample(getFullResPoints(body), resolution.getStepSize());
   }
 
   /** Returns the altitude curve for the given body and resolution, wrapped with metadata. */
   public AstronomyCurveDto getPoints(CelestialBody body, DailyCurveResolution resolution) {
-    List<AstronomyPoint> points = switch (resolution) {
-      case CARD -> getLowResPoints(body, resolution);
-      case FULL_CHART -> getFullResPoints(body);
-    };
+    List<AstronomyPoint> points =
+        switch (resolution) {
+          case CARD -> getLowResPoints(body, resolution);
+          case FULL_CHART -> getFullResPoints(body);
+        };
     return new AstronomyCurveDto(body, resolution, points);
   }
 

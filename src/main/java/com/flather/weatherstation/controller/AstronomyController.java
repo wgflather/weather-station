@@ -15,12 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/astronomy")
 public class AstronomyController {
 
-    private final AstronomySearch astronomySearch;
+  private final AstronomySearch astronomySearch;
 
-    @GetMapping("/curve")
-    public AstronomyCurveDto getBodyCurve(
-            @RequestParam(name = "body", defaultValue = "SUN") CelestialBody body,
-            @RequestParam(name = "resolution", defaultValue = "CARD") DailyCurveResolution resolution) {
-        return astronomySearch.getPoints(body, resolution);
-    }
+  @GetMapping("/curve")
+  public AstronomyCurveDto getBodyCurve(
+      @RequestParam(name = "body", defaultValue = "SUN") CelestialBody body,
+      @RequestParam(name = "resolution", defaultValue = "CARD") DailyCurveResolution resolution) {
+    return astronomySearch.getPoints(body, resolution);
+  }
 }

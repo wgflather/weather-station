@@ -30,7 +30,6 @@ public class WeatherController {
   private final AnalyticsService analyticsService;
   private final DashboardService dashboardService;
 
-
   @PostMapping(BASE_PATH)
   public ResponseEntity<WeatherRecordResponseDto> createNewWeatherRecord(
       @RequestBody WeatherRecordCreatedDto dto) {
@@ -52,7 +51,7 @@ public class WeatherController {
   @GetMapping(BASE_PATH + "/chart")
   public ResponseEntity<ChartDto> getChart(
       @RequestParam(value = "metric", defaultValue = "temperature") Metric metric,
-      @RequestParam(value = "resolution", defaultValue = "10") String resolution,
+      @RequestParam(value = "resolution", defaultValue = "10") int resolution,
       @RequestParam(required = false, value = "since") String since) {
     return ResponseEntity.ok(analyticsService.returnChart(metric, since, resolution));
   }

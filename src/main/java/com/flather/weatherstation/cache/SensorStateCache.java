@@ -119,7 +119,6 @@ public class SensorStateCache {
       dtos.forEach(this::addSpikes);
     }
 
-
     todayMaxTemp = extremesProjection.max();
     todayMinTemp = extremesProjection.min();
 

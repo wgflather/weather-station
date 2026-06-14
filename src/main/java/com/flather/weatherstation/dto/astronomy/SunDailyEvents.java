@@ -18,10 +18,10 @@ import java.util.List;
  * @param nightLengthSeconds length of astronomical night (sun below -18°), in seconds.
  */
 public record SunDailyEvents(
-        ZonedDateTime rise,
-        ZonedDateTime set,
-        TransitDto solarNoon,
-        SunTimesDto times,
-        long dayLengthSeconds,
-        long nightLengthSeconds,
-        List<AstronomyPoint> sunCurve) {}
+    ZonedDateTime rise,
+    ZonedDateTime set,
+    TransitDto solarNoon,
+    SunTimesDto times,
+    long dayLengthSeconds,
+    long nightLengthSeconds,
+    List<AstronomyPoint> sunCurve) {}

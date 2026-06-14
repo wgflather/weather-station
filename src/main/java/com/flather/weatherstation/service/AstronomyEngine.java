@@ -17,7 +17,6 @@ import io.github.cosinekitty.astronomy.Observer;
 import io.github.cosinekitty.astronomy.Refraction;
 import io.github.cosinekitty.astronomy.Time;
 import io.github.cosinekitty.astronomy.Topocentric;
-
 import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -134,13 +133,11 @@ public class AstronomyEngine {
     return new AstronomyPoint(toZoned(time), alt);
   }
 
-
-
   /**
-   * Samples the body's altitude every minute from midnight to midnight (inclusive), producing
-   * 1441 points on standard days. DST transitions shift the count by ±60. The full-resolution
-   * list is stored in the daily-events cache; callers that need fewer points should downsample
-   * via {@link AstronomySearch#downsample}.
+   * Samples the body's altitude every minute from midnight to midnight (inclusive), producing 1441
+   * points on standard days. DST transitions shift the count by ±60. The full-resolution list is
+   * stored in the daily-events cache; callers that need fewer points should downsample via {@link
+   * AstronomySearch#downsample}.
    */
   public List<AstronomyPoint> generateWholeDayCurve(Body body) {
     ZoneId zone = zoneId();
@@ -158,8 +155,6 @@ public class AstronomyEngine {
 
     return curve;
   }
-
-
 
   /**
    * Finds the next true rise or set today using the library's rise/set search, which accounts for

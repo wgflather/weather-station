@@ -560,27 +560,29 @@ function updateMoonCountdown(riseIso, setIso) {
 // Symmetric in altitude — dawn and dusk render identically because they
 // hit the same altitude values on the way up vs the way down.
 const SKY_ANCHORS = [
-    // alt   sky top              sky bottom            card bg              card accent (border + divider)
-    { alt: -18, top: [  8,  13,  26], bottom: [ 19,  26,  46], cardBg: [ 22,  30,  56], cardAcc: [125, 145, 195] },  // astronomical night
-    { alt: -12, top: [ 14,  26,  54], bottom: [ 29,  42,  82], cardBg: [ 28,  40,  75], cardAcc: [138, 158, 210] },  // nautical twilight
-    { alt:  -6, top: [ 29,  38,  73], bottom: [ 61,  58, 110], cardBg: [ 40,  52, 102], cardAcc: [148, 168, 222] },  // civil twilight
-    { alt:  -1, top: [ 42,  59, 106], bottom: [196, 122,  82], cardBg: [ 52,  72, 125], cardAcc: [165, 188, 235] },  // horizon (rise/set)
-    { alt:   5, top: [ 62,  90, 142], bottom: [232, 160, 106], cardBg: [ 55,  92, 152], cardAcc: [172, 200, 240] },  // golden hour
-    { alt:  15, top: [ 38,  85, 155], bottom: [100, 160, 200], cardBg: [ 55,  95, 160], cardAcc: [168, 202, 245] },  // morning / late afternoon
-    { alt:  30, top: [ 25,  95, 175], bottom: [ 80, 160, 205], cardBg: [ 52,  92, 162], cardAcc: [165, 200, 248] },  // mid-day blue
-    { alt:  50, top: [ 22,  90, 170], bottom: [ 65, 145, 210], cardBg: [ 50,  90, 160], cardAcc: [175, 210, 252] },  // bright midday
+    // alt   sky top              sky bottom            card bg (used for modal --card-bg-strong)
+    //                                                                        card accent          sky-rgb (ambient glow / accent tint)
+    { alt: -18, top: [  8,  13,  26], bottom: [ 19,  26,  46], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [ 90, 110, 200] },  // astronomical night
+    { alt: -12, top: [ 14,  26,  54], bottom: [ 29,  42,  82], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [ 90, 120, 215] },  // nautical twilight
+    { alt:  -6, top: [ 29,  38,  73], bottom: [ 61,  58, 110], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [105, 100, 210] },  // civil twilight
+    { alt:  -1, top: [ 42,  59, 106], bottom: [196, 122,  82], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [255, 150,  90] },  // horizon (rise/set)
+    { alt:   5, top: [ 62,  90, 142], bottom: [232, 160, 106], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [255, 165,  80] },  // golden hour
+    { alt:  15, top: [ 38,  85, 155], bottom: [100, 160, 200], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [120, 190, 255] },  // morning / late afternoon
+    { alt:  30, top: [ 25,  95, 175], bottom: [ 80, 160, 205], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [100, 180, 255] },  // mid-day blue
+    { alt:  50, top: [ 22,  90, 170], bottom: [ 65, 145, 210], cardBg: [18, 24, 52], cardAcc: [255, 255, 255], skyRgb: [ 80, 165, 245] },  // bright midday
 ];
 
-// Alpha channels for the card surface and accent vars. Kept constant
-// across phases so only the hue/value shifts — the apparent solidity
-// of cards doesn't change with the sky.
-const CARD_BG_ALPHA           = 0.64;
-const CARD_BORDER_ALPHA       = 0.22;
-const DIVIDER_ALPHA           = 0.16;
-// Stronger variants for elements that need to feel solid against the
-// page (FAB, modal panel, astro-card hover state).
-const CARD_BG_STRONG_ALPHA     = 0.92;
-const CARD_BORDER_STRONG_ALPHA = 0.32;
+// Alpha channels for card surface and accent.
+const CARD_BG_ALPHA           = 0.46;
+const CARD_BORDER_ALPHA       = 0.12;
+const DIVIDER_ALPHA           = 0.10;
+// Stronger variants for elements that sit above the page (modal panel, hover).
+const CARD_BG_STRONG_ALPHA     = 0.85;
+const CARD_BORDER_STRONG_ALPHA = 0.18;
+// Sky-ambient outer glow: the current sky bottom color applied as an outer
+// box-shadow — warm at sunset, cool-blue at midday, deep at night. Lower
+// alpha than the former inner glow since outer shadows need less density.
+const SKY_AMBIENT_ALPHA        = 0.15;
 
 function lerpChannel(a, b, t) {
     return Math.round(a + (b - a) * t);
@@ -594,11 +596,33 @@ function rgbString([r, g, b])          { return `rgb(${r}, ${g}, ${b})`; }
 function rgbaString([r, g, b], alpha)  { return `rgba(${r}, ${g}, ${b}, ${alpha})`; }
 function rgbHex([r, g, b])             { return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join(''); }
 
+// Shifts a color toward its own perceptual luminance (neutral grey), reducing
+// saturation without changing perceived brightness. ratio=0: unchanged;
+// ratio=1: fully grey. Used to normalize warm sunset colors so the ambient
+// glow doesn't appear significantly brighter than cool-sky versions.
+function desaturateColor([r, g, b], ratio) {
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return [
+        Math.round(r + (luma - r) * ratio),
+        Math.round(g + (luma - g) * ratio),
+        Math.round(b + (luma - b) * ratio),
+    ];
+}
+
 function buildSkyState(lo, hi, t) {
     const topRgb    = lerpTriplet(lo.top,     hi.top,     t);
     const bottomRgb = lerpTriplet(lo.bottom,  hi.bottom,  t);
     const cardBgRgb = lerpTriplet(lo.cardBg,  hi.cardBg,  t);
     const accRgb    = lerpTriplet(lo.cardAcc, hi.cardAcc, t);
+    const skyRgbArr = lerpTriplet(lo.skyRgb,  hi.skyRgb,  t);
+
+    // Desaturate ambient colors before use: warm sunset oranges and yellows
+    // are perceptually much brighter than cool blues at the same luminance.
+    // Shifting each color 55% toward its own luma (neutral grey) normalizes
+    // perceived brightness across all sky states while preserving temperature
+    // direction (warm vs cool remains distinguishable).
+    const ambientRgb = desaturateColor(bottomRgb, 0.55);
+    const accentRgb  = desaturateColor(skyRgbArr, 0.40);
 
     return {
         top:              rgbString(topRgb),
@@ -606,16 +630,14 @@ function buildSkyState(lo, hi, t) {
         cardBg:           rgbaString(cardBgRgb, CARD_BG_ALPHA),
         cardBorder:       rgbaString(accRgb,    CARD_BORDER_ALPHA),
         divider:          rgbaString(accRgb,    DIVIDER_ALPHA),
-        // Solid-feeling variants — same hue, higher alpha. Used by FAB,
-        // modal panel, and card hover so they harmonise with the cards
-        // but read as a layer above the page.
         cardBgStrong:     rgbaString(cardBgRgb, CARD_BG_STRONG_ALPHA),
         cardBorderStrong: rgbaString(accRgb,    CARD_BORDER_STRONG_ALPHA),
-        // Hex forms for <meta name="theme-color"> — some older browsers
-        // only accept hex there, even though modern ones happily take
-        // rgb() / rgba(). The bottom color tracks the iOS Safari URL bar
-        // (which sits at the bottom of the viewport); the top is kept
-        // available for browsers with a top-mounted URL bar.
+        // Desaturated bottom-sky at low alpha as outer box-shadow on cards.
+        // Retains warm/cool temperature direction without the brightness
+        // spike that raw orange/yellow would create at golden hour.
+        skyAmbient:       rgbaString(ambientRgb, SKY_AMBIENT_ALPHA),
+        // Desaturated sky-RGB triplet for CSS rgba() accent usage.
+        skyRgb:           accentRgb.join(', '),
         topHex:           rgbHex(topRgb),
         bottomHex:        rgbHex(bottomRgb),
     };
@@ -684,6 +706,8 @@ function renderSkyBackground(sunAltitudeDeg) {
     root.style.setProperty('--divider',            colors.divider);
     root.style.setProperty('--card-bg-strong',     colors.cardBgStrong);
     root.style.setProperty('--card-border-strong', colors.cardBorderStrong);
+    root.style.setProperty('--sky-ambient',        colors.skyAmbient);
+    root.style.setProperty('--sky-rgb',            colors.skyRgb);
 
     if (snap) {
         // Flush the no-transition styles, then clear the inline override
@@ -711,6 +735,7 @@ function renderSkyBackground(sunAltitudeDeg) {
     // cache is the most accurate snapshot available.
     try {
         localStorage.setItem('skyColors', JSON.stringify({
+            version:          '2',
             top:              colors.top,
             bottom:           colors.bottom,
             cardBg:           colors.cardBg,
@@ -718,6 +743,8 @@ function renderSkyBackground(sunAltitudeDeg) {
             divider:          colors.divider,
             cardBgStrong:     colors.cardBgStrong,
             cardBorderStrong: colors.cardBorderStrong,
+            skyAmbient:       colors.skyAmbient,
+            skyRgb:           colors.skyRgb,
             bottomHex:        colors.bottomHex,
         }));
     } catch (e) { /* private mode / quota — fall back to defaults next load */ }

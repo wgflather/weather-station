@@ -5,10 +5,10 @@ import com.flather.weatherstation.domain.entity.StationConfiguration;
 import com.flather.weatherstation.dto.configuration.*;
 import com.flather.weatherstation.mapper.StationConfigurationMapper;
 import com.flather.weatherstation.repository.StationConfigurationRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -84,7 +84,7 @@ public class StationConfigurationService {
 
   private StationConfiguration persistAndRefreshCache(StationConfiguration cfg) {
     StationConfiguration savedCfg = stationConfigurationRepository.save(cfg);
-    eventPublisher.publishEvent(new ConfigurationUpdatedEvent(cfg));
+    eventPublisher.publishEvent(new ConfigurationUpdatedEvent(savedCfg));
     return savedCfg;
   }
 }

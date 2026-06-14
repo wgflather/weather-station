@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 public class WeatherStationApplication {
 
-  //TODO: Sun altitude <= (minimum altitude + 2°)
+  // TODO: Sun altitude <= (minimum altitude + 2°)
 
   public static void main(String[] args) {
     SpringApplication.run(WeatherStationApplication.class, args);

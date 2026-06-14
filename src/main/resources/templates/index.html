@@ -23,7 +23,7 @@
         (function applyCachedSky() {
             let cached;
             try { cached = JSON.parse(localStorage.getItem('skyColors')); } catch (e) { return; }
-            if (!cached) return;
+            if (!cached || cached.version !== '2') return;
             const root = document.documentElement;
             const vars = [
                 ['--bg-grad-top',        cached.top],
@@ -33,6 +33,8 @@
                 ['--divider',            cached.divider],
                 ['--card-bg-strong',     cached.cardBgStrong],
                 ['--card-border-strong', cached.cardBorderStrong],
+                ['--sky-ambient',        cached.skyAmbient],
+                ['--sky-rgb',            cached.skyRgb],
             ];
             for (const [name, value] of vars) {
                 if (typeof value === 'string') root.style.setProperty(name, value);

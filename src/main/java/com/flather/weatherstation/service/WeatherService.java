@@ -11,7 +11,6 @@ import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
 import com.flather.weatherstation.mapper.WeatherRecordMapper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
 import java.time.*;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
@@ -99,13 +98,11 @@ public class WeatherService {
         validateIfOk(
             Metric.HUMIDITY, anomalyAndMissingValidationResult, weatherRecordDto.getHumidity());
 
-
-
     record.setTemperatureDataQuality(tempQuality);
     record.setPressureDataQuality(pressureQuality);
     record.setHumidityDataQuality(humidityQuality);
     record.setSurfaceWetnessDataQuality(
-            anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
+        anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
 
     // ============================
     // persist
