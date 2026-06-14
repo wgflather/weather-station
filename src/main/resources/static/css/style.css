@@ -1085,86 +1085,187 @@ h3 {
     padding-top: 4px;
 }
 
-/* Row of 2 or 3 time events (rise / set, or rise / noon / set).
-   Uses grid so the columns stay aligned regardless of label length. */
-.astro-event-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    align-items: end;
+/* Moon card body lays out as a vertical stack with consistent spacing.
+   The sun card uses the more generic .astro-card-content above. */
+.moon-card-content {
+    gap: 12px;
 }
 
-.astro-event-row-pair {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.astro-event {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    min-width: 0;
-}
-
-.astro-event .event-label {
-    font-size: 0.7rem;
-    font-weight: var(--fw-label);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-}
-
-.astro-event .event-time {
-    font-size: 1.25rem;
-    font-weight: var(--fw-value);
-    color: var(--text-primary);
-    line-height: 1.1;
-    font-variant-numeric: tabular-nums;
-}
-
-.astro-event .event-sub {
-    font-size: 0.7rem;
-    font-weight: var(--fw-regular);
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Solar noon is the centerpiece of the sun card — bump it up subtly. */
-.astro-event-peak .event-time {
-    font-size: 1.45rem;
-    color: #fcd34d;
-}
-
-/* Footer line: light secondary information, divider above. */
-.astro-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding-top: 10px;
-    border-top: 1px solid var(--divider);
-    font-size: 0.78rem;
-}
-
-.astro-footer-label {
-    color: var(--text-muted);
-    font-weight: var(--fw-label);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.astro-footer-value {
-    color: var(--text-strong);
-    font-weight: var(--fw-value);
-    font-variant-numeric: tabular-nums;
-}
-
-/* Moon phase visual + meta sit on one row, glyph on the left. */
-.moon-phase-row {
+/* Moon's glyph-led hero: phase disk on the left, phase name + percent
+   stacked to the right. The disk is the visual anchor of the moon card
+   (its identity), so it gets prime real estate in the same way the
+   countdown does on the sun card. */
+.moon-glyph-hero {
     display: flex;
     align-items: center;
     gap: 14px;
 }
 
+.moon-glyph-hero .moon-disk {
+    width: 64px;
+    height: 64px;
+}
+
+.moon-glyph-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+/* Smaller countdown for the moon card — no curve to anchor it, so the
+   phase glyph above already owns the visual weight. */
+.moon-card-countdown {
+    font-size: 1.05rem;
+    font-weight: var(--fw-value);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+}
+
+.moon-card-times {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.moon-time-value {
+    color: var(--text-primary);
+    font-weight: var(--fw-value);
+}
+
+.moon-time-sep {
+    color: var(--text-muted);
+    margin: 0 6px;
+}
+
+/* Hero: countdown to the next horizon event ("Sunset in 3h 22m"),
+   plus a quieter sub line carrying that event's clock time and the
+   body's current altitude. This is the at-a-glance value of the card —
+   the curve below provides the visual context, the events row below
+   that provides the exact times. */
+.astro-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    line-height: 1.15;
+}
+
+.astro-hero-event {
+    font-size: 1.2rem;
+    font-weight: var(--fw-value);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.astro-hero-sub {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Daily altitude arc — sun card only. The wrapper holds the SVG and
+   absolute-positioned HTML markers/labels so dot sizes and label fonts
+   don't get stretched by the SVG's preserveAspectRatio="none". The
+   curve fills 70px; labels live in a 16px band below it. */
+/* 70px SVG + 12px label gap + ~14px label font = 96px. The wrapper
+   only needs to contain the worst-case horizon label (rise / set sit
+   at y≈42px in the SVG; add offset + font height ≈ 68px total). 86px
+   gives comfortable headroom without the old fixed 16px band. */
+.astro-curve-wrapper {
+    position: relative;
+    width: 100%;
+    height: 86px;
+    overflow: visible;
+}
+
+.astro-curve {
+    width: 100%;
+    height: 70px;
+    display: block;
+    overflow: visible;
+}
+
+.astro-curve-horizon {
+    stroke: var(--divider);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+}
+
+.astro-curve-path {
+    fill: none;
+    stroke: var(--text-strong);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+    opacity: 0.85;
+}
+
+/* Marker dots overlaid on the curve via absolute positioning. Rise/set
+   are small hollow circles on the horizon; solar noon sits at the
+   curve's peak. The "now" marker is filled and a touch larger so the
+   eye finds it first. JS sets left/top in pixels relative to the
+   wrapper for each marker. */
+.astro-marker {
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.astro-marker-event {
+    width: 7px;
+    height: 7px;
+    background: transparent;
+    border: 1.5px solid rgba(252, 211, 77, 0.7);
+}
+
+.astro-marker-peak {
+    border-color: #fcd34d;
+}
+
+.astro-marker-now {
+    width: 9px;
+    height: 9px;
+    background: #fcd34d;
+    border: 1.5px solid var(--card-bg-strong);
+    box-shadow: 0 0 6px rgba(252, 211, 77, 0.4);
+}
+
+.astro-curve-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.astro-curve-label {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    white-space: nowrap;
+    /* Tick line from the label up to its marker dot. The dot sits
+       exactly LABEL_OFFSET_PX (12px) above the label's top edge, so
+       a 10px pseudo-element bridges the gap. */
+}
+
+.astro-curve-label::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 8px;
+    background: var(--divider);
+}
+
+/* Default .moon-disk size — used by the modal hero. The card variant
+   overrides this in .moon-glyph-hero .moon-disk above. */
 .moon-disk {
     width: 56px;
     height: 56px;
@@ -1172,13 +1273,7 @@ h3 {
     filter: drop-shadow(0 0 6px rgba(252, 211, 77, 0.18));
 }
 
-.moon-phase-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-}
-
+/* Modal still uses these — see .modal-moon-hero below. */
 .phase-name {
     font-size: 1.05rem;
     font-weight: var(--fw-value);
@@ -1193,30 +1288,17 @@ h3 {
     font-variant-numeric: tabular-nums;
 }
 
-/* Above/below horizon pill — lives where status-circle sits on
-   metric cards. Tinted by data-state so the live snapshot has a
-   visible footprint even when nothing else on the card moves. */
-.position-pill {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-    padding: 3px 9px;
-    border-radius: 999px;
-    border: 1px solid transparent;
-    white-space: nowrap;
+.moon-phase-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
 }
 
-.position-pill[data-state="up"] {
-    color: #fcd34d;
-    border-color: rgba(252, 211, 77, 0.55);
-    background: rgba(252, 211, 77, 0.10);
-}
-
-.position-pill[data-state="below"] {
-    color: var(--text-muted);
-    border-color: rgba(162, 198, 248, 0.25);
-    background: rgba(162, 198, 248, 0.06);
+.moon-phase-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
 }
 
 /* Cards are clickable — open a detail modal. Subtle hover/focus
@@ -1252,9 +1334,9 @@ h3 {
         flex: 1 1 100%;
     }
 
-    .astro-event .event-time { font-size: 1.15rem; }
-    .astro-event-peak .event-time { font-size: 1.3rem; }
+    .astro-hero-event { font-size: 1.1rem; }
     .moon-disk { width: 48px; height: 48px; }
+    .moon-glyph-hero .moon-disk { width: 56px; height: 56px; }
 }
 
 /* =========================================================

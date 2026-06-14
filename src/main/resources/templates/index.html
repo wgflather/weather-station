@@ -228,27 +228,26 @@
                 </svg>
                 <span>Sun</span>
             </h3>
-            <div class="position-pill" id="sun-position" data-state="below">--</div>
         </div>
         <div class="astro-card-content">
-            <div class="astro-event-row">
-                <div class="astro-event">
-                    <span class="event-label">Rise</span>
-                    <span class="event-time" id="sun-card-rise">--:--</span>
-                </div>
-                <div class="astro-event astro-event-peak">
-                    <span class="event-label">Solar noon</span>
-                    <span class="event-time" id="sun-card-noon">--:--</span>
-                    <span class="event-sub" id="sun-card-noon-alt">--°</span>
-                </div>
-                <div class="astro-event">
-                    <span class="event-label">Set</span>
-                    <span class="event-time" id="sun-card-set">--:--</span>
-                </div>
+            <div class="astro-hero">
+                <div class="astro-hero-event" id="sun-hero-event">--</div>
+                <div class="astro-hero-sub" id="sun-hero-sub">--</div>
             </div>
-            <div class="astro-footer">
-                <span class="astro-footer-label">Day length</span>
-                <span class="astro-footer-value" id="sun-day-length">--</span>
+            <div class="astro-curve-wrapper" id="sun-curve-wrapper">
+                <svg class="astro-curve" id="sun-curve" viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true">
+                    <line class="astro-curve-horizon" x1="0" x2="300" y1="42" y2="42"/>
+                    <path class="astro-curve-path" d=""/>
+                </svg>
+                <div class="astro-marker astro-marker-event" id="sun-marker-rise" style="display:none"></div>
+                <div class="astro-marker astro-marker-event astro-marker-peak" id="sun-marker-noon" style="display:none"></div>
+                <div class="astro-marker astro-marker-event" id="sun-marker-set" style="display:none"></div>
+                <div class="astro-marker astro-marker-now" id="sun-marker-now" style="display:none"></div>
+                <div class="astro-curve-labels">
+                    <span class="astro-curve-label" id="sun-label-rise" style="display:none">--:--</span>
+                    <span class="astro-curve-label" id="sun-label-noon" style="display:none">--:--</span>
+                    <span class="astro-curve-label" id="sun-label-set" style="display:none">--:--</span>
+                </div>
             </div>
         </div>
     </div>
@@ -261,27 +260,22 @@
                 </svg>
                 <span>Moon</span>
             </h3>
-            <div class="position-pill" id="moon-position" data-state="below">--</div>
         </div>
-        <div class="astro-card-content">
-            <div class="moon-phase-row">
+        <div class="astro-card-content moon-card-content">
+            <div class="moon-glyph-hero">
                 <svg class="moon-disk" id="moon-disk" viewBox="0 0 100 100" aria-hidden="true">
                     <circle cx="50" cy="50" r="48" fill="#1a2842"></circle>
                 </svg>
-                <div class="moon-phase-meta">
-                    <span class="phase-name" id="moon-phase-name">--</span>
-                    <span class="phase-illum"><span id="moon-phase-illum">--</span>% lit</span>
+                <div class="moon-glyph-meta">
+                    <div class="phase-name" id="moon-phase-name">--</div>
+                    <div class="phase-illum"><span id="moon-phase-illum">--</span>% lit</div>
                 </div>
             </div>
-            <div class="astro-event-row astro-event-row-pair">
-                <div class="astro-event">
-                    <span class="event-label">Rise</span>
-                    <span class="event-time" id="moon-card-rise">--:--</span>
-                </div>
-                <div class="astro-event">
-                    <span class="event-label">Set</span>
-                    <span class="event-time" id="moon-card-set">--:--</span>
-                </div>
+            <div class="moon-card-countdown" id="moon-hero-event">--</div>
+            <div class="moon-card-times">
+                Rise <span class="moon-time-value" id="moon-card-rise">--:--</span>
+                <span class="moon-time-sep">·</span>
+                Set <span class="moon-time-value" id="moon-card-set">--:--</span>
             </div>
         </div>
     </div>

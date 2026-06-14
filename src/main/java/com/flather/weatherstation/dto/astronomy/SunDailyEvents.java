@@ -1,6 +1,7 @@
 package com.flather.weatherstation.dto.astronomy;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 /**
  * Solar events that are fixed for a given calendar day at the observer's location — they do not
@@ -17,9 +18,10 @@ import java.time.ZonedDateTime;
  * @param nightLengthSeconds length of astronomical night (sun below -18°), in seconds.
  */
 public record SunDailyEvents(
-    ZonedDateTime rise,
-    ZonedDateTime set,
-    TransitDto solarNoon,
-    SunTimesDto times,
-    long dayLengthSeconds,
-    long nightLengthSeconds) {}
+        ZonedDateTime rise,
+        ZonedDateTime set,
+        TransitDto solarNoon,
+        SunTimesDto times,
+        long dayLengthSeconds,
+        long nightLengthSeconds,
+        List<AstronomyPoint> sunCurve) {}

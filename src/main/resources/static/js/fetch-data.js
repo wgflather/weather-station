@@ -240,26 +240,63 @@ function renderPressure(pressure) {
 // ASTRONOMY
 // ==========================================
 
-// Eight named lunar phases → inline SVG content drawn inside .moon-disk.
-// Lit area is yellow (#fcd34d), unlit is dark (#1a2842). The crescent /
-// gibbous shapes use two arcs of differing horizontal radii so the
-// terminator looks like a real ellipse rather than a straight line.
-const MOON_PHASE_SVG = {
-    'New Moon':        `<circle cx="50" cy="50" r="48" fill="#1a2842" stroke="#3a4d72" stroke-width="1"/>`,
-    'Waxing Crescent': `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
-                        <path d="M50 2 A48 48 0 0 1 50 98 A22 48 0 0 0 50 2 Z" fill="#fcd34d"/>`,
-    'First Quarter':   `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
-                        <path d="M50 2 A48 48 0 0 1 50 98 Z" fill="#fcd34d"/>`,
-    'Waxing Gibbous':  `<circle cx="50" cy="50" r="48" fill="#fcd34d"/>
-                        <path d="M50 2 A22 48 0 0 1 50 98 A48 48 0 0 1 50 2 Z" fill="#1a2842"/>`,
-    'Full Moon':       `<circle cx="50" cy="50" r="48" fill="#fcd34d"/>`,
-    'Waning Gibbous':  `<circle cx="50" cy="50" r="48" fill="#fcd34d"/>
-                        <path d="M50 2 A48 48 0 0 0 50 98 A22 48 0 0 1 50 2 Z" fill="#1a2842"/>`,
-    'Last Quarter':    `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
-                        <path d="M50 2 A48 48 0 0 0 50 98 Z" fill="#fcd34d"/>`,
-    'Waning Crescent': `<circle cx="50" cy="50" r="48" fill="#1a2842"/>
-                        <path d="M50 2 A22 48 0 0 1 50 98 A48 48 0 0 0 50 2 Z" fill="#fcd34d"/>`,
-};
+// Derives the moon's phase angle (0–360°) from the illumination percentage
+// and the phase name. illuminationPercent = (1 − cos θ) / 2 × 100, so
+// θ = arccos(1 − 2k) which maps to [0°, 180°]. Waning phases mirror into
+// [180°, 360°] using the name string. Accurate to < 0.5° — imperceptible
+// at card or modal size.
+function moonPhaseAngle(illuminationPercent, phaseName) {
+    const k = Math.max(0, Math.min(100, illuminationPercent ?? 0)) / 100;
+    let theta = Math.acos(Math.max(-1, Math.min(1, 1 - 2 * k))) * 180 / Math.PI;
+    if (phaseName && phaseName.includes('Waning')) theta = 360 - theta;
+    return theta;
+}
+
+// Generates SVG inner-HTML for a moon disk of radius r centred at (50,50)
+// in a 100×100 viewBox, accurately representing any phase angle.
+//
+// The lit portion is bounded by two arcs:
+//   • One semicircle — the outer lit edge (right for waxing, left for waning)
+//   • One terminator ellipse — horizontal semi-axis = r × |cos θ|, which
+//     collapses to a straight line at quarters and expands to r at new/full.
+// An edge ring is layered on top so the dark-side boundary reads as a disk
+// rather than a void.
+function moonPhaseSVG(phaseDeg) {
+    const r = 47, cx = 50, cy = 50;
+    const DARK = '#1a2842', LIT = '#fcd34d';
+    const top = `${cx} ${cy - r}`, bot = `${cx} ${cy + r}`;
+    const ring = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#3a4d72" stroke-width="1.5"/>`;
+
+    // Edge cases — full circle saves the path math and avoids degenerate arcs.
+    if (phaseDeg < 1)
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}" stroke="#3a4d72" stroke-width="1.5"/>`;
+    if (phaseDeg > 179 && phaseDeg < 181)
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/>${ring}`;
+
+    // Terminator ellipse horizontal semi-axis. 0 at quarters, r at new/full.
+    const atx = (r * Math.abs(Math.cos(phaseDeg * Math.PI / 180))).toFixed(2);
+
+    // Each case: background fill first, then the terminator+outer path,
+    // then the edge ring so the disk outline is always visible.
+    if (phaseDeg < 90) {
+        // Waxing crescent: dark bg → lit path = right-arc CW + terminator CCW
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}"/>
+<path d="M${top} A${r},${r} 0 0,1 ${bot} A${atx},${r} 0 0,0 ${top}Z" fill="${LIT}"/>${ring}`;
+    }
+    if (phaseDeg < 180) {
+        // Waxing gibbous: lit bg → dark sliver = terminator CW + right-arc CW
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/>
+<path d="M${top} A${atx},${r} 0 0,1 ${bot} A${r},${r} 0 0,1 ${top}Z" fill="${DARK}"/>${ring}`;
+    }
+    if (phaseDeg < 270) {
+        // Waning gibbous: lit bg → dark sliver = terminator CCW + left-arc CCW
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/>
+<path d="M${top} A${atx},${r} 0 0,0 ${bot} A${r},${r} 0 0,0 ${top}Z" fill="${DARK}"/>${ring}`;
+    }
+    // Waning crescent: dark bg → lit path = left-arc CCW + terminator CW
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}"/>
+<path d="M${top} A${r},${r} 0 0,0 ${bot} A${atx},${r} 0 0,1 ${top}Z" fill="${LIT}"/>${ring}`;
+}
 
 function formatTimeOfDay(isoString) {
     if (!isoString) return '--:--';
@@ -288,40 +325,220 @@ function renderAstronomyDaily(daily) {
 
 function renderSunCard(sun) {
     if (!sun) return;
-
-    document.getElementById('sun-card-rise').textContent = formatTimeOfDay(sun.rise);
-    document.getElementById('sun-card-set').textContent  = formatTimeOfDay(sun.set);
-    document.getElementById('sun-card-noon').textContent = formatTimeOfDay(sun.solarNoon?.time);
-
-    const noonAltEl = document.getElementById('sun-card-noon-alt');
-    const noonAlt   = sun.solarNoon?.alt;
-    noonAltEl.textContent = (noonAlt != null) ? `${Math.round(noonAlt)}°` : '--°';
-
-    document.getElementById('sun-day-length').textContent = formatDuration(sun.dayLengthSeconds);
+    renderSunCurve(sun);
 }
 
 function renderMoonCard(moon) {
     if (!moon) return;
-
     document.getElementById('moon-card-rise').textContent = formatTimeOfDay(moon.rise);
     document.getElementById('moon-card-set').textContent  = formatTimeOfDay(moon.set);
-    // The moon phase itself isn't on the daily-events DTO — it lives on
-    // the live snapshot (which is the correct cadence since phase drifts
-    // continuously). renderAstronomyLive handles it.
+    // Phase name / illumination come from the live snapshot (phase drifts
+    // continuously, see renderAstronomyLive).
 }
 
 function renderAstronomyLive(sunSnapshot, moonSnapshot) {
-    setPositionPill('sun-position',  sunSnapshot?.currentAltitude);
-    setPositionPill('moon-position', moonSnapshot?.currentAltitude);
-
     renderSkyBackground(sunSnapshot?.currentAltitude);
 
     if (moonSnapshot?.phase) {
         renderMoonPhase(moonSnapshot.phase);
     }
 
+    // Refresh the time-dependent bits every tick — countdown text and
+    // sun-curve "now" marker both depend on Date.now().
+    const sun = state.astronomyDaily?.sunDailyEvents;
+    if (sun) {
+        updateSunHero(sun.rise, sun.set, sun.dayLengthSeconds);
+        updateSunNowMarker(sunSnapshot?.currentAltitude);
+    }
+    const moon = state.astronomyDaily?.moonDailyEvents;
+    if (moon) updateMoonCountdown(moon.rise, moon.set);
+
     // Keep the open modal's live fields in sync on every poll tick.
     if (state.openModal) renderActiveModal();
+}
+
+// ==========================================
+// SUN CURVE + HERO
+// ==========================================
+
+// SVG viewBox dimensions for the daily-arc curve. preserveAspectRatio is
+// 'none' on the element so width stretches with the card while height
+// stays at 70px. Marker / label positioning uses these same logical
+// units (HORIZON_Y_VB is in viewBox y, but since the SVG is 70px tall
+// with a 70-unit-tall viewBox, the y values double as pixel offsets
+// inside the wrapper).
+const CURVE_W_VB = 300;
+const CURVE_H_VB = 70;
+// Horizon sits 60% down so the daytime arc gets ~1.5× the vertical room
+// of the night dip — matches what people expect (day is the part that
+// matters; the trough below is context).
+const CURVE_HORIZON_Y = 42;
+const CURVE_ABOVE_PADDING = 0.88;
+const CURVE_BELOW_PADDING = 0.88;
+
+// Scale memoised from the daily render so the per-tick "now" marker
+// reposition doesn't rescan the points list.
+let sunCurveScale = null;
+
+function altitudeToY(altDeg, maxAlt, minAlt) {
+    if (altDeg >= 0) {
+        return CURVE_HORIZON_Y - (altDeg / maxAlt) * CURVE_HORIZON_Y * CURVE_ABOVE_PADDING;
+    }
+    const belowSpace = CURVE_H_VB - CURVE_HORIZON_Y;
+    return CURVE_HORIZON_Y + (Math.abs(altDeg) / Math.abs(minAlt)) * belowSpace * CURVE_BELOW_PADDING;
+}
+
+function timeToXPercent(isoTime, startMs, endMs) {
+    const ms = new Date(isoTime).getTime();
+    return Math.max(0, Math.min(100, ((ms - startMs) / (endMs - startMs)) * 100));
+}
+
+function renderSunCurve(sun) {
+    const svg = document.getElementById('sun-curve');
+    const points = sun.sunCurve;
+    if (!svg || !points || !points.length) return;
+
+    let maxAlt = 0, minAlt = 0;
+    for (const p of points) {
+        if (p.altitude > maxAlt) maxAlt = p.altitude;
+        if (p.altitude < minAlt) minAlt = p.altitude;
+    }
+    // Guard against degenerate (polar-day / polar-night) curves where the
+    // body stays one side of the horizon — keep a minimum range so the
+    // scale doesn't collapse to a div-by-zero.
+    maxAlt = Math.max(maxAlt, 1);
+    minAlt = Math.min(minAlt, -1);
+
+    const startMs = new Date(points[0].time).getTime();
+    const endMs   = new Date(points[points.length - 1].time).getTime();
+
+    sunCurveScale = { maxAlt, minAlt, startMs, endMs };
+
+    // Path is sampled every ~10 minutes (embedded curve is 1-min
+    // resolution; ~144 segments draw a smooth arc at card size without
+    // shipping ~1.4k path commands).
+    const N = points.length;
+    const step = Math.max(1, Math.floor(N / 144));
+    let pathD = '';
+    for (let i = 0; i < N; i += step) {
+        const x = (i / (N - 1)) * CURVE_W_VB;
+        const y = altitudeToY(points[i].altitude, maxAlt, minAlt);
+        pathD += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+    }
+    pathD += 'L' + CURVE_W_VB + ',' + altitudeToY(points[N - 1].altitude, maxAlt, minAlt).toFixed(1);
+    svg.querySelector('.astro-curve-path').setAttribute('d', pathD);
+
+    // Rise / noon / set markers + their time labels. The viewBox y range
+    // [0, 70] equals the SVG's rendered pixel height, so altitudeToY's
+    // output doubles as a top offset in pixels relative to the wrapper.
+    placeSunMarker('sun-marker-rise', 'sun-label-rise', sun.rise, 0);
+    placeSunMarker('sun-marker-set',  'sun-label-set',  sun.set,  0);
+    placeSunMarker(
+        'sun-marker-noon',
+        'sun-label-noon',
+        sun.solarNoon?.time,
+        sun.solarNoon?.alt ?? maxAlt,
+    );
+}
+
+// Gap between the bottom edge of a marker dot and the top of its label.
+const LABEL_OFFSET_PX = 12;
+
+function placeSunMarker(markerId, labelId, isoTime, altitudeDeg) {
+    const marker = document.getElementById(markerId);
+    const label  = document.getElementById(labelId);
+    if (!marker || !label || !sunCurveScale) return;
+
+    if (!isoTime) {
+        marker.style.display = 'none';
+        label.style.display  = 'none';
+        return;
+    }
+
+    const { maxAlt, minAlt, startMs, endMs } = sunCurveScale;
+    const xPercent = timeToXPercent(isoTime, startMs, endMs);
+    const yPx = altitudeToY(altitudeDeg, maxAlt, minAlt);
+
+    marker.style.display = '';
+    marker.style.left = `${xPercent}%`;
+    marker.style.top  = `${yPx}px`;
+
+    // Label sits LABEL_OFFSET_PX below the marker's centre. The tick
+    // ::before pseudo-element bridges the gap visually.
+    label.style.display = '';
+    label.textContent   = formatTimeOfDay(isoTime);
+    label.style.left    = `${xPercent}%`;
+    label.style.top     = `${yPx + LABEL_OFFSET_PX}px`;
+}
+
+function updateSunNowMarker(currentAltitude) {
+    const el = document.getElementById('sun-marker-now');
+    if (!el) return;
+    if (!sunCurveScale || currentAltitude == null) {
+        el.style.display = 'none';
+        return;
+    }
+    const { maxAlt, minAlt, startMs, endMs } = sunCurveScale;
+    const t = Math.max(0, Math.min(1, (Date.now() - startMs) / (endMs - startMs)));
+    el.style.display = '';
+    el.style.left = `${(t * 100).toFixed(2)}%`;
+    el.style.top  = `${altitudeToY(currentAltitude, maxAlt, minAlt)}px`;
+}
+
+// ==========================================
+// COUNTDOWN HELPERS (shared by sun + moon)
+// ==========================================
+
+// Picks the next horizon-crossing event today and returns { label,
+// timeMs } or null when no future event remains in today's data (the
+// tail end of the day — tomorrow's rise isn't on this payload).
+function pickNextEvent(riseIso, setIso, bodyLabel) {
+    const now = Date.now();
+    const candidates = [
+        { label: `${bodyLabel}rise`, timeMs: riseIso ? new Date(riseIso).getTime() : null },
+        { label: `${bodyLabel}set`,  timeMs: setIso  ? new Date(setIso).getTime()  : null },
+    ].filter(e => e.timeMs != null && e.timeMs > now);
+    candidates.sort((a, b) => a.timeMs - b.timeMs);
+    return candidates[0] ?? null;
+}
+
+function formatCountdown(targetMs) {
+    const diffSec = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+    const hours = Math.floor(diffSec / 3600);
+    const minutes = Math.floor((diffSec % 3600) / 60);
+    if (hours === 0) return `${minutes}m`;
+    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+}
+
+function clockText(ms) {
+    return new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function updateSunHero(riseIso, setIso, dayLengthSeconds) {
+    const eventEl = document.getElementById('sun-hero-event');
+    const subEl   = document.getElementById('sun-hero-sub');
+    if (!eventEl || !subEl) return;
+
+    const dayText = `Day ${formatDuration(dayLengthSeconds)}`;
+    const next = pickNextEvent(riseIso, setIso, 'Sun');
+    if (next) {
+        eventEl.textContent = `${next.label} in ${formatCountdown(next.timeMs)}`;
+        subEl.textContent   = `${clockText(next.timeMs)} · ${dayText}`;
+    } else {
+        eventEl.textContent = 'Below horizon';
+        subEl.textContent   = dayText;
+    }
+}
+
+function updateMoonCountdown(riseIso, setIso) {
+    const el = document.getElementById('moon-hero-event');
+    if (!el) return;
+    const next = pickNextEvent(riseIso, setIso, 'Moon');
+    if (next) {
+        el.textContent = `${next.label} in ${formatCountdown(next.timeMs)} · ${clockText(next.timeMs)}`;
+    } else {
+        el.textContent = 'Below horizon';
+    }
 }
 
 // ==========================================
@@ -506,19 +723,6 @@ function renderSkyBackground(sunAltitudeDeg) {
     } catch (e) { /* private mode / quota — fall back to defaults next load */ }
 }
 
-function setPositionPill(elementId, altitudeDeg) {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    if (altitudeDeg == null) {
-        el.textContent     = '--';
-        el.dataset.state   = 'below';
-        return;
-    }
-    const isUp         = altitudeDeg > 0;
-    el.textContent     = isUp ? `Up · ${Math.round(altitudeDeg)}°` : 'Below horizon';
-    el.dataset.state   = isUp ? 'up' : 'below';
-}
-
 // ==========================================
 // ASTRONOMY MODAL
 // ==========================================
@@ -688,9 +892,8 @@ function buildMoonModalHTML() {
     const snapshot = state.moonSnapshot;
     const phase    = snapshot?.phase;
 
-    const phaseSvg = phase?.phaseName
-        ? (MOON_PHASE_SVG[phase.phaseName] ?? MOON_PHASE_SVG['New Moon'])
-        : MOON_PHASE_SVG['New Moon'];
+    const phaseSvg = moonPhaseSVG(
+        moonPhaseAngle(phase?.illuminationPercent ?? 0, phase?.phaseName ?? ''));
 
     const illumPct = phase?.illuminationPercent != null
         ? `${phase.illuminationPercent.toFixed(1)}%`
@@ -802,18 +1005,17 @@ function renderMoonPhase(phase) {
     const pct  = document.getElementById('moon-phase-illum');
     if (!disk || !name || !pct) return;
 
-    const svg = MOON_PHASE_SVG[phase.phaseName] ?? MOON_PHASE_SVG['New Moon'];
-    // Only redraw if the phase name actually changed — saves DOM churn
-    // on every live tick (phase name only flips every few days).
-    if (disk.dataset.phase !== phase.phaseName) {
-        disk.innerHTML     = svg;
-        disk.dataset.phase = phase.phaseName;
+    // Redraw when illumination changes by more than 0.2% — continuous
+    // rendering at any precision, without DOM churn on every tick.
+    const illum = phase.illuminationPercent ?? 0;
+    if (Math.abs((disk._lastIllum ?? -1) - illum) > 0.2) {
+        const phaseDeg = moonPhaseAngle(illum, phase.phaseName);
+        disk.innerHTML  = moonPhaseSVG(phaseDeg);
+        disk._lastIllum = illum;
     }
 
     name.textContent = phase.phaseName ?? '--';
-    pct.textContent  = (phase.illuminationPercent != null)
-        ? phase.illuminationPercent.toFixed(0)
-        : '--';
+    pct.textContent  = illum != null ? illum.toFixed(0) : '--';
 }
 
 function renderPressureTrend(pressureTrend, changeValue) {
