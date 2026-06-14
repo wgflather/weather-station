@@ -22,7 +22,7 @@ public class SensorStateCache {
 
   // 60-min rolling window — dashboard metrics, trend, averages
   // never forcefully reset, represents continuous sensor history
-  @Getter private final Deque<WeatherRecord> metricsWindow = new ArrayDeque<>();
+  private final Deque<WeatherRecord> metricsWindow = new ArrayDeque<>();
 
   // Spike detection reference — small, can be reset aggressively
   // represents "current conditions" not "recent history"
@@ -81,6 +81,10 @@ public class SensorStateCache {
     }
   }
 
+  public synchronized List<WeatherRecord> getMetricsWindow() {
+    return List.copyOf(metricsWindow);
+  }
+
   public synchronized List<Double> getSpikeWindowSnapshot(Metric metric) {
     Deque<Double> values = metricsSpikeWindow.get(metric);
 
@@ -109,9 +113,12 @@ public class SensorStateCache {
 
     metricsWindow.addAll(dtos);
 
-    if (dtos.size() >= 5) {
-      dtos.subList(0, dtos.size() - SPIKE_REFERENCE_SIZE).forEach(this::addSpikes);
+    if (dtos.size() >= SPIKE_REFERENCE_SIZE) {
+      dtos.subList(dtos.size() - SPIKE_REFERENCE_SIZE, dtos.size()).forEach(this::addSpikes);
+    } else {
+      dtos.forEach(this::addSpikes);
     }
+
 
     todayMaxTemp = extremesProjection.max();
     todayMinTemp = extremesProjection.min();
