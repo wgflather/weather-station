@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <!-- Initial value matches the static-palette bottom color; JS updates
-         this on every live tick (see renderSkyBackground). The bottom is
-         what the iOS Safari URL bar (at the page bottom) is adjacent to,
-         so tracking the bottom avoids a visible color seam there. -->
-    <meta name="theme-color" content="#3b629b">
+    <!-- theme-color tints the iOS status bar (top chrome). Default matches
+         the static-palette top gradient; JS updates this on every live tick
+         and refreshChromeColorFromCache() re-stamps it on bfcache restore. -->
+    <meta name="theme-color" content="#21376e">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Weather Dashboard</title>
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
@@ -39,9 +38,13 @@
             for (const [name, value] of vars) {
                 if (typeof value === 'string') root.style.setProperty(name, value);
             }
-            if (typeof cached.bottomHex === 'string') {
+            // Use topHex — theme-color controls the top status bar, not the
+            // bottom URL bar. Fall back to bottomHex for caches written before
+            // topHex was added so old entries still improve over the default.
+            const chromeColor = cached.topHex ?? cached.bottomHex;
+            if (typeof chromeColor === 'string') {
                 const meta = document.head.querySelector('meta[name="theme-color"]');
-                if (meta) meta.setAttribute('content', cached.bottomHex);
+                if (meta) meta.setAttribute('content', chromeColor);
             }
         })();
     </script>

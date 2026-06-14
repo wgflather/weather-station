@@ -374,7 +374,9 @@ const CURVE_H_VB = 70;
 // matters; the trough below is context).
 const CURVE_HORIZON_Y = 42;
 const CURVE_ABOVE_PADDING = 0.88;
-const CURVE_BELOW_PADDING = 0.88;
+// Below-horizon depth is intentionally shallow (0.25) so the trough reads
+// as a gentle suggestion of nighttime rather than a sharp V-shape.
+const CURVE_BELOW_PADDING = 0.25;
 
 // Scale memoised from the daily render so the per-tick "now" marker
 // reposition doesn't rescan the points list.
@@ -579,10 +581,9 @@ const DIVIDER_ALPHA           = 0.10;
 // Stronger variants for elements that sit above the page (modal panel, hover).
 const CARD_BG_STRONG_ALPHA     = 0.85;
 const CARD_BORDER_STRONG_ALPHA = 0.18;
-// Sky-ambient outer glow: the current sky bottom color applied as an outer
-// box-shadow — warm at sunset, cool-blue at midday, deep at night. Lower
-// alpha than the former inner glow since outer shadows need less density.
-const SKY_AMBIENT_ALPHA        = 0.15;
+// Sky-ambient outer glow: desaturated sky bottom at very low alpha as a
+// barely-perceptible outer box-shadow on cards — environmental hue, not glow.
+const SKY_AMBIENT_ALPHA        = 0.10;
 
 function lerpChannel(a, b, t) {
     return Math.round(a + (b - a) * t);
@@ -717,14 +718,11 @@ function renderSkyBackground(sunAltitudeDeg) {
         skyBackgroundPrimed = true;
     }
 
-    // Browser chrome (URL bar on Chrome / Android / iOS Safari 15+) reads
-    // the <meta name="theme-color"> tag. We track the *bottom* of the sky
-    // gradient because the iOS Safari URL bar — the main consumer of this
-    // signal — sits at the bottom of the viewport; tracking the top would
-    // leave a visible color seam between the toolbar tint and the page
-    // above it. setBrowserChromeColor replaces the element to work around
-    // iOS Safari's caching of the initial value.
-    setBrowserChromeColor(colors.bottomHex);
+    // theme-color on iOS Safari tints the top status bar (time/battery/signal),
+    // not the bottom URL bar. Track the top gradient so the status bar matches
+    // the sky at the top of the page instead of bleeding the bottom colour up.
+    // The bottom URL bar uses standard system chrome and is not themeable here.
+    setBrowserChromeColor(colors.topHex);
 
     // Persist the resolved palette so the inline <head> script can apply
     // it before first paint on the *next* load. Safari (iOS + macOS) only
@@ -745,6 +743,7 @@ function renderSkyBackground(sunAltitudeDeg) {
             cardBorderStrong: colors.cardBorderStrong,
             skyAmbient:       colors.skyAmbient,
             skyRgb:           colors.skyRgb,
+            topHex:           colors.topHex,
             bottomHex:        colors.bottomHex,
         }));
     } catch (e) { /* private mode / quota — fall back to defaults next load */ }
@@ -1194,6 +1193,16 @@ async function loadDaily() {
         state.astronomyDaily   = daily;
         state.dailyKey         = daily.dailyKey;
         renderAstronomyDaily(daily);
+        // Race-condition guard: loadDaily() and the first updateLive() run
+        // concurrently at boot. The live endpoint is usually faster, so
+        // renderAstronomyLive() often runs before state.astronomyDaily is
+        // set — skipping updateSunHero, updateSunNowMarker, and
+        // updateMoonCountdown. Re-run the live render now that daily data
+        // is in state so those fields populate immediately instead of
+        // waiting for the next 30-second poll tick.
+        if (state.sunSnapshot || state.moonSnapshot) {
+            renderAstronomyLive(state.sunSnapshot, state.moonSnapshot);
+        }
     } catch (error) {
         console.error('Daily dashboard load failed:', error);
     }
@@ -1548,6 +1557,24 @@ function startPolling(fn, interval) {
 // ==========================================
 // BOOT
 // ==========================================
+
+// When iOS Safari restores a tab from the Back-Forward Cache (bfcache), JS
+// doesn't re-run and the 30s poll timer is frozen — so theme-color stays at
+// whatever it was when the tab was frozen, even if the sky has since changed.
+// pageshow (e.persisted) fires on every bfcache restore; visibilitychange
+// catches switching back to the tab without a full bfcache restore. Both
+// re-stamp theme-color from the localStorage cache immediately, before the
+// next poll tick, so the status bar matches the current sky on first glance.
+function refreshChromeColorFromCache() {
+    try {
+        const c = JSON.parse(localStorage.getItem('skyColors') || 'null');
+        if (c?.version === '2' && c.topHex) setBrowserChromeColor(c.topHex);
+    } catch (_) {}
+}
+window.addEventListener('pageshow', (e) => { if (e.persisted) refreshChromeColorFromCache(); });
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshChromeColorFromCache();
+});
 
 document.addEventListener('click', () => globalPopup.classList.remove('open'));
 
