@@ -320,9 +320,12 @@ body::before {
 
 /* Fallback breakpoint only for wrapping orientation on extremely small devices if needed */
 @media (max-width: 480px) {
-    /* Keeps everything on one line if space permits, but allows safe breathing room */
+    /* Keeps everything on one line if space permits, but allows safe breathing room.
+       Right side keeps the wider strip from the base rule so the absolute-positioned
+       admin gear (top: 14px; right: 16px; 26x26) doesn't crowd the date/time. */
     .today_data_block {
         padding: 12px;
+        padding-right: 52px;
     }
 }
 
@@ -1556,7 +1559,7 @@ h3 {
 }
 
 /* =========================================================
-   ADMIN GATEWAY (gear icon + mobile FAB)
+   ADMIN GEAR ICON
 ========================================================= */
 .admin-gear {
     position: absolute;
@@ -1578,42 +1581,6 @@ h3 {
 .admin-gear svg {
     width: 100%;
     height: 100%;
-}
-
-.admin-fab {
-    display: none;
-}
-
-/* Phones: hide the inline gear, show a floating action button instead */
-@media (max-width: 480px) {
-    .admin-gear {
-        display: none;
-    }
-
-    .admin-fab {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 52px;
-        height: 52px;
-        border-radius: 50%;
-        /* Dynamic palette — also drives the iOS Safari liquid-glass
-           toolbar tint, since the FAB sits at the bottom of the viewport
-           in the area Safari samples. */
-        background: var(--card-bg-strong);
-        border: 1px solid var(--card-border-strong);
-        color: var(--text-secondary);
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-        z-index: 500;
-    }
-
-    .admin-fab svg {
-        width: 26px;
-        height: 26px;
-    }
 }
 
 .dashboard-row.row-split {
