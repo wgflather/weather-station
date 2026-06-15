@@ -1,4 +1,4 @@
-package com.flather.weatherstation.dto.configuration;
+package com.flather.weatherstation.domain.event;
 
 import com.flather.weatherstation.domain.entity.StationConfiguration;
 

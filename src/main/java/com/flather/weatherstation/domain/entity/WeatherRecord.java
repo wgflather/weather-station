@@ -32,6 +32,10 @@ public class WeatherRecord {
 
   private Double surfaceWetness;
 
+  @NotNull
+  @Column(name = "wifi_rssi")
+  private Double wifiRssi;
+
   @Column(name = "humidity_data_quality")
   @Enumerated(EnumType.STRING)
   private DataQuality humidityDataQuality;

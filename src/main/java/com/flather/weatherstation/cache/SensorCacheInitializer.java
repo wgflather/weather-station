@@ -2,8 +2,8 @@ package com.flather.weatherstation.cache;
 
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
-import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
+import com.flather.weatherstation.util.DateRangeHelper;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;

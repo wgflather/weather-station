@@ -176,7 +176,7 @@ function startChart(metric) {
 // ==========================================
 
 async function fetchDashboardDaily() {
-    const response = await fetch('/api/weather/dashboard/daily');
+    const response = await fetch('/api/astronomy/daily');
     if (!response.ok) throw new Error('Daily dashboard fetch failed');
     return await response.json();
 }
@@ -518,17 +518,20 @@ function clockText(ms) {
 
 function updateSunHero(riseIso, setIso, dayLengthSeconds) {
     const eventEl = document.getElementById('sun-hero-event');
-    const subEl   = document.getElementById('sun-hero-sub');
-    if (!eventEl || !subEl) return;
+    const timeEl  = document.getElementById('sun-sub-time');
+    const dayEl   = document.getElementById('sun-sub-day');
+    if (!eventEl || !timeEl || !dayEl) return;
 
     const dayText = `Day ${formatDuration(dayLengthSeconds)}`;
     const next = pickNextEvent(riseIso, setIso, 'Sun');
     if (next) {
         eventEl.textContent = `${next.label} in ${formatCountdown(next.timeMs)}`;
-        subEl.textContent   = `${clockText(next.timeMs)} · ${dayText}`;
+        timeEl.textContent  = `${clockText(next.timeMs)} · `;
+        dayEl.textContent   = dayText;
     } else {
         eventEl.textContent = 'Below horizon';
-        subEl.textContent   = dayText;
+        timeEl.textContent  = '';
+        dayEl.textContent   = dayText;
     }
 }
 
@@ -537,7 +540,7 @@ function updateMoonCountdown(riseIso, setIso) {
     if (!el) return;
     const next = pickNextEvent(riseIso, setIso, 'Moon');
     if (next) {
-        el.textContent = `${next.label} in ${formatCountdown(next.timeMs)} · ${clockText(next.timeMs)}`;
+        el.textContent = `${next.label} in ${formatCountdown(next.timeMs)}`;
     } else {
         el.textContent = 'Below horizon';
     }

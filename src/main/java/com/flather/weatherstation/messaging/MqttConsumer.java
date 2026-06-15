@@ -3,7 +3,6 @@ package com.flather.weatherstation.messaging;
 import com.flather.weatherstation.config.MqttProperties;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
-import com.flather.weatherstation.exception.DataQualityFailureException;
 import com.flather.weatherstation.service.WeatherService;
 import java.util.HashSet;
 import java.util.Set;
@@ -125,9 +124,6 @@ public class MqttConsumer {
       log.info("Saved record from [{}]: {}", normalizedTopic, savedDto);
       log.info("{}", dto);
 
-    } catch (DataQualityFailureException e) {
-      log.warn("Rejected record: {}", e.getMessage());
-
     } catch (Exception e) {
       log.error("Failed to process MQTT message topic={}", topic, e);
     }
@@ -136,12 +132,12 @@ public class MqttConsumer {
   // ---------------- SUBSCRIPTIONS ----------------
 
   private void subscribeInitialTopics() throws MqttException {
-    subscribe("weather/bmp180");
+    subscribe(properties.getTopic());
   }
 
   private void resubscribe() {
     try {
-      subscribe("weather/bmp180");
+      subscribe(properties.getTopic());
     } catch (MqttException e) {
       log.warn("Resubscribe failed", e);
     }

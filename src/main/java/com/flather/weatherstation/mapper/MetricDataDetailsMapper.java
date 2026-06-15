@@ -4,7 +4,7 @@ import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
-import com.flather.weatherstation.dto.dashboard.MetricDataDetails;
+import com.flather.weatherstation.dto.analytics.MetricDataDetails;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,9 +15,9 @@ public class MetricDataDetailsMapper {
 
   private final ConfigurationCache configurationCache;
 
-  public MetricDataDetails from(WeatherRecord entity, Metric metric, HardwareConfig config) {
+  public MetricDataDetails from(WeatherRecord entity, Metric metric) {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
-    config = configurationCache.getHardwareConfig();
+    HardwareConfig config = configurationCache.getHardwareConfig();
     return switch (metric) {
       case TEMPERATURE ->
           new MetricDataDetails(

@@ -14,7 +14,7 @@ import com.flather.weatherstation.dto.astronomy.SunSnapshot;
  * @param moonSnapshot continuously-changing lunar state (altitude, distance, phase, constellation).
  * @param dailyKey the {@code "<LocalDate>@<ZoneId>"} key for the current observer day. The client
  *     compares this against the key stored alongside its cached daily payload — when they differ
- *     (midnight rollover or zone change) it re-fetches {@code /dashboard/daily}.
+ *     (midnight rollover or zone change) it re-fetches {@code /api/astronomy/daily}.
  */
 public record DashboardLiveDto(
     MetricsDashboardDto metrics,

@@ -1,4 +1,4 @@
-package com.flather.weatherstation.dto.dashboard;
+package com.flather.weatherstation.dto.analytics;
 
 import com.flather.weatherstation.domain.constant.DataQuality;
 import java.time.ZonedDateTime;

@@ -44,7 +44,8 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                     AND measured_at < :endTime
                   """,
       nativeQuery = true)
-  long findRecordsBetween(@Param("startTime") Instant startTime, @Param("endTime") Instant endTime);
+  long countRecordsBetween(
+      @Param("startTime") Instant startTime, @Param("endTime") Instant endTime);
 
   List<WeatherRecord> findByMeasuredAtAfterOrderByMeasuredAtAsc(Instant after);
 

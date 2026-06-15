@@ -1206,6 +1206,11 @@ h3 {
     font-variant-numeric: tabular-nums;
 }
 
+/* The next-event clock time is redundant on big screens because it already
+   appears as a label on the sun curve. Hidden by default; revealed below
+   the 520px breakpoint where curve labels are suppressed. */
+#sun-sub-time { display: none; }
+
 /* Daily altitude arc — sun card only. The wrapper holds the SVG and
    absolute-positioned HTML markers/labels so dot sizes and label fonts
    don't get stretched by the SVG's preserveAspectRatio="none". The
@@ -1392,6 +1397,7 @@ h3 {
     #sun-marker-set  { display: none !important; }
     #sun-label-rise,
     #sun-label-set  { display: none !important; }
+    #sun-sub-time   { display: inline; }
 
     .astro-curve-wrapper { height: 58px; }
 

@@ -1,11 +1,8 @@
-package com.flather.weatherstation.dto.dashboard;
-
-import com.flather.weatherstation.dto.astronomy.MoonDailyEvents;
-import com.flather.weatherstation.dto.astronomy.SunDailyEvents;
+package com.flather.weatherstation.dto.astronomy;
 
 /**
- * Response payload for {@code GET /api/weather/dashboard/daily} — the astronomy values that only
- * change at calendar-day boundaries (or when the configured timezone changes).
+ * Response payload for {@code GET /api/astronomy/daily} — the astronomy values that only change at
+ * calendar-day boundaries (or when the configured timezone changes).
  *
  * <p>The client fetches this once on page load and then only re-fetches when the {@code dailyKey}
  * returned by the live endpoint stops matching the key associated with the cached daily payload.

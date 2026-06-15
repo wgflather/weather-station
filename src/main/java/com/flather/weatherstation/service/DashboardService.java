@@ -2,14 +2,12 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.constant.DataStatus;
-import com.flather.weatherstation.dto.dashboard.AstronomyDailyEventsDto;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Optional;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -53,18 +51,6 @@ public class DashboardService {
         .status(dataStatus)
         .lagMinutes(lagMinutes)
         .build();
-  }
-
-  /**
-   * Builds the once-per-day astronomy payload. The two underlying methods are {@code @Cacheable}
-   * and keyed by {@code dailyKey()}, so this call is essentially free after the first hit of the
-   * day (or after a runtime timezone change).
-   */
-  public AstronomyDailyEventsDto getAstronomyDailyEvents() {
-    return new AstronomyDailyEventsDto(
-        astronomySearchService.getSunDailyEvents(),
-        astronomySearchService.getMoonDailyEvents(),
-        astronomySearchService.dailyKey());
   }
 
   /**

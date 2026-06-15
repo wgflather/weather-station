@@ -1,7 +1,6 @@
 package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.domain.constant.Metric;
-import com.flather.weatherstation.dto.dashboard.AstronomyDailyEventsDto;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
@@ -23,7 +22,6 @@ public class WeatherController {
 
   public static final String BASE_PATH = "/api/weather";
   public static final String LATEST_WEATHER_PATH = BASE_PATH + "/latest";
-  public static final String DASHBOARD_DAILY_PATH = BASE_PATH + "/dashboard/daily";
   public static final String DASHBOARD_LIVE_PATH = BASE_PATH + "/dashboard/live";
 
   private final WeatherService service;
@@ -34,12 +32,6 @@ public class WeatherController {
   public ResponseEntity<WeatherRecordResponseDto> createNewWeatherRecord(
       @RequestBody WeatherRecordCreatedDto dto) {
     return ResponseEntity.created(URI.create("api/weather")).body(service.saveWeatherRecord(dto));
-  }
-
-  /** Stable per-day astronomy events. Client fetches once on page load. */
-  @GetMapping(DASHBOARD_DAILY_PATH)
-  public ResponseEntity<AstronomyDailyEventsDto> getDashboardDaily() {
-    return ResponseEntity.ok(dashboardService.getAstronomyDailyEvents());
   }
 
   /** Live dashboard tick: metrics, system health, sun/moon snapshots, and current dailyKey. */

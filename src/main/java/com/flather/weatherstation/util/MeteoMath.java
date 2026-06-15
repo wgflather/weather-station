@@ -1,4 +1,4 @@
-package com.flather.weatherstation.service;
+package com.flather.weatherstation.util;
 
 import com.flather.weatherstation.domain.constant.TrendDirection;
 import com.flather.weatherstation.dto.analytics.TrendResult;

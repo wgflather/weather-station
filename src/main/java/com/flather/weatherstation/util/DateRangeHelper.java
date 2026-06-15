@@ -1,4 +1,4 @@
-package com.flather.weatherstation.repository;
+package com.flather.weatherstation.util;
 
 import java.time.*;
 

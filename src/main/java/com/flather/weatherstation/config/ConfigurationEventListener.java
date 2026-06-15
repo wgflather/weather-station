@@ -1,7 +1,7 @@
 package com.flather.weatherstation.config;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
-import com.flather.weatherstation.dto.configuration.ConfigurationUpdatedEvent;
+import com.flather.weatherstation.domain.event.ConfigurationUpdatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;

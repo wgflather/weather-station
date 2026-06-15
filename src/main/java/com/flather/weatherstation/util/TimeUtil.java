@@ -7,8 +7,6 @@ import java.time.ZonedDateTime;
 
 public class TimeUtil {
 
-  public static final ZoneId ZONE = ZoneId.systemDefault();
-
   public static Time toTime(ZonedDateTime time) {
 
     return Time.fromMillisecondsSince1970(time.toInstant().toEpochMilli());
@@ -16,7 +14,7 @@ public class TimeUtil {
 
   public static ZonedDateTime toZoned(Time time, ZoneId zoneId) {
 
-    return Instant.ofEpochMilli(time.toMillisecondsSince1970()).atZone(ZONE);
+    return Instant.ofEpochMilli(time.toMillisecondsSince1970()).atZone(zoneId);
   }
 
   /**

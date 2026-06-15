@@ -1,5 +1,7 @@
 package com.flather.weatherstation.dto.weather;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 @RequiredArgsConstructor
@@ -8,8 +10,7 @@ import lombok.*;
 @Data
 @ToString
 public class WeatherRecordCreatedDto {
-
-  private String deviceId;
+  @NotNull private String deviceId;
 
   private Double temperature;
 
@@ -19,5 +20,7 @@ public class WeatherRecordCreatedDto {
 
   private Double surfaceWetness;
 
-  private double WIFI_RSSI;
+  @NotNull
+  @JsonProperty("WIFI_RSSI")
+  private Double wifiRssi;
 }

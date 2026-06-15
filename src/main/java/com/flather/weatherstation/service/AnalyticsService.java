@@ -5,12 +5,13 @@ import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.domain.constant.*;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
+import com.flather.weatherstation.dto.analytics.MetricDataDetails;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
-import com.flather.weatherstation.dto.dashboard.MetricDataDetails;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
-import com.flather.weatherstation.repository.DateRangeHelper;
 import com.flather.weatherstation.repository.WeatherReportRepository;
+import com.flather.weatherstation.util.DateRangeHelper;
+import com.flather.weatherstation.util.MeteoMath;
 import java.time.*;
 import java.util.*;
 import java.util.function.Function;
@@ -43,14 +44,15 @@ public class AnalyticsService {
 
   public long findTodayRecordsCount() {
     var range = today();
-    return repository.findRecordsBetween(range.startTime(), range.endTime());
+    return repository.countRecordsBetween(range.startTime(), range.endTime());
   }
 
   public Optional<ZonedDateTime> findLastRecordTime() {
-      return Optional.of(sensorStateCache
-          .getLastSavedMeasurement()
-          .getMeasuredAt()
-          .atZone(configurationCache.getLocationContext().zoneId()));
+    return Optional.of(
+        sensorStateCache
+            .getLastSavedMeasurement()
+            .getMeasuredAt()
+            .atZone(configurationCache.getLocationContext().zoneId()));
   }
 
   public long getLagMinutes(ZonedDateTime lastRecord) {
@@ -90,9 +92,7 @@ public class AnalyticsService {
         sensorStateCache.getTodayMinTemp(),
         sensorStateCache.getTodayMaxTemp(),
         metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(),
-            Metric.TEMPERATURE,
-            configurationCache.getHardwareConfig()));
+            sensorStateCache.getLastSavedMeasurement(), Metric.TEMPERATURE));
   }
 
   public PressureDto getPressure() {
@@ -101,10 +101,7 @@ public class AnalyticsService {
         averageOfFiveLastReadings(
             WeatherRecord::getPressure, WeatherRecord::getPressureDataQuality),
         trendResult,
-        metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(),
-            Metric.PRESSURE,
-            configurationCache.getHardwareConfig()),
+        metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.PRESSURE),
         PressureTrend.classify(trendResult));
   }
 
@@ -126,10 +123,7 @@ public class AnalyticsService {
 
     return new HumidityDto(
         humidity,
-        metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(),
-            Metric.HUMIDITY,
-            configurationCache.getHardwareConfig()),
+        metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.HUMIDITY),
         dewPoint,
         dewPointRisk);
   }
@@ -143,9 +137,7 @@ public class AnalyticsService {
     Double raw = window.getLast().getSurfaceWetness();
     MetricDataDetails dataDetails =
         metricDataDetailsMapper.from(
-            sensorStateCache.getLastSavedMeasurement(),
-            Metric.SURFACE_WETNESS,
-            configurationCache.getHardwareConfig());
+            sensorStateCache.getLastSavedMeasurement(), Metric.SURFACE_WETNESS);
 
     if (raw == null) {
       return new SurfaceWetnessDto(null, dataDetails, SurfaceWetnessStatus.DRY);
@@ -199,8 +191,7 @@ public class AnalyticsService {
     Instant nextBucketExpectedAt = null;
 
     if (!dtos.isEmpty()) {
-      nextBucketExpectedAt =
-          getNextExpectedBucketEpochMillis(dtos.getLast().hour(), resolution);
+      nextBucketExpectedAt = getNextExpectedBucketEpochMillis(dtos.getLast().hour(), resolution);
     }
 
     return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt);
