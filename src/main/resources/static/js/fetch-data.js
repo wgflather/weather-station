@@ -1236,6 +1236,13 @@ async function updateLive() {
 // SYSTEM HEALTH
 // ==========================================
 
+const STATUS_DOT_GLOW = {
+    LIVE:    'rgba(34, 197, 94, 0.50)',
+    DELAYED: 'rgba(252, 211, 77, 0.50)',
+    STALE:   'rgba(249, 115, 22, 0.50)',
+    OFFLINE: 'rgba(239, 68, 68, 0.50)',
+};
+
 function renderSystemHealth(systemHealth) {
     if (!systemHealth) return;
 
@@ -1248,8 +1255,61 @@ function renderSystemHealth(systemHealth) {
         ? new Date(systemHealth.lastMeasuredAt).toLocaleTimeString('en-GB')
         : '--:--:--';
 
-    const colors = { LIVE: '#22c55e', DELAYED: '#fcd34d', STALE: '#f97316', OFFLINE: '#ef4444' };
-    document.getElementById('status').style.color = colors[systemHealth.status] ?? '#ffffff';
+    const color = DATA_STATUS_COLORS[systemHealth.status] ?? '#6b7280';
+    document.getElementById('status').style.color = color;
+
+    // Drive the header status dot — color, glow, and pulse when live.
+    const dot = document.getElementById('health-dot');
+    if (dot) {
+        dot.style.backgroundColor = color;
+        dot.style.boxShadow = `0 0 7px 2px ${STATUS_DOT_GLOW[systemHealth.status] ?? 'rgba(107,114,128,0.4)'}`;
+        dot.classList.toggle('pulsing', systemHealth.status === 'LIVE');
+    }
+    const label = document.getElementById('health-status-label');
+    if (label) {
+        label.textContent = DATA_STATUS_INFO[systemHealth.status]?.label ?? '--';
+        label.style.color = color;
+    }
+}
+
+function initHealthPopover() {
+    const btn     = document.getElementById('health-dot-btn');
+    const popover = document.getElementById('health-popover');
+    if (!btn || !popover) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const opening = !popover.classList.contains('open');
+        popover.classList.toggle('open', opening);
+        btn.setAttribute('aria-expanded', String(opening));
+        popover.setAttribute('aria-hidden', String(!opening));
+
+        if (opening) {
+            // Position below the button, right-aligned to it.
+            const rect = btn.getBoundingClientRect();
+            popover.style.top   = `${rect.bottom + 6}px`;
+            popover.style.right = `${window.innerWidth - rect.right}px`;
+            popover.style.left  = 'auto';
+        }
+    });
+
+    // Close on any outside click (piggyback the existing global handler).
+    document.addEventListener('click', () => {
+        if (popover.classList.contains('open')) {
+            popover.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+            popover.setAttribute('aria-hidden', 'true');
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && popover.classList.contains('open')) {
+            popover.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+            popover.setAttribute('aria-hidden', 'true');
+            btn.focus();
+        }
+    });
 }
 
 // ==========================================
@@ -1597,5 +1657,6 @@ initEventListeners();
 initStatusCircles();
 initDewRiskBadge();
 initAstroModal();
+initHealthPopover();
 loadDaily();
 startPolling(updateLive, 30000);
