@@ -153,17 +153,17 @@ public class AnalyticsService {
         pctWetness, dataDetails, SurfaceWetnessStatus.classify(pctWetness));
   }
 
-  public List<HourlyChartAvgDto> getMetricChart(Instant since, Metric metric, int resolution) {
+  public List<HourlyChartAvgDto> getMetricChart(Instant from, Instant to, Metric metric, int resolution) {
     String bucketInterval = resolution + "minutes";
     switch (metric) {
       case TEMPERATURE -> {
-        return dataPointToDto(repository.findChartTemperature(since, bucketInterval));
+        return dataPointToDto(repository.findChartTemperature(from, to, bucketInterval));
       }
       case PRESSURE -> {
-        return dataPointToDto(repository.findChartPressure(since, bucketInterval));
+        return dataPointToDto(repository.findChartPressure(from, to, bucketInterval));
       }
       case HUMIDITY -> {
-        return dataPointToDto(repository.findChartHumidity(since, bucketInterval));
+        return dataPointToDto(repository.findChartHumidity(from, to, bucketInterval));
       }
       default -> throw new IllegalArgumentException("Unknown Metric");
     }
@@ -186,7 +186,7 @@ public class AnalyticsService {
             ? LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant()
             : OffsetDateTime.parse(since).toInstant();
 
-    List<HourlyChartAvgDto> dtos = getMetricChart(sinceInstant, metric, resolution);
+    List<HourlyChartAvgDto> dtos = getMetricChart(sinceInstant, Instant.now(), metric, resolution);
 
     Instant nextBucketExpectedAt = null;
 

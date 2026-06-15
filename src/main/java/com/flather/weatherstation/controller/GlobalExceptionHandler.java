@@ -5,6 +5,7 @@ import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.NoSuchElementException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -78,6 +79,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus.BAD_REQUEST,
         "Invalid request body format. Please check the JSON structure.",
         request);
+  }
+
+  @ExceptionHandler(NoSuchElementException.class)
+  protected ResponseEntity<Object> handleNoSuchElementException(
+      NoSuchElementException ex, WebRequest request) {
+    log.warn("Resource not found: {}", ex.getMessage());
+    return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
   }
 
   @ExceptionHandler(IllegalArgumentException.class)

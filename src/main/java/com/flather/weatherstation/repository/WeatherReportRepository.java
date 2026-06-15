@@ -1,6 +1,7 @@
 package com.flather.weatherstation.repository;
 
 import com.flather.weatherstation.domain.entity.WeatherRecord;
+import com.flather.weatherstation.dto.projection.DailySummaryProjection;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
 import java.time.Instant;
@@ -49,51 +50,55 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
 
   List<WeatherRecord> findByMeasuredAtAfterOrderByMeasuredAtAsc(Instant after);
 
+
   @Query(
       value =
           """
                   SELECT
-                      date_bin(CAST(:bucketInterval AS interval), measured_at, :since) AS bucket,
+                      date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
                       ROUND(AVG(temperature)::numeric, 1)::double precision AS value
                   FROM weather_records
                   WHERE temperature_data_quality = 'OK'
-                    AND measured_at >= :since
+                    AND measured_at >= :from
+                    AND measured_at < :to
                   GROUP BY bucket
                   ORDER BY bucket ASC
                   """,
       nativeQuery = true)
   List<DataPoint> findChartTemperature(
-      @Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
-
-  @Query(
-      value =
-          """
-                          SELECT
-                              date_bin(CAST(:bucketInterval AS interval), measured_at, :since) AS bucket,
-                              ROUND(AVG(humidity)::numeric, 1)::double precision AS value
-                          FROM weather_records
-                          WHERE humidity_data_quality = 'OK'
-                           AND measured_at >= :since
-                          GROUP BY bucket
-                          ORDER BY bucket ASC
-                          """,
-      nativeQuery = true)
-  List<DataPoint> findChartHumidity(
-      @Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
+      @Param("from") Instant from, @Param("to") Instant to, @Param("bucketInterval") String bucketInterval);
 
   @Query(
       value =
           """
                   SELECT
-                      date_bin(CAST(:bucketInterval AS interval), measured_at, :since) AS bucket,
+                      date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
+                      ROUND(AVG(humidity)::numeric, 1)::double precision AS value
+                  FROM weather_records
+                  WHERE humidity_data_quality = 'OK'
+                    AND measured_at >= :from
+                    AND measured_at < :to
+                  GROUP BY bucket
+                  ORDER BY bucket ASC
+                  """,
+      nativeQuery = true)
+  List<DataPoint> findChartHumidity(
+      @Param("from") Instant from, @Param("to") Instant to, @Param("bucketInterval") String bucketInterval);
+
+  @Query(
+      value =
+          """
+                  SELECT
+                      date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
                       ROUND(AVG(pressure)::numeric, 1)::double precision AS value
                   FROM weather_records
                   WHERE pressure_data_quality = 'OK'
-                    AND measured_at >= :since
+                    AND measured_at >= :from
+                    AND measured_at < :to
                   GROUP BY bucket
                   ORDER BY bucket ASC
                   """,
       nativeQuery = true)
   List<DataPoint> findChartPressure(
-      @Param("since") Instant since, @Param("bucketInterval") String bucketInterval);
+      @Param("from") Instant from, @Param("to") Instant to, @Param("bucketInterval") String bucketInterval);
 }
