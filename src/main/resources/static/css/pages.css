@@ -1253,32 +1253,36 @@ span.flatpickr-weekday {
         font-size: 13px;
     }
 
-    /* ----- Flatpickr calendar — bottom-sheet style on mobile -----
-       Flatpickr positions the calendar inline (absolute, anchored to the
-       input). On narrow screens that puts it partially off-viewport when
-       the input sits near an edge. Detaching it as a fixed bottom sheet
-       guarantees it always opens fully visible regardless of which input
-       was tapped.
+    /* ----- Flatpickr calendar on mobile -----
+       Rendered as a compact centred fixed popup rather than a full-width
+       bottom sheet. Appending to the modal element (appendTo option) keeps
+       the position calculation inside the fixed stacking context and avoids
+       the viewport-jump that occurs when flatpickr appends to <body>.
     ========================================================= */
+    /* Kill the default fpFadeInDown animation — its transform conflicts with
+       our translateX(-50%) centering and causes a position flash on open. */
+    .flatpickr-calendar.animate.open {
+        animation: none !important;
+    }
+
     .flatpickr-calendar.open {
         position: fixed !important;
         top: auto !important;
-        bottom: 16px !important;
-        left: 12px !important;
-        right: 12px !important;
-        width: auto !important;
+        bottom: 24px !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        width: min(272px, calc(100vw - 32px)) !important;
         max-width: none !important;
         margin: 0 !important;
-        z-index: 1000;
+        z-index: 1100;
     }
 
-    /* The little arrow only makes sense when anchored to the input */
     .flatpickr-calendar.open:before,
     .flatpickr-calendar.open:after {
         display: none !important;
     }
 
-    /* Let the day grid grow with the sheet width */
     .flatpickr-rContainer,
     .flatpickr-days {
         width: 100% !important;
@@ -1292,31 +1296,30 @@ span.flatpickr-weekday {
 
     .flatpickr-day {
         max-width: none;
-        height: 38px;
-        line-height: 36px;
-        font-size: 0.9rem;
+        height: 34px;
+        line-height: 32px;
+        font-size: 0.82rem;
         margin: 1px 0;
     }
 
-    /* Larger month/year controls for finger taps */
     .flatpickr-current-month {
-        font-size: 1rem;
+        font-size: 0.9rem;
     }
 
     .flatpickr-current-month .flatpickr-monthDropdown-months,
     .flatpickr-current-month input.cur-year {
-        font-size: 1rem;
-        padding: 6px 10px;
+        font-size: 0.9rem;
+        padding: 4px 8px;
     }
 
     .flatpickr-current-month input.cur-year {
-        width: 72px;
+        width: 60px;
     }
 
     .flatpickr-months .flatpickr-prev-month,
     .flatpickr-months .flatpickr-next-month {
-        height: 36px;
-        width: 36px;
+        height: 32px;
+        width: 32px;
     }
 }
 
@@ -1494,6 +1497,42 @@ span.flatpickr-weekday {
     background: rgba(32, 58, 112, 0.7);
     color: var(--text-strong);
     border-color: rgba(150, 200, 255, 0.3);
+}
+
+/* Period stats bar — shown inside the chart card for multi-day views */
+.hist-period-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0 10px;
+    flex-wrap: wrap;
+}
+
+.hist-period-stat {
+    font-size: 0.68rem;
+    font-weight: var(--fw-label);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.hist-period-stat span {
+    color: var(--text-primary);
+    font-weight: var(--fw-value);
+    font-variant-numeric: tabular-nums;
+    margin-left: 3px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.hist-period-high span { color: #fb923c; }
+.hist-period-low  span { color: #38bdf8; }
+
+.hist-period-sep {
+    color: var(--divider);
+    font-size: 0.75rem;
+    line-height: 1;
 }
 
 .history-chart-card .chart-container {

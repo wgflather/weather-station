@@ -106,6 +106,13 @@
                 <button class="history-metric-tab" data-metric="humidity">Humidity</button>
             </div>
         </div>
+        <div class="hist-period-stats" id="hist-period-stats" hidden>
+            <span class="hist-period-stat">Avg <span id="hist-chart-avg">–</span></span>
+            <span class="hist-period-sep">·</span>
+            <span class="hist-period-stat hist-period-high">High <span id="hist-chart-high">–</span></span>
+            <span class="hist-period-sep">·</span>
+            <span class="hist-period-stat hist-period-low">Low <span id="hist-chart-low">–</span></span>
+        </div>
         <div class="chart-container">
             <canvas id="weatherChart"></canvas>
         </div>

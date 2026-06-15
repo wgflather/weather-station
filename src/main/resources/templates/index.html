@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#21376e">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Weather Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css"/>
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
     <!-- Apply last-known sky colors *before* first paint. Safari (both iOS
          and macOS) reads <meta theme-color> once during initial sampling
@@ -50,6 +51,7 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 </head>
 <div id="global-popup" class="details-popup"></div>
 <body th:with="d=${dashboard}">
@@ -200,20 +202,28 @@
     <div class="chart-header">
         <h3>24-Hour Trend</h3>
 
-        <div class="metric-selector">
-            <span class="selector-label">View:</span>
-            <select id="metric-selector" class="metric-dropdown">
-                <option value="temperature">Temperature</option>
-                <option value="pressure">Pressure</option>
-                <option value="humidity">Humidity</option>
-            </select>
-            <select id="resolution-selector" class="resolution-dropdown">
-                <option value="2">2 min</option>
-                <option value="5">5 min</option>
-                <option value="10" selected>10 min</option>
-                <option value="30">30 min</option>
-                <option value="60">60 min</option>
-            </select>
+        <div class="chart-header-right">
+            <div class="metric-selector">
+                <span class="selector-label">View:</span>
+                <select id="metric-selector" class="metric-dropdown">
+                    <option value="temperature">Temperature</option>
+                    <option value="pressure">Pressure</option>
+                    <option value="humidity">Humidity</option>
+                </select>
+                <select id="resolution-selector" class="resolution-dropdown">
+                    <option value="2">2 min</option>
+                    <option value="5">5 min</option>
+                    <option value="10" selected>10 min</option>
+                    <option value="30">30 min</option>
+                    <option value="60">60 min</option>
+                </select>
+            </div>
+            <button class="chart-expand-btn" id="chart-history-btn" aria-label="Open history" title="View history">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+                    <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+            </button>
         </div>
     </div>
 
@@ -308,93 +318,49 @@
     </div>
 </div>
 
-<div class="history-summary-block" id="history-summary">
-    <div class="card-header history-header">
-        <h3>
-            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span>History</span>
-        </h3>
-        <div class="history-nav-cluster">
-            <button class="history-nav-btn" id="history-prev" aria-label="Previous day">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            </button>
-            <button class="history-date-btn" id="history-date-btn" aria-label="Open date picker">
-                <span id="history-date-label">–</span>
-            </button>
-            <button class="history-nav-btn" id="history-next" aria-label="Next day" disabled>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-            </button>
+<div class="hist-modal" id="hist-modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="hist-modal-backdrop"></div>
+    <div class="hist-modal-panel">
+        <div class="hist-modal-header">
+            <span class="hist-modal-title">History</span>
+            <button class="astro-modal-close" id="hist-modal-close" type="button" aria-label="Close">&times;</button>
         </div>
-        <div class="history-header-right">
-            <span class="history-temp-peek" id="history-temp-peek"></span>
-            <button class="history-expand-btn" id="history-toggle" aria-expanded="false" aria-controls="history-body" aria-label="Toggle day summary">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-        </div>
-    </div>
-    <div class="history-body" id="history-body" aria-hidden="true">
-      <div class="history-body-inner">
-        <p class="history-no-data" id="history-no-data" hidden>No data available for this day</p>
-        <div class="history-metrics" id="history-metrics">
-            <div class="history-metric-row">
-                <span class="history-metric-name">
-                    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0Z"/></svg>
-                    Temperature
-                </span>
-                <div class="history-metric-stats">
-                    <span class="history-stat"><span class="history-stat-label">min</span> <span id="hist-temp-min" class="history-stat-value">–</span>°C</span>
-                    <span class="history-stat-dot">·</span>
-                    <span class="history-stat"><span class="history-stat-label">max</span> <span id="hist-temp-max" class="history-stat-value">–</span>°C</span>
-                    <span class="history-stat-dot">·</span>
-                    <span class="history-stat"><span class="history-stat-label">avg</span> <span id="hist-temp-avg" class="history-stat-value">–</span>°C</span>
-                </div>
+        <div class="hist-modal-topbar">
+            <div id="hist-picker-wrapper" class="history-picker-group">
+                <span class="history-picker-label">Date</span>
+                <input type="text" id="hist-date-input" class="db-date-input" placeholder="Select a date" readonly>
             </div>
-            <div class="history-metric-row">
-                <span class="history-metric-name">
-                    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
-                    Pressure
-                </span>
-                <div class="history-metric-stats">
-                    <span class="history-stat"><span class="history-stat-label">min</span> <span id="hist-pres-min" class="history-stat-value">–</span> hPa</span>
-                    <span class="history-stat-dot">·</span>
-                    <span class="history-stat"><span class="history-stat-label">max</span> <span id="hist-pres-max" class="history-stat-value">–</span> hPa</span>
-                    <span class="history-stat-dot">·</span>
-                    <span class="history-stat"><span class="history-stat-label">avg</span> <span id="hist-pres-avg" class="history-stat-value">–</span> hPa</span>
-                </div>
-            </div>
-            <div class="history-metric-row">
-                <span class="history-metric-name">
-                    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7Z"/></svg>
-                    Humidity
-                </span>
-                <div class="history-metric-stats">
-                    <span class="history-stat"><span class="history-stat-label">min</span> <span id="hist-hum-min" class="history-stat-value">–</span>%</span>
-                    <span class="history-stat-dot">·</span>
-                    <span class="history-stat"><span class="history-stat-label">max</span> <span id="hist-hum-max" class="history-stat-value">–</span>%</span>
-                    <span class="history-stat-dot">·</span>
-                    <span class="history-stat"><span class="history-stat-label">avg</span> <span id="hist-hum-avg" class="history-stat-value">–</span>%</span>
-                </div>
+            <div class="history-period-tabs" id="hist-period-tabs">
+                <button class="history-period-btn active" data-days="1">Day</button>
+                <button class="history-period-btn" data-days="7">7D</button>
+                <button class="history-period-btn" data-days="14">14D</button>
+                <button class="history-period-btn" data-days="30">30D</button>
             </div>
         </div>
-        <a class="history-full-link" id="history-full-link" href="/history.html">View full history &rarr;</a>
-      </div>
+        <div class="hist-modal-body">
+            <div class="configuration_block history-chart-card history-page-card">
+                <div class="chart-header">
+                    <h3 id="hist-chart-title">Hourly</h3>
+                    <div class="history-metric-tabs" id="hist-metric-tabs">
+                        <button class="history-metric-tab active" data-metric="temperature">Temperature</button>
+                        <button class="history-metric-tab" data-metric="pressure">Pressure</button>
+                        <button class="history-metric-tab" data-metric="humidity">Humidity</button>
+                    </div>
+                </div>
+                <div class="hist-period-stats" id="hist-period-stats">
+                    <span class="hist-period-stat">Avg <span id="hist-chart-avg">–</span></span>
+                    <span class="hist-period-sep">·</span>
+                    <span class="hist-period-stat hist-period-high">High <span id="hist-chart-high">–</span></span>
+                    <span class="hist-period-sep">·</span>
+                    <span class="hist-period-stat hist-period-low">Low <span id="hist-chart-low">–</span></span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="hist-modal-chart"></canvas>
+                </div>
+                <p class="history-chart-empty" id="hist-chart-empty" hidden>No chart data for this period</p>
+            </div>
+        </div>
     </div>
-</div>
-
-<div class="history-calendar" id="history-calendar" aria-hidden="true" role="dialog" aria-label="Date picker">
-    <div class="history-cal-header">
-        <button class="history-cal-nav" id="cal-prev-month" aria-label="Previous month">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="history-cal-title" id="cal-month-label">–</span>
-        <button class="history-cal-nav" id="cal-next-month" aria-label="Next month">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
-    </div>
-    <div class="history-cal-weekdays">
-        <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
-    </div>
-    <div class="history-cal-grid" id="cal-grid"></div>
 </div>
 
 <div class="astro-modal" id="astro-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="astro-modal-title">
@@ -410,6 +376,6 @@
 
 <script th:src="@{/js/realtime-script.js}"></script>
 <script type="module" th:src="@{/js/fetch-data.js}"></script>
-<script type="module" th:src="@{/js/history-summary.js}"></script>
+<script type="module" th:src="@{/js/history-modal.js}"></script>
 </body>
 </html>

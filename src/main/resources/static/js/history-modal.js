@@ -2,16 +2,17 @@ import { renderWeatherChart } from './weather-chart.js';
 import { renderDailyChart }   from './daily-chart.js';
 
 /* =========================================================
-   HISTORY PAGE
-   Standalone page for browsing daily weather summaries and
-   per-metric charts. Single-day views use the hourly chart;
-   multi-day (7 / 14 / 30) use the dedicated daily chart.
+   HISTORY MODAL
+   Single-day views: hourly chart + day stats bar.
+   Multi-day views (7 / 14 / 30): daily chart + period stats bar.
+   Both views share the same Avg / High / Low bar above the chart.
 ========================================================= */
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentDate   = null;
 let currentMetric = 'temperature';
 let currentPeriod = 1;
+let initialized   = false;
 
 const monthCache    = new Map();
 const monthInFlight = new Map();
@@ -33,19 +34,28 @@ function subtractDays(dateStr, days) {
 
 function fmt1(v) { return v != null ? Number(v).toFixed(1) : '–'; }
 
-function formatPageTitle(dateStr) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    });
-}
-
 function formatDateRange(fromStr, toStr) {
     const [fy, fm, fd] = fromStr.split('-').map(Number);
     const [ty, tm, td] = toStr.split('-').map(Number);
     const from = new Date(fy, fm - 1, fd).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const to   = new Date(ty, tm - 1, td).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     return `${from} – ${to}`;
+}
+
+// ── Stats bar ─────────────────────────────────────────────────────────────────
+const UNITS = { temperature: '°C', pressure: ' hPa', humidity: '%' };
+
+function resetStatsBar() {
+    document.getElementById('hist-chart-avg').textContent  = '–';
+    document.getElementById('hist-chart-high').textContent = '–';
+    document.getElementById('hist-chart-low').textContent  = '–';
+}
+
+function setStatsBar(avg, high, low, metric) {
+    const unit = UNITS[metric] ?? '';
+    document.getElementById('hist-chart-avg').textContent  = avg  != null ? `${fmt1(avg)}${unit}`  : '–';
+    document.getElementById('hist-chart-high').textContent = high != null ? `${fmt1(high)}${unit}` : '–';
+    document.getElementById('hist-chart-low').textContent  = low  != null ? `${fmt1(low)}${unit}`  : '–';
 }
 
 // ── Available dates ───────────────────────────────────────────────────────────
@@ -109,7 +119,24 @@ async function initDatePicker() {
         disableMobile: true,
         defaultDate:   currentDate,
         enable:        [isDateEnabled],
-        onOpen:        (_s, _str, instance) => ensureMonthsLoaded(instance),
+        // Append inside the modal so flatpickr's position math runs within the
+        // fixed stacking context, avoiding the viewport jump on first open.
+        appendTo:      document.getElementById('hist-modal'),
+        onOpen: (_s, _str, instance) => {
+            // On mobile, flatpickr's JS-calculated position (near the input) is
+            // overridden by CSS !important rules, but there's a single paint frame
+            // where the JS position is visible — fix it synchronously here first.
+            if (window.innerWidth <= 600) {
+                const cal = instance.calendarContainer;
+                cal.style.top       = 'auto';
+                cal.style.bottom    = '24px';
+                cal.style.left      = '50%';
+                cal.style.right     = 'auto';
+                cal.style.transform = 'translateX(-50%)';
+                cal.style.width     = `${Math.min(272, window.innerWidth - 32)}px`;
+            }
+            ensureMonthsLoaded(instance);
+        },
         onMonthChange: (_s, _str, instance) => ensureMonthsLoaded(instance),
         onYearChange:  (_s, _str, instance) => ensureMonthsLoaded(instance),
         onChange: (selectedDates) => {
@@ -118,64 +145,47 @@ async function initDatePicker() {
             const dateStr = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
             if (dateStr !== currentDate) {
                 currentDate = dateStr;
-                history.replaceState(null, '', `?date=${dateStr}`);
                 loadRange(currentPeriod);
             }
         },
     });
 }
 
-// ── Single-day summary ────────────────────────────────────────────────────────
-async function loadDaySummary(dateStr) {
-    const titleEl   = document.getElementById('hist-summary-title');
-    const noData    = document.getElementById('hist-no-data');
-    const statsGrid = document.getElementById('hist-stats-grid');
-
-    titleEl.textContent = formatPageTitle(dateStr);
-    noData.hidden   = true;
-    statsGrid.hidden = false;
-
+// ── Single-day stats bar (from daily summary API) ─────────────────────────────
+async function loadDaySummaryStats(dateStr, metric) {
     try {
         const res = await fetch(`/api/weather/history/daily/summary?date=${dateStr}`);
-        if (res.status === 404) { showSummaryNoData(noData, statsGrid, 'No data for this day'); return; }
-        if (!res.ok) throw new Error(res.status);
+        if (!res.ok) return;
         const d = await res.json();
-
-        document.getElementById('hist-temp-min').textContent = `${fmt1(d.temperatureMin)}°C`;
-        document.getElementById('hist-temp-max').textContent = `${fmt1(d.temperatureMax)}°C`;
-        document.getElementById('hist-temp-avg').textContent = `${fmt1(d.temperatureAvg)}°C`;
-        document.getElementById('hist-pres-min').textContent = `${fmt1(d.pressureMin)} hPa`;
-        document.getElementById('hist-pres-max').textContent = `${fmt1(d.pressureMax)} hPa`;
-        document.getElementById('hist-pres-avg').textContent = `${fmt1(d.pressureAvg)} hPa`;
-        document.getElementById('hist-hum-min').textContent  = `${fmt1(d.humidityMin)}%`;
-        document.getElementById('hist-hum-max').textContent  = `${fmt1(d.humidityMax)}%`;
-        document.getElementById('hist-hum-avg').textContent  = `${fmt1(d.humidityAvg)}%`;
-    } catch {
-        showSummaryNoData(noData, statsGrid, 'No data for this day');
-    }
+        const vals = {
+            temperature: [d.temperatureAvg, d.temperatureMax, d.temperatureMin],
+            pressure:    [d.pressureAvg,    d.pressureMax,    d.pressureMin],
+            humidity:    [d.humidityAvg,     d.humidityMax,    d.humidityMin],
+        }[metric] ?? [null, null, null];
+        setStatsBar(vals[0], vals[1], vals[2], metric);
+    } catch { /* stats bar stays at "–" */ }
 }
 
 // ── Single-day chart ──────────────────────────────────────────────────────────
 async function loadDayChart(dateStr, metric) {
     const emptyEl = document.getElementById('hist-chart-empty');
-    const canvas  = document.getElementById('weatherChart');
+    const canvas  = document.getElementById('hist-modal-chart');
 
     try {
         const res = await fetch(`/api/weather/history/chart/day?date=${dateStr}&metric=${metric}`);
         if (!res.ok) throw new Error(res.status);
-        const dto = await res.json();
+        const dto    = await res.json();
         const points = (dto.chartPoints || []).map(p => ({ hour: p.hour, hourlyValue: p.hourlyValue }));
 
         if (points.length === 0) {
             canvas.hidden  = true;
             emptyEl.hidden = false;
-            renderWeatherChart([], metric, 60, { canvasId: 'weatherChart', showNow: false });
         } else {
             canvas.hidden  = false;
             emptyEl.hidden = true;
             const [y, m, d] = dateStr.split('-').map(Number);
             renderWeatherChart(points, metric, 60, {
-                canvasId: 'weatherChart',
+                canvasId: 'hist-modal-chart',
                 showNow:  false,
                 refDate:  new Date(y, m - 1, d),
             });
@@ -186,19 +196,10 @@ async function loadDayChart(dateStr, metric) {
     }
 }
 
-// ── Multi-day: single fetch drives both summary card and daily chart ──────────
+// ── Multi-day: single fetch drives both stats bar and daily chart ─────────────
 async function loadMultiDay(fromStr, toStr, days, metric) {
-    const titleEl   = document.getElementById('hist-summary-title');
-    const noData    = document.getElementById('hist-no-data');
-    const statsGrid = document.getElementById('hist-stats-grid');
-    const emptyEl   = document.getElementById('hist-chart-empty');
-    const canvas    = document.getElementById('weatherChart');
-    const statsBar  = document.getElementById('hist-period-stats');
-
-    titleEl.textContent = `${formatDateRange(fromStr, toStr)} (${days} days)`;
-    noData.hidden    = true;
-    statsGrid.hidden = false;
-    if (statsBar) statsBar.hidden = true;
+    const emptyEl = document.getElementById('hist-chart-empty');
+    const canvas  = document.getElementById('hist-modal-chart');
 
     try {
         const res = await fetch(`/api/weather/history/daily?from=${fromStr}&to=${toStr}`);
@@ -206,97 +207,41 @@ async function loadMultiDay(fromStr, toStr, days, metric) {
         const records = await res.json();
 
         if (!records.length) {
-            showSummaryNoData(noData, statsGrid, 'No data for this period');
             canvas.hidden  = true;
             emptyEl.hidden = false;
             return;
         }
 
-        populateMultiDaySummary(records, noData, statsGrid);
-        updatePeriodStatsBar(records, metric);
+        // Period stats bar
+        let minVal = Infinity, maxVal = -Infinity, avgSum = 0, avgCount = 0;
+        for (const r of records) {
+            const mn = r[metric + 'Min'], mx = r[metric + 'Max'], av = r[metric + 'Avg'];
+            if (mn != null) minVal = Math.min(minVal, mn);
+            if (mx != null) maxVal = Math.max(maxVal, mx);
+            if (av != null) { avgSum += av; avgCount++; }
+        }
+        setStatsBar(
+            avgCount          ? avgSum / avgCount : null,
+            maxVal !== -Infinity ? maxVal         : null,
+            minVal !== Infinity  ? minVal         : null,
+            metric
+        );
 
         canvas.hidden  = false;
         emptyEl.hidden = true;
-        renderDailyChart(records, metric, 'weatherChart', fromStr, toStr);
+        renderDailyChart(records, metric, 'hist-modal-chart', fromStr, toStr);
 
     } catch {
-        showSummaryNoData(noData, statsGrid, 'No data for this period');
         if (canvas) canvas.hidden = true;
         emptyEl.hidden = false;
     }
-}
-
-// ── Populate summary stat grid from daily records array ───────────────────────
-function populateMultiDaySummary(records, noData, statsGrid) {
-    let tempMin = Infinity, tempMax = -Infinity, tempAvgSum = 0, tempAvgCount = 0;
-    let presMin = Infinity, presMax = -Infinity, presAvgSum = 0, presAvgCount = 0;
-    let humMin  = Infinity, humMax  = -Infinity, humAvgSum  = 0, humAvgCount  = 0;
-
-    for (const r of records) {
-        if (r.temperatureMin != null) tempMin = Math.min(tempMin, r.temperatureMin);
-        if (r.temperatureMax != null) tempMax = Math.max(tempMax, r.temperatureMax);
-        if (r.temperatureAvg != null) { tempAvgSum += r.temperatureAvg; tempAvgCount++; }
-        if (r.pressureMin != null) presMin = Math.min(presMin, r.pressureMin);
-        if (r.pressureMax != null) presMax = Math.max(presMax, r.pressureMax);
-        if (r.pressureAvg != null) { presAvgSum += r.pressureAvg; presAvgCount++; }
-        if (r.humidityMin != null) humMin = Math.min(humMin, r.humidityMin);
-        if (r.humidityMax != null) humMax = Math.max(humMax, r.humidityMax);
-        if (r.humidityAvg != null) { humAvgSum += r.humidityAvg; humAvgCount++; }
-    }
-
-    const safe = (v, sentinel) => (v === sentinel ? null : v);
-
-    document.getElementById('hist-temp-min').textContent = `${fmt1(safe(tempMin, Infinity))}°C`;
-    document.getElementById('hist-temp-max').textContent = `${fmt1(safe(tempMax, -Infinity))}°C`;
-    document.getElementById('hist-temp-avg').textContent = `${fmt1(tempAvgCount ? tempAvgSum / tempAvgCount : null)}°C`;
-    document.getElementById('hist-pres-min').textContent = `${fmt1(safe(presMin, Infinity))} hPa`;
-    document.getElementById('hist-pres-max').textContent = `${fmt1(safe(presMax, -Infinity))} hPa`;
-    document.getElementById('hist-pres-avg').textContent = `${fmt1(presAvgCount ? presAvgSum / presAvgCount : null)} hPa`;
-    document.getElementById('hist-hum-min').textContent  = `${fmt1(safe(humMin, Infinity))}%`;
-    document.getElementById('hist-hum-max').textContent  = `${fmt1(safe(humMax, -Infinity))}%`;
-    document.getElementById('hist-hum-avg').textContent  = `${fmt1(humAvgCount ? humAvgSum / humAvgCount : null)}%`;
-
-    noData.hidden    = true;
-    statsGrid.hidden = false;
-}
-
-// ── Period stats bar (Avg / High / Low for the active metric) ─────────────────
-function updatePeriodStatsBar(records, metric) {
-    const bar    = document.getElementById('hist-period-stats');
-    const avgEl  = document.getElementById('hist-chart-avg');
-    const highEl = document.getElementById('hist-chart-high');
-    const lowEl  = document.getElementById('hist-chart-low');
-    if (!bar || !avgEl || !highEl || !lowEl) return;
-
-    const UNITS = { temperature: '°C', pressure: ' hPa', humidity: '%' };
-    const unit  = UNITS[metric] ?? '';
-
-    let minVal = Infinity, maxVal = -Infinity, avgSum = 0, avgCount = 0;
-    for (const r of records) {
-        const mn = r[metric + 'Min'], mx = r[metric + 'Max'], av = r[metric + 'Avg'];
-        if (mn != null) minVal = Math.min(minVal, mn);
-        if (mx != null) maxVal = Math.max(maxVal, mx);
-        if (av != null) { avgSum += av; avgCount++; }
-    }
-
-    avgEl.textContent  = avgCount            ? `${fmt1(avgSum / avgCount)}${unit}` : '–';
-    highEl.textContent = maxVal !== -Infinity ? `${fmt1(maxVal)}${unit}`            : '–';
-    lowEl.textContent  = minVal !== Infinity  ? `${fmt1(minVal)}${unit}`            : '–';
-
-    bar.hidden = false;
-}
-
-function showSummaryNoData(noData, statsGrid, message) {
-    noData.textContent = message ?? 'No data for this day';
-    noData.hidden      = false;
-    statsGrid.hidden   = true;
 }
 
 // ── Metric tabs ───────────────────────────────────────────────────────────────
 document.getElementById('hist-metric-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('.history-metric-tab');
     if (!btn || btn.classList.contains('active')) return;
-    document.querySelectorAll('.history-metric-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#hist-metric-tabs .history-metric-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentMetric = btn.dataset.metric;
     if (currentDate) loadRange(currentPeriod);
@@ -306,7 +251,7 @@ document.getElementById('hist-metric-tabs').addEventListener('click', (e) => {
 document.getElementById('hist-period-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('.history-period-btn');
     if (!btn || btn.classList.contains('active')) return;
-    document.querySelectorAll('.history-period-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#hist-period-tabs .history-period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentPeriod = Number(btn.dataset.days);
     if (currentDate) loadRange(currentPeriod);
@@ -316,18 +261,22 @@ document.getElementById('hist-period-tabs').addEventListener('click', (e) => {
 async function loadRange(days) {
     const chartTitle    = document.getElementById('hist-chart-title');
     const pickerWrapper = document.getElementById('hist-picker-wrapper');
-    const statsBar      = document.getElementById('hist-period-stats');
+    const dateInput     = document.getElementById('hist-date-input');
 
-    if (days === 1) {
-        if (statsBar) statsBar.hidden = true;
-        pickerWrapper.hidden   = false;
+    resetStatsBar();
+
+    const singleDay = days === 1;
+    // Disable the date picker in multi-day views — it only applies to single day.
+    pickerWrapper.classList.toggle('hist-picker-disabled', !singleDay);
+    dateInput.disabled = !singleDay;
+
+    if (singleDay) {
         chartTitle.textContent = 'Hourly';
         await Promise.all([
-            loadDaySummary(currentDate),
+            loadDaySummaryStats(currentDate, currentMetric),
             loadDayChart(currentDate, currentMetric),
         ]);
     } else {
-        pickerWrapper.hidden   = true;
         chartTitle.textContent = 'Daily';
         const toDate   = yesterday();
         const fromDate = subtractDays(toDate, days - 1);
@@ -335,12 +284,47 @@ async function loadRange(days) {
     }
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-(async () => {
-    const params = new URLSearchParams(window.location.search);
-    const raw    = params.get('date');
-    currentDate  = (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) ? raw : yesterday();
-
+// ── Init (lazy — runs only on first modal open) ───────────────────────────────
+async function initModal() {
+    if (initialized) return;
+    initialized = true;
+    currentDate = yesterday();
     await initDatePicker();
     await loadRange(currentPeriod);
-})();
+}
+
+// ── Modal open / close ────────────────────────────────────────────────────────
+const modal = document.getElementById('hist-modal');
+let savedScrollY = 0;
+
+function openHistModal() {
+    // iOS Safari ignores overflow:hidden on <body> alone and still allows
+    // scroll/viewport shifts. position:fixed + top = -scrollY prevents that.
+    savedScrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top      = `-${savedScrollY}px`;
+    document.body.style.width    = '100%';
+    modal.classList.add('open');
+    modal.removeAttribute('aria-hidden');
+    document.getElementById('hist-modal-close').focus();
+    initModal();
+}
+
+function closeHistModal() {
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top      = '';
+    document.body.style.width    = '';
+    window.scrollTo(0, savedScrollY);
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+document.getElementById('chart-history-btn').addEventListener('click', openHistModal);
+document.getElementById('hist-modal-close').addEventListener('click', closeHistModal);
+modal.querySelector('.hist-modal-backdrop').addEventListener('click', closeHistModal);
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeHistModal();
+});

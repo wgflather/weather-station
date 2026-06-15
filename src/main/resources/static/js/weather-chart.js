@@ -1,4 +1,4 @@
-let weatherChartInstance = null;
+const chartInstances = new Map();
 
 /* =========================================================
    PER-METRIC VALUE -> COLOR SCALES
@@ -720,6 +720,10 @@ function dismissTooltip(chart) {
     try {
         chart.setActiveElements([]);
         if (chart.tooltip) chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+        // Null the cached last-event so Chart.js treats the next touch as a
+        // genuinely new interaction — otherwise re-tapping the same point is
+        // ignored because Chart.js sees no positional change.
+        chart._lastEvent = null;
         chart.update('none');
     } catch (_) { /* chart may be mid-teardown */ }
 }
@@ -749,7 +753,10 @@ function installPointerHandlers(canvas) {
     const endTouch = (e) => {
         if (e.cancelable) e.preventDefault();
         tooltipSuppressed = true;
-        dismissTooltip(weatherChartInstance);
+        // Use Chart.getChart() rather than chartInstances so this handler
+        // correctly dismisses whichever chart is currently on the canvas —
+        // including daily charts that are not tracked in chartInstances.
+        dismissTooltip(Chart.getChart(canvas));
         if (suppressTimer) clearTimeout(suppressTimer);
         suppressTimer = setTimeout(() => { tooltipSuppressed = false; }, 600);
     };
@@ -1312,19 +1319,26 @@ export function renderWeatherChart(backendData, metric = 'temperature', resoluti
 
         const state = computeChartState(backendData, metric, resolutionMinutes, options);
 
-        const canReuse = weatherChartInstance
-            && weatherChartInstance.$metric === metric
-            && weatherChartInstance.$resolution === resolutionMinutes
-            && weatherChartInstance.$xUnit === (options.xUnit ?? 'hour');
+        const tracked = chartInstances.get(canvasId) ?? null;
+        const live    = Chart.getChart(canvasElement) ?? null;
+        // If another module destroyed or replaced our chart, the tracked reference
+        // is stale — treat it as absent so we fall through to a fresh create.
+        const existing = (tracked !== null && tracked === live) ? tracked : null;
+        if (tracked !== null && tracked !== live) chartInstances.delete(canvasId);
+
+        const canReuse = existing
+            && existing.$metric === metric
+            && existing.$resolution === resolutionMinutes
+            && existing.$xUnit === (options.xUnit ?? 'hour');
 
         if (canReuse) {
-            updateChart(weatherChartInstance, state);
+            updateChart(existing, state);
         } else {
-            if (weatherChartInstance !== null) {
-                weatherChartInstance.destroy();
-                weatherChartInstance = null;
-            }
-            weatherChartInstance = createChart(canvasElement, state);
+            // Destroy any chart on this canvas — covers both own instances and
+            // charts created by other modules (e.g. daily-chart.js).
+            Chart.getChart(canvasElement)?.destroy();
+            chartInstances.delete(canvasId);
+            chartInstances.set(canvasId, createChart(canvasElement, state));
         }
     } catch (error) {
         console.error('Error rendering weather chart:', error);
