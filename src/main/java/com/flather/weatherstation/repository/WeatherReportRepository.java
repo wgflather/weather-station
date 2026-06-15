@@ -1,7 +1,6 @@
 package com.flather.weatherstation.repository;
 
 import com.flather.weatherstation.domain.entity.WeatherRecord;
-import com.flather.weatherstation.dto.projection.DailySummaryProjection;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.projection.ExtremesProjection;
 import java.time.Instant;
@@ -50,7 +49,6 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
 
   List<WeatherRecord> findByMeasuredAtAfterOrderByMeasuredAtAsc(Instant after);
 
-
   @Query(
       value =
           """
@@ -66,7 +64,9 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   """,
       nativeQuery = true)
   List<DataPoint> findChartTemperature(
-      @Param("from") Instant from, @Param("to") Instant to, @Param("bucketInterval") String bucketInterval);
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("bucketInterval") String bucketInterval);
 
   @Query(
       value =
@@ -83,7 +83,9 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   """,
       nativeQuery = true)
   List<DataPoint> findChartHumidity(
-      @Param("from") Instant from, @Param("to") Instant to, @Param("bucketInterval") String bucketInterval);
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("bucketInterval") String bucketInterval);
 
   @Query(
       value =
@@ -100,5 +102,7 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   """,
       nativeQuery = true)
   List<DataPoint> findChartPressure(
-      @Param("from") Instant from, @Param("to") Instant to, @Param("bucketInterval") String bucketInterval);
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("bucketInterval") String bucketInterval);
 }

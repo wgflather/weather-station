@@ -449,7 +449,7 @@ const minMaxLabelsPlugin = {
 
         const {
             minIndex, maxIndex, latestIndex, validMinMax, scenario, isMobile,
-            maxLabelColor, minLabelColor,
+            showNow = true, maxLabelColor, minLabelColor,
         } = pluginOptions;
 
         chart.$hideMaxPin    = false;
@@ -510,21 +510,25 @@ const minMaxLabelsPlugin = {
                 key: 'max', point: nowEl, text: 'H', color: maxLabelColor, font: hlFont,
                 gap: fixedGap, preferAbove: true, ...measureLabel(ctx, 'H', hlFont),
             };
-            const nowLabel = {
-                key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
-                gap, preferAbove: false, ...measureLabel(ctx, 'Now', nowFont),
-            };
             const lLabel = {
                 key: 'min', point: minEl, text: 'L', color: minLabelColor, font: hlFont,
                 gap, preferAbove: false, ...measureLabel(ctx, 'L', hlFont),
             };
 
             placeFixedOffsetLabel(hLabel, chartArea);
-            placeLabel(nowLabel, chartArea);
             placeLabel(lLabel, chartArea);
-            resolveLabelOverlaps([nowLabel, lLabel], chartArea);
 
-            visible = [hLabel, nowLabel, lLabel];
+            if (showNow) {
+                const nowLabel = {
+                    key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
+                    gap, preferAbove: false, ...measureLabel(ctx, 'Now', nowFont),
+                };
+                placeLabel(nowLabel, chartArea);
+                resolveLabelOverlaps([nowLabel, lLabel], chartArea);
+                visible = [hLabel, nowLabel, lLabel];
+            } else {
+                visible = [hLabel, lLabel];
+            }
 
         } else if (scenario === 'minAbsorbed') {
             // L collapses onto "Now" — ring Now in L's color, pin "L" 14px
@@ -540,21 +544,25 @@ const minMaxLabelsPlugin = {
                 key: 'min', point: nowEl, text: 'L', color: minLabelColor, font: hlFont,
                 gap: fixedGap, preferAbove: false, ...measureLabel(ctx, 'L', hlFont),
             };
-            const nowLabel = {
-                key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
-                gap, preferAbove: true, ...measureLabel(ctx, 'Now', nowFont),
-            };
             const hLabel = {
                 key: 'max', point: maxEl, text: 'H', color: maxLabelColor, font: hlFont,
                 gap, preferAbove: true, ...measureLabel(ctx, 'H', hlFont),
             };
 
             placeFixedOffsetLabel(lLabel, chartArea);
-            placeLabel(nowLabel, chartArea);
             placeLabel(hLabel, chartArea);
-            resolveLabelOverlaps([nowLabel, hLabel], chartArea);
 
-            visible = [lLabel, nowLabel, hLabel];
+            if (showNow) {
+                const nowLabel = {
+                    key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
+                    gap, preferAbove: true, ...measureLabel(ctx, 'Now', nowFont),
+                };
+                placeLabel(nowLabel, chartArea);
+                resolveLabelOverlaps([nowLabel, hLabel], chartArea);
+                visible = [lLabel, nowLabel, hLabel];
+            } else {
+                visible = [lLabel, hLabel];
+            }
 
         } else {
             // ── 'none': pixel-geometry fallback ──────────────────────
@@ -610,7 +618,7 @@ const minMaxLabelsPlugin = {
                 });
             }
 
-            if (nowEl) {
+            if (nowEl && showNow) {
                 // When "Now" lands on the same point as H, put "Now" on the
                 // opposite side so both labels sit cleanly above/below the pin
                 candidates.push({
@@ -819,15 +827,32 @@ function externalTooltipHandler(context) {
    latest analytics — letting us update in place instead of
    destroying/recreating the chart each poll cycle.
 ========================================================= */
-function computeChartState(backendData, metric, resolutionMinutes) {
+function computeChartState(backendData, metric, resolutionMinutes, options = {}) {
     const config   = METRIC_CONFIG[metric] ?? METRIC_CONFIG.temperature;
     const scale    = COLOR_SCALES[metric] ?? COLOR_SCALES.temperature;
     const isMobile = window.innerWidth <= 480;
+    const xUnit    = options.xUnit ?? 'hour';
+    // showNow only applies to hourly (live) charts
+    const showNow  = options.showNow !== false && xUnit === 'hour';
 
     // ── Time range ──────────────────────────────────────────
-    const today      = new Date();
-    const startRange = new Date(today); startRange.setHours(0, 0, 0, 0);
-    const endRange   = new Date(today); endRange.setHours(23, 59, 59, 999);
+    const today       = new Date();
+    let startRange, endRange;
+
+    if (options.xRange) {
+        startRange = options.xRange.from;
+        endRange   = options.xRange.to;
+    } else {
+        const displayDate = options.refDate ?? today;
+        startRange = new Date(displayDate); startRange.setHours(0, 0, 0, 0);
+        endRange   = new Date(displayDate);
+        if (showNow) {
+            endRange.setHours(23, 59, 59, 999);
+        } else {
+            endRange.setDate(endRange.getDate() + 1);
+            endRange.setHours(0, 0, 0, 0);
+        }
+    }
 
     // ── Build point arrays ──────────────────────────────────
     const rawPoints = (backendData || []).map(item => ({
@@ -835,13 +860,28 @@ function computeChartState(backendData, metric, resolutionMinutes) {
         y: item.hourlyValue,
     }));
 
+    // For historical single-day views, trim the right x-axis edge to just past
+    // the last data point so there is no visible empty strip after the final bucket.
+    if (!showNow && !options.xRange && rawPoints.length > 0) {
+        const lastTime = rawPoints[rawPoints.length - 1].x.getTime();
+        endRange.setTime(lastTime + 5 * 60 * 1000);
+    }
+
+    // ── X-axis tick step for daily charts ──────────────────
+    const daySpan   = xUnit === 'day'
+        ? Math.round((endRange.getTime() - startRange.getTime()) / 86400000)
+        : 0;
+    const xTickStep = daySpan <= 8 ? 1 : daySpan <= 16 ? 2 : 5;
+
     const chartPoints = insertGapNulls(rawPoints, resolutionMinutes);
-    const gapPoints   = extractGapSegments(rawPoints, resolutionMinutes, startRange, today);
+    const gapBoundary = showNow ? today : endRange;
+    const gapPoints   = extractGapSegments(rawPoints, resolutionMinutes, startRange, gapBoundary);
 
     // ── Analytics ───────────────────────────────────────────
     const yBounds                = getDynamicYBounds(chartPoints, metric);
     const { minIndex, maxIndex } = getMinMaxPoints(chartPoints);
-    const showMinMax             = hasEnoughDataDuration(backendData);
+    // H/L markers only make sense on hourly charts (not daily trend lines)
+    const showMinMax             = xUnit === 'hour' && hasEnoughDataDuration(backendData);
     const validMinMax            = showMinMax
         && minIndex !== -1 && maxIndex !== -1
         && minIndex !== maxIndex;
@@ -856,8 +896,9 @@ function computeChartState(backendData, metric, resolutionMinutes) {
     );
 
     return {
-        metric, resolutionMinutes, config, scale, isMobile,
+        metric, resolutionMinutes, config, scale, isMobile, showNow,
         today, startRange, endRange,
+        xUnit, xTickStep,
         chartPoints, gapPoints, yBounds,
         minIndex, maxIndex, latestIndex,
         showMinMax, validMinMax, scenario,
@@ -988,13 +1029,15 @@ function createChart(canvasElement, state) {
                 x: {
                     type: 'time',
                     time: {
-                        unit:           'hour',
-                        displayFormats: { hour: 'H' },
-                        tooltipFormat:  'HH:mm',
+                        unit:           state.xUnit,
+                        displayFormats: state.xUnit === 'day'
+                            ? { day: 'MMM d' }
+                            : { hour: 'H' },
+                        tooltipFormat:  state.xUnit === 'day' ? 'MMM d' : 'HH:mm',
                     },
                     min:    state.startRange,
                     max:    state.endRange,
-                    ticks:  { stepSize: 3, color: 'rgba(148, 163, 184, 0.6)', font: { size: state.isMobile ? 9 : 11 } },
+                    ticks:  { stepSize: state.xUnit === 'day' ? state.xTickStep : 3, color: 'rgba(148, 163, 184, 0.6)', font: { size: state.isMobile ? 9 : 11 } },
                     grid:   { color: 'rgba(255,255,255,0.028)', drawBorder: false },
                     border: { display: false },
                 },
@@ -1029,6 +1072,12 @@ function createChart(canvasElement, state) {
                             if (!items.length) return '';
                             const isGap = items.some(i => i.dataset.label === '__gap__');
                             if (isGap) return 'Missing data';
+                            const st = items[0].chart.$state;
+                            if (st.xUnit === 'day') {
+                                return new Date(items[0].parsed.x).toLocaleDateString([], {
+                                    weekday: 'short', month: 'short', day: 'numeric',
+                                });
+                            }
                             return new Date(items[0].parsed.x).toLocaleTimeString([], {
                                 hour: '2-digit', minute: '2-digit',
                             });
@@ -1092,6 +1141,7 @@ function createChart(canvasElement, state) {
                     validMinMax:   state.validMinMax,
                     scenario:      state.scenario,
                     isMobile:      state.isMobile,
+                    showNow:       state.showNow,
                     maxLabelColor: state.config.maxNodeColor,
                     minLabelColor: state.config.minNodeColor,
                 }
@@ -1113,7 +1163,7 @@ function createChart(canvasElement, state) {
                 id: 'futureAreaOverlay',
                 beforeDatasetsDraw(chart) {
                     const st = chart.$state;
-                    if (!st.chartPoints.length) return;
+                    if (!st.showNow || !st.chartPoints.length) return;
                     const { ctx, chartArea, scales } = chart;
                     const lastReal = st.chartPoints[st.latestIndex];
                     if (!lastReal) return;
@@ -1208,6 +1258,7 @@ function createChart(canvasElement, state) {
     chart.$state      = state;
     chart.$metric     = state.metric;
     chart.$resolution = state.resolutionMinutes;
+    chart.$xUnit      = state.xUnit;
     return chart;
 }
 
@@ -1237,6 +1288,7 @@ function updateChart(chart, state) {
     p.validMinMax   = state.validMinMax;
     p.scenario      = state.scenario;
     p.isMobile      = state.isMobile;
+    p.showNow       = state.showNow;
     p.maxLabelColor = state.config.maxNodeColor;
     p.minLabelColor = state.config.minNodeColor;
 
@@ -1249,19 +1301,21 @@ function updateChart(chart, state) {
    full rebuild is paid only on metric/resolution change (or the
    first render).
 ========================================================= */
-export function renderWeatherChart(backendData, metric = 'temperature', resolutionMinutes = 10) {
+export function renderWeatherChart(backendData, metric = 'temperature', resolutionMinutes = 10, options = {}) {
     try {
-        const canvasElement = document.getElementById('weatherChart');
+        const canvasId = options.canvasId ?? 'weatherChart';
+        const canvasElement = document.getElementById(canvasId);
         if (!canvasElement) {
-            console.error("Canvas 'weatherChart' not found.");
+            console.error(`Canvas '${canvasId}' not found.`);
             return;
         }
 
-        const state = computeChartState(backendData, metric, resolutionMinutes);
+        const state = computeChartState(backendData, metric, resolutionMinutes, options);
 
         const canReuse = weatherChartInstance
             && weatherChartInstance.$metric === metric
-            && weatherChartInstance.$resolution === resolutionMinutes;
+            && weatherChartInstance.$resolution === resolutionMinutes
+            && weatherChartInstance.$xUnit === (options.xUnit ?? 'hour');
 
         if (canReuse) {
             updateChart(weatherChartInstance, state);

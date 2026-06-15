@@ -24,8 +24,9 @@ public class WeatherHistoryController {
   public static final String DAILY_PATH = BASE_PATH + "/daily";
   public static final String DAILY_SUMMARY_PATH = DAILY_PATH + "/summary";
   public static final String CHART_PATH = BASE_PATH + "/chart";
+  public static final String CHART_DAY_PATH = BASE_PATH + "/chart/day";
+  public static final String CHART_DAILY_PATH = BASE_PATH + "/chart/daily";
   public static final String AVAILABLE_DATES_PATH = BASE_PATH + "/available-dates";
-
 
   private final WeatherHistoryService historyService;
 
@@ -38,23 +39,34 @@ public class WeatherHistoryController {
 
   @GetMapping(CHART_PATH)
   public ResponseEntity<ChartDto> getHistoryChart(
-      @RequestParam Metric metric,
-      @RequestParam Instant from,
-      @RequestParam Instant to) {
+      @RequestParam Metric metric, @RequestParam Instant from, @RequestParam Instant to) {
     return ResponseEntity.ok(historyService.getChart(metric, from, to));
+  }
+
+  @GetMapping(CHART_DAY_PATH)
+  public ResponseEntity<ChartDto> getHourlyChart(
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+      @RequestParam Metric metric) {
+    return ResponseEntity.ok(historyService.getDayChart(date, metric));
+  }
+
+  @GetMapping(CHART_DAILY_PATH)
+  public ResponseEntity<ChartDto> getDailyChart(
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+      @RequestParam Metric metric) {
+    return ResponseEntity.ok(historyService.getDailyChartPoints(from, to, metric));
   }
 
   @GetMapping(HOURLY_PATH)
   public ResponseEntity<List<HourlyWeatherRecordDto>> getHourlyHistory(
-      @RequestParam Instant from,
-      @RequestParam Instant to) {
+      @RequestParam Instant from, @RequestParam Instant to) {
     return ResponseEntity.ok(historyService.getHourlyHistory(from, to));
   }
 
   @GetMapping(DAILY_SUMMARY_PATH)
   public ResponseEntity<DailyWeatherRecordDto> getDailySummary(
-          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
-  ){
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
     return ResponseEntity.ok(historyService.getHistoryDailySummary(date));
   }
 

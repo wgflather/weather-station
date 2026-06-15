@@ -153,7 +153,8 @@ public class AnalyticsService {
         pctWetness, dataDetails, SurfaceWetnessStatus.classify(pctWetness));
   }
 
-  public List<HourlyChartAvgDto> getMetricChart(Instant from, Instant to, Metric metric, int resolution) {
+  public List<ChartPointDto> getMetricChart(
+      Instant from, Instant to, Metric metric, int resolution) {
     String bucketInterval = resolution + "minutes";
     switch (metric) {
       case TEMPERATURE -> {
@@ -169,11 +170,11 @@ public class AnalyticsService {
     }
   }
 
-  private List<HourlyChartAvgDto> dataPointToDto(List<DataPoint> dataPoints) {
+  private List<ChartPointDto> dataPointToDto(List<DataPoint> dataPoints) {
     return dataPoints.stream()
         .map(
             projection ->
-                new HourlyChartAvgDto(
+                new ChartPointDto(
                     projection.hour().atZone(configurationCache.getLocationContext().zoneId()),
                     projection.value()))
         .toList();
@@ -186,7 +187,7 @@ public class AnalyticsService {
             ? LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant()
             : OffsetDateTime.parse(since).toInstant();
 
-    List<HourlyChartAvgDto> dtos = getMetricChart(sinceInstant, Instant.now(), metric, resolution);
+    List<ChartPointDto> dtos = getMetricChart(sinceInstant, Instant.now(), metric, resolution);
 
     Instant nextBucketExpectedAt = null;
 

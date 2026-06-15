@@ -78,8 +78,6 @@ public interface WeatherRetentionRepository extends JpaRepository<WeatherRecord,
 
   @Modifying(clearAutomatically = true)
   @Transactional
-  @Query(
-      value = "DELETE FROM weather_records WHERE measured_at < :cutoff",
-      nativeQuery = true)
+  @Query(value = "DELETE FROM weather_records WHERE measured_at < :cutoff", nativeQuery = true)
   int deleteRawOlderThan(@Param("cutoff") Instant cutoff);
 }

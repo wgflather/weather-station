@@ -2530,6 +2530,25 @@ h3 {
     border: 1px solid rgba(56, 189, 248, 0.35);
 }
 
+/* "View full history" link shown inside the expanded body */
+.history-full-link {
+    display: none;
+    font-size: 0.78rem;
+    font-weight: var(--fw-label);
+    color: var(--accent);
+    text-decoration: none;
+    padding: 10px 0 2px;
+    transition: opacity 0.15s var(--ease-standard);
+}
+
+.history-full-link:hover {
+    opacity: 0.8;
+}
+
+.history-summary-block.expanded .history-full-link {
+    display: inline-block;
+}
+
 @media (max-width: 480px) {
     .history-temp-peek {
         display: none;

@@ -113,12 +113,18 @@ async function updateNavButtons() {
 }
 
 // ── Summary loading ───────────────────────────────────────────────────────────
+function updateHistoryLink(dateStr) {
+    const link = document.getElementById('history-full-link');
+    if (link) link.href = `/history.html?date=${dateStr}`;
+}
+
 async function loadDate(dateStr) {
     currentDate = dateStr;
     dateLabel.textContent = formatDateLabel(dateStr);
     tempPeek.textContent  = '';
     noDataMsg.hidden      = true;
     metricsEl.hidden      = false;
+    updateHistoryLink(dateStr);
 
     // Disable both buttons while loading to prevent double-navigation.
     prevBtn.disabled = true;
@@ -299,6 +305,7 @@ window.addEventListener('resize', () => {
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async () => {
     dateLabel.textContent = formatDateLabel(currentDate);
+    updateHistoryLink(currentDate);
     prevBtn.disabled = true;
     nextBtn.disabled = true;
     // Warm the cache for the current month and the previous month so that

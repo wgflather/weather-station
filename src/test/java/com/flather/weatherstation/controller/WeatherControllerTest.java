@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.flather.weatherstation.domain.constant.DataStatus;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
-import com.flather.weatherstation.dto.analytics.HourlyChartAvgDto;
+import com.flather.weatherstation.dto.analytics.ChartPointDto;
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
@@ -132,10 +132,8 @@ class WeatherControllerTest {
   void shouldReturnChart_WithTemperatureMetric() throws Exception {
     Instant now = Instant.parse("2026-05-20T12:00:00Z");
 
-    HourlyChartAvgDto point1 =
-        new HourlyChartAvgDto(ZonedDateTime.parse("2026-05-20T10:00Z"), 21.5);
-    HourlyChartAvgDto point2 =
-        new HourlyChartAvgDto(ZonedDateTime.parse("2026-05-20T11:00Z"), 23.0);
+    ChartPointDto point1 = new ChartPointDto(ZonedDateTime.parse("2026-05-20T10:00Z"), 21.5);
+    ChartPointDto point2 = new ChartPointDto(ZonedDateTime.parse("2026-05-20T11:00Z"), 23.0);
 
     ChartDto chart = new ChartDto("temperature", List.of(point1, point2), now.plusSeconds(600));
 
@@ -162,8 +160,7 @@ class WeatherControllerTest {
     Instant now = Instant.now();
 
     PressureDto pressureData = new PressureDto(1012.0);
-    HourlyChartAvgDto point1 =
-        new HourlyChartAvgDto(ZonedDateTime.parse("2026-05-20T10:00Z"), 1010.0);
+    ChartPointDto point1 = new ChartPointDto(ZonedDateTime.parse("2026-05-20T10:00Z"), 1010.0);
 
     ChartDto chart = new ChartDto("pressure", List.of(point1), now.plusSeconds(600));
 

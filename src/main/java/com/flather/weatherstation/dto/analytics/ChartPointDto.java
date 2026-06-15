@@ -4,4 +4,4 @@ import java.time.ZonedDateTime;
 import lombok.Builder;
 
 @Builder
-public record HourlyChartAvgDto(ZonedDateTime hour, double hourlyValue) {}
+public record ChartPointDto(ZonedDateTime hour, double hourlyValue) {}

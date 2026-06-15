@@ -16,6 +16,7 @@ public interface DailyWeatherRecordRepository extends JpaRepository<DailyWeather
 
   Optional<DailyWeatherRecord> findByDate(LocalDate date);
 
-  @Query("SELECT d.date FROM DailyWeatherRecord d WHERE d.date BETWEEN :from AND :to ORDER BY d.date DESC")
+  @Query(
+      "SELECT d.date FROM DailyWeatherRecord d WHERE d.date BETWEEN :from AND :to ORDER BY d.date DESC")
   List<LocalDate> findDatesBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }
