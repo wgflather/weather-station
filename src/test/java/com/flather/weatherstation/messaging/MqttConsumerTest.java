@@ -6,7 +6,6 @@ import static org.mockito.Mockito.*;
 import com.flather.weatherstation.config.MqttProperties;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.service.WeatherService;
-import java.time.Instant;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,12 +34,12 @@ class MqttConsumerTest {
 
   @Test
   void shouldSaveWeatherMessage_whenMessageIsValid() throws Exception {
-    Instant staticTime = Instant.parse("2026-05-20T12:00:00Z");
     WeatherRecordCreatedDto mockDto =
         WeatherRecordCreatedDto.builder()
-            .temperature(20)
-            .measuredAt(staticTime)
-            .pressure(1000)
+            .deviceId("device-1")
+            .temperature(20.0)
+            .pressure(1000.0)
+            .wifiRssi(-60.0)
             .build();
 
     byte[] payload = objectMapper.writeValueAsBytes(mockDto);

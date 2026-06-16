@@ -1,0 +1,7 @@
+user:
+  username: testuser
+  password: testpass
+
+mqtt:
+  enabled: false
+
