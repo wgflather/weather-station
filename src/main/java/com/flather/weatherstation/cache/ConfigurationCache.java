@@ -14,14 +14,11 @@ import org.springframework.stereotype.Component;
 public class ConfigurationCache {
   private final StationConfigurationMapper mapper;
 
-  @Getter
-  private volatile LocationContext locationContext;
+  @Getter private volatile LocationContext locationContext;
 
-  @Getter
-  private volatile WeatherValidationConfig validationConfig;
+  @Getter private volatile WeatherValidationConfig validationConfig;
 
-  @Getter
-  private volatile HardwareConfig hardwareConfig;
+  @Getter private volatile HardwareConfig hardwareConfig;
 
   public void apply(StationConfiguration cfg) {
     locationContext = mapper.toLocationContext(cfg);
@@ -38,5 +35,4 @@ public class ConfigurationCache {
     LocationContext ctx = locationContext;
     return ctx != null ? ctx.longitude() : null;
   }
-
 }

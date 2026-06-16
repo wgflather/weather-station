@@ -24,11 +24,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(
-        name = "mqtt.enabled",
-        havingValue = "true",
-        matchIfMissing = true)
-
+@ConditionalOnProperty(name = "mqtt.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class MqttConsumer {
 

@@ -140,19 +140,20 @@ public class AstronomyEngine {
    * AstronomySearch#downsample}.
    */
   public List<AstronomyPoint> generateWholeDayCurve(Body body) {
+    return generateCurveForDate(body, LocalDate.now(zoneId()));
+  }
+
+  /** Same as {@link #generateWholeDayCurve} but for an arbitrary calendar date. */
+  public List<AstronomyPoint> generateCurveForDate(Body body, LocalDate date) {
     ZoneId zone = zoneId();
-    ZonedDateTime todayStart = LocalDate.now(zone).atStartOfDay(zone);
-    ZonedDateTime todayEnd = LocalDate.now(zone).plusDays(1).atStartOfDay(zone);
+    ZonedDateTime start = date.atStartOfDay(zone);
+    ZonedDateTime end = date.plusDays(1).atStartOfDay(zone);
 
     List<AstronomyPoint> curve = new ArrayList<>();
-
-    long dayDuration = Duration.between(todayStart, todayEnd).toMinutes();
-
-    for (int i = 0; i <= dayDuration; i++) {
-      Time time = toTime(todayStart.plusMinutes(i));
-      curve.add(pointAt(body, time));
+    long minutes = Duration.between(start, end).toMinutes();
+    for (int i = 0; i <= minutes; i++) {
+      curve.add(pointAt(body, toTime(start.plusMinutes(i))));
     }
-
     return curve;
   }
 

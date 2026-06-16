@@ -113,6 +113,25 @@ public class AstronomySearch {
     return new AstronomyCurveDto(body, resolution, points);
   }
 
+  /**
+   * Returns the altitude curve for {@code daysOffset} days from today. Offset 0 delegates to the
+   * cached {@link #getPoints}; positive offsets compute fresh curves without caching (called only
+   * on modal open, not on the main polling loop).
+   */
+  public AstronomyCurveDto getPointsForOffset(
+      CelestialBody body, DailyCurveResolution resolution, int daysOffset) {
+    if (daysOffset == 0) {
+      return getPoints(body, resolution);
+    }
+    LocalDate date = LocalDate.now(engine.zoneId()).plusDays(daysOffset);
+    List<AstronomyPoint> all = engine.generateCurveForDate(body.toLibraryBody(), date);
+    List<AstronomyPoint> points =
+        resolution == DailyCurveResolution.FULL_CHART
+            ? all
+            : downsample(all, resolution.getStepSize());
+    return new AstronomyCurveDto(body, resolution, points);
+  }
+
   /** Live lunar state at the given moment: altitude, distance, phase, constellation. */
   public MoonSnapshot getMoonSnapshot(ZonedDateTime time) {
     double currentAlt = round2(engine.altitude(Body.Moon, engine.observer(), toTime(time)));

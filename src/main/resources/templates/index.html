@@ -75,6 +75,12 @@
                 <span class="status-dot" id="health-dot"></span>
                 <span class="status-label" id="health-status-label">--</span>
             </button>
+            <button class="astro-fc-btn" id="astro-fc-btn" type="button"
+                    aria-label="Astro forecast" aria-haspopup="dialog">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+            </button>
             <button class="bg-pref-btn" id="bg-pref-btn" type="button"
                     aria-label="Background theme" aria-haspopup="true" aria-expanded="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -403,9 +409,24 @@
     </div>
 </div>
 
+<!-- Astro forecast modal -->
+<div class="astro-modal" id="astro-fc-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="astro-fc-title">
+    <div class="astro-modal-backdrop" id="astro-fc-backdrop"></div>
+    <div class="astro-modal-panel astro-fc-panel" role="document">
+        <div class="astro-modal-header">
+            <h2 id="astro-fc-title">Astro Forecast</h2>
+            <button class="astro-modal-close" id="astro-fc-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="astro-modal-body astro-fc-body" id="astro-fc-body">
+            <div class="af-loading" id="af-loading">Loading forecast&hellip;</div>
+        </div>
+    </div>
+</div>
+
 <script th:src="@{/js/realtime-script.js}"></script>
 <script type="module" th:src="@{/js/fetch-data.js}"></script>
 <script type="module" th:src="@{/js/history-modal.js}"></script>
 <script type="module" th:src="@{/js/cloud-forecast.js}"></script>
+<script type="module" th:src="@{/js/astro-forecast.js}"></script>
 </body>
 </html>

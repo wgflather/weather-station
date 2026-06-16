@@ -29,7 +29,8 @@ public class AstronomyController {
   @GetMapping("/curve")
   public AstronomyCurveDto getBodyCurve(
       @RequestParam(name = "body", defaultValue = "SUN") CelestialBody body,
-      @RequestParam(name = "resolution", defaultValue = "CARD") DailyCurveResolution resolution) {
-    return astronomySearch.getPoints(body, resolution);
+      @RequestParam(name = "resolution", defaultValue = "CARD") DailyCurveResolution resolution,
+      @RequestParam(name = "daysOffset", defaultValue = "0") int daysOffset) {
+    return astronomySearch.getPointsForOffset(body, resolution, daysOffset);
   }
 }

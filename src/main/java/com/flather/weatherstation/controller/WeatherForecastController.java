@@ -1,5 +1,6 @@
 package com.flather.weatherstation.controller;
 
+import com.flather.weatherstation.dto.forecast.AstroForecastDto;
 import com.flather.weatherstation.dto.forecast.ForecastDto;
 import com.flather.weatherstation.service.WeatherClientService;
 import lombok.RequiredArgsConstructor;
@@ -13,10 +14,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class WeatherForecastController {
 
-    private final WeatherClientService service;
+  private final WeatherClientService service;
 
-    @GetMapping("/clouds")
-    public ResponseEntity<ForecastDto> getForecast() {
-        return ResponseEntity.ok(service.getForecast());
-    }
+  @GetMapping("/clouds")
+  public ResponseEntity<ForecastDto> getForecast() {
+    return ResponseEntity.ok(service.getForecast());
+  }
+
+  @GetMapping("/astro")
+  public ResponseEntity<AstroForecastDto> getAstroForecast() {
+    return ResponseEntity.ok(service.getAstroForecast());
+  }
 }

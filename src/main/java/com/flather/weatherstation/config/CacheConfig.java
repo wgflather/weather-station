@@ -48,11 +48,11 @@ public class CacheConfig {
         .build();
   }
 
-  private static Cache<Object, Object> apiWeatherCache(){
+  private static Cache<Object, Object> apiWeatherCache() {
     return Caffeine.newBuilder()
-            .maximumSize(1)
-            .expireAfterWrite(Duration.ofMinutes(20))
-            .recordStats()
-            .build();
+        .maximumSize(1)
+        .expireAfterWrite(Duration.ofMinutes(20))
+        .recordStats()
+        .build();
   }
 }
