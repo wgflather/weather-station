@@ -45,7 +45,7 @@
 
 .section-tab {
     padding: 8px 18px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.78rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -97,7 +97,7 @@
 
 .config-tab {
     padding: 7px 14px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -167,7 +167,7 @@
     border-radius: 10px;
     padding: 7px 10px;
     color: var(--text-primary);
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.9rem;
     font-weight: 600;
     outline: none;
@@ -223,7 +223,7 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 7px;
     line-height: 1;
     color: var(--text-muted);
@@ -252,7 +252,7 @@
 
 .config-save-btn {
     padding: 7px 18px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 12px;
     font-weight: var(--fw-label);
     letter-spacing: 0.02em;
@@ -319,7 +319,7 @@
     background-color: rgba(28, 52, 102, 0.42);
     border: 1px solid var(--card-border);
     border-radius: 10px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 12px;
     font-weight: var(--fw-label);
     outline: none;
@@ -388,7 +388,7 @@
 
 .db-mode-btn {
     padding: 5px 13px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -439,7 +439,7 @@
     border-radius: 10px;
     padding: 7px 10px;
     color: var(--text-secondary);
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 12px;
     font-weight: var(--fw-label);
     outline: none;
@@ -471,7 +471,7 @@
     box-shadow:
         0 14px 40px rgba(0, 0, 0, 0.45),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     color: var(--text-secondary);
     padding: 4px;
 }
@@ -519,7 +519,7 @@
     -moz-appearance: textfield;
     appearance: none;
     color: var(--text-strong);
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-weight: 700;
     font-size: 0.95rem;
     background: rgba(125, 200, 255, 0.08);
@@ -813,7 +813,7 @@ span.flatpickr-weekday {
 
 .db-delete-btn {
     padding: 4px 12px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.72rem;
     font-weight: 700;
     color: #fecaca;
@@ -851,7 +851,7 @@ span.flatpickr-weekday {
 
 .db-page-btn {
     padding: 6px 16px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 12px;
     font-weight: var(--fw-label);
     color: var(--text-secondary);
@@ -934,7 +934,7 @@ span.flatpickr-weekday {
     border-radius: 8px;
     padding: 9px 12px;
     color: #ffffff;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.95rem;
     font-weight: 600;
     outline: none;
@@ -950,7 +950,7 @@ span.flatpickr-weekday {
 .login-form button {
     margin-top: 4px;
     padding: 10px 20px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.9rem;
     font-weight: 700;
     color: #e2eeff;
@@ -1019,7 +1019,7 @@ span.flatpickr-weekday {
         0 20px 50px rgba(0, 0, 0, 0.55),
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
     color: var(--text-strong);
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
 }
 
 .confirm-message {
@@ -1037,7 +1037,7 @@ span.flatpickr-weekday {
 
 .confirm-btn {
     padding: 8px 18px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.82rem;
     font-weight: 700;
     border-radius: 8px;
@@ -1361,7 +1361,7 @@ span.flatpickr-weekday {
 
 .history-period-btn {
     padding: 5px 12px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -1475,7 +1475,7 @@ span.flatpickr-weekday {
 
 .history-metric-tab {
     padding: 5px 14px;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Figtree', sans-serif;
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;

@@ -16,6 +16,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,11 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(
+        name = "mqtt.enabled",
+        havingValue = "true",
+        matchIfMissing = true)
+
 @RequiredArgsConstructor
 public class MqttConsumer {
 
@@ -136,10 +142,13 @@ public class MqttConsumer {
   }
 
   private void resubscribe() {
-    try {
-      subscribe(properties.getTopic());
-    } catch (MqttException e) {
-      log.warn("Resubscribe failed", e);
+    for (String topic : subscribedTopics) {
+      try {
+        client.subscribe(topic, 1);
+        log.info("Resubscribed to {}", topic);
+      } catch (MqttException e) {
+        log.warn("Resubscribe failed for topic {}", topic, e);
+      }
     }
   }
 
@@ -176,7 +185,7 @@ public class MqttConsumer {
   private void sleep(long ms) {
     try {
       Thread.sleep(ms);
-    } catch (InterruptedException ignored) {
+    } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
   }

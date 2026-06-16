@@ -690,17 +690,12 @@ function computeSkyColors(altitudeDeg) {
 
 let skyBackgroundPrimed = false;
 
-function renderSkyBackground(sunAltitudeDeg) {
-    const colors = computeSkyColors(sunAltitudeDeg);
-    // No altitude data → leave the CSS custom properties at their
-    // initial values, which match the original static palette.
+// Shared DOM-writer used by both the dynamic renderer and the static
+// background preference. `snap` bypasses the 12s CSS transition so the
+// switch is instantaneous rather than a 12-second crawl to the new colour.
+function applySkyColors(colors, snap = false) {
     if (!colors) return;
     const root = document.documentElement;
-
-    // First successful render snaps directly to the correct sky instead
-    // of animating in from the static deep-blue defaults. Subsequent
-    // ticks use the 12s transition defined on :root.
-    const snap = !skyBackgroundPrimed;
     if (snap) root.style.transition = 'none';
 
     root.style.setProperty('--bg-grad-top',        colors.top);
@@ -713,46 +708,149 @@ function renderSkyBackground(sunAltitudeDeg) {
     root.style.setProperty('--sky-ambient',        colors.skyAmbient);
     root.style.setProperty('--sky-rgb',            colors.skyRgb);
 
-    if (snap) {
-        // Flush the no-transition styles, then clear the inline override
-        // so the stylesheet's transition rule applies to the next update.
-        void root.offsetWidth;
-        root.style.transition = '';
-        skyBackgroundPrimed = true;
-    }
+    if (snap) { void root.offsetWidth; root.style.transition = ''; }
+    skyBackgroundPrimed = true;
 
-    // theme-color on iOS Safari tints the top status bar (time/battery/signal),
-    // not the bottom URL bar. Track the top gradient so the status bar matches
-    // the sky at the top of the page instead of bleeding the bottom colour up.
-    // The bottom URL bar uses standard system chrome and is not themeable here.
     setBrowserChromeColor(colors.topHex);
-
-    // Persist the resolved palette so the inline <head> script can apply
-    // it before first paint on the *next* load. Safari (iOS + macOS) only
-    // samples theme-color / page colors once at initial paint and ignores
-    // subsequent JS updates, so the only way to make the URL bar / toolbar
-    // tint match reality is to have the right values already present in
-    // the document when Safari samples it. After one successful tick this
-    // cache is the most accurate snapshot available.
     try {
         localStorage.setItem('skyColors', JSON.stringify({
-            version:          '2',
-            top:              colors.top,
-            bottom:           colors.bottom,
-            cardBg:           colors.cardBg,
-            cardBorder:       colors.cardBorder,
-            divider:          colors.divider,
-            cardBgStrong:     colors.cardBgStrong,
-            cardBorderStrong: colors.cardBorderStrong,
-            skyAmbient:       colors.skyAmbient,
-            skyRgb:           colors.skyRgb,
-            topHex:           colors.topHex,
-            bottomHex:        colors.bottomHex,
+            version: '2', top: colors.top, bottom: colors.bottom,
+            cardBg: colors.cardBg, cardBorder: colors.cardBorder,
+            divider: colors.divider, cardBgStrong: colors.cardBgStrong,
+            cardBorderStrong: colors.cardBorderStrong, skyAmbient: colors.skyAmbient,
+            skyRgb: colors.skyRgb, topHex: colors.topHex, bottomHex: colors.bottomHex,
         }));
-    } catch (e) { /* private mode / quota — fall back to defaults next load */ }
+    } catch (e) { /* private mode / quota */ }
+}
+
+function renderSkyBackground(sunAltitudeDeg) {
+    if (loadBgPreference().mode === 'static') return;
+    const colors = computeSkyColors(sunAltitudeDeg);
+    if (!colors) return;
+    applySkyColors(colors, !skyBackgroundPrimed);
 }
 
 // ==========================================
+// ==========================================
+// BACKGROUND PREFERENCE
+// ==========================================
+
+const PRESET_ANCHORS = [
+    { label: 'Night',    idx: 0 },
+    { label: 'Twilight', idx: 2 },
+    { label: 'Sunset',   idx: 3 },
+    { label: 'Golden',   idx: 4 },
+    { label: 'Morning',  idx: 5 },
+    { label: 'Midday',   idx: 6 },
+];
+
+function loadBgPreference() {
+    try { return JSON.parse(localStorage.getItem('bgPreference') || 'null') ?? { mode: 'dynamic' }; }
+    catch { return { mode: 'dynamic' }; }
+}
+
+function saveBgPreference(pref) {
+    try { localStorage.setItem('bgPreference', JSON.stringify(pref)); } catch {}
+}
+
+function applyBgPreference(pref) {
+    saveBgPreference(pref);
+    if (pref.mode === 'static') {
+        const a = SKY_ANCHORS[pref.anchorIndex];
+        applySkyColors(buildSkyState(a, a, 0), true);
+    } else {
+        // Snap back to the current sun altitude so the transition is instant.
+        skyBackgroundPrimed = false;
+        const alt = state.sunSnapshot?.currentAltitude;
+        if (alt != null) renderSkyBackground(alt);
+    }
+}
+
+function updateSwatchActive(pref) {
+    document.querySelectorAll('.bg-swatch').forEach(el => {
+        const active = pref.mode === el.dataset.mode &&
+            (pref.mode === 'dynamic' || String(pref.anchorIndex) === el.dataset.anchor);
+        el.classList.toggle('active', active);
+    });
+}
+
+function initBgPreference() {
+    // Apply saved static preference before the first astronomy poll arrives.
+    const pref = loadBgPreference();
+    if (pref.mode === 'static' && pref.anchorIndex != null) {
+        const a = SKY_ANCHORS[pref.anchorIndex];
+        applySkyColors(buildSkyState(a, a, 0), true);
+    }
+
+    const swatchesEl = document.getElementById('bg-pref-swatches');
+    if (!swatchesEl) return;
+
+    // Dynamic option (full-width horizontal row)
+    let html = `<div class="bg-swatch" data-mode="dynamic" title="Changes with sun position">
+        <div class="bg-swatch-circle bg-swatch-dynamic-circle"></div>
+        <span class="bg-swatch-label">Dynamic — follows sun</span>
+    </div><div class="bg-preset-grid">`;
+
+    for (const preset of PRESET_ANCHORS) {
+        const a   = SKY_ANCHORS[preset.idx];
+        const top = `rgb(${a.top[0]},${a.top[1]},${a.top[2]})`;
+        const bot = `rgb(${a.bottom[0]},${a.bottom[1]},${a.bottom[2]})`;
+        html += `<div class="bg-swatch" data-mode="static" data-anchor="${preset.idx}" title="${preset.label}">
+            <div class="bg-swatch-circle" style="background:linear-gradient(to bottom,${top},${bot})"></div>
+            <span class="bg-swatch-label">${preset.label}</span>
+        </div>`;
+    }
+    html += '</div>';
+
+    swatchesEl.innerHTML = html;
+    updateSwatchActive(pref);
+
+    swatchesEl.addEventListener('click', e => {
+        const swatch = e.target.closest('.bg-swatch');
+        if (!swatch) return;
+        const newPref = swatch.dataset.mode === 'static'
+            ? { mode: 'static', anchorIndex: Number(swatch.dataset.anchor) }
+            : { mode: 'dynamic' };
+        applyBgPreference(newPref);
+        updateSwatchActive(newPref);
+    });
+
+    const btn     = document.getElementById('bg-pref-btn');
+    const popover = document.getElementById('bg-pref-popover');
+    if (!btn || !popover) return;
+
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const opening = !popover.classList.contains('open');
+        popover.classList.toggle('open', opening);
+        btn.setAttribute('aria-expanded', String(opening));
+        popover.setAttribute('aria-hidden', String(!opening));
+        if (opening) {
+            const rect = btn.getBoundingClientRect();
+            popover.style.top   = `${rect.bottom + 6}px`;
+            popover.style.right = `${window.innerWidth - rect.right}px`;
+            popover.style.left  = 'auto';
+        }
+    });
+
+    document.addEventListener('click', () => {
+        if (popover.classList.contains('open')) {
+            popover.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+            popover.setAttribute('aria-hidden', 'true');
+        }
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && popover.classList.contains('open')) {
+            popover.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+            popover.setAttribute('aria-hidden', 'true');
+            btn.focus();
+        }
+    });
+}
+
 // ASTRONOMY MODAL
 // ==========================================
 
@@ -1196,6 +1294,7 @@ async function loadDaily() {
         state.astronomyDaily   = daily;
         state.dailyKey         = daily.dailyKey;
         renderAstronomyDaily(daily);
+        window.refreshCloudSunset?.(daily.sunDailyEvents?.set);
         // Race-condition guard: loadDaily() and the first updateLive() run
         // concurrently at boot. The live endpoint is usually faster, so
         // renderAstronomyLive() often runs before state.astronomyDaily is
@@ -1658,5 +1757,6 @@ initStatusCircles();
 initDewRiskBadge();
 initAstroModal();
 initHealthPopover();
+initBgPreference();
 loadDaily();
 startPolling(updateLive, 30000);

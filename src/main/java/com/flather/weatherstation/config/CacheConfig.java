@@ -1,5 +1,6 @@
 package com.flather.weatherstation.config;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
 import org.springframework.cache.CacheManager;
@@ -34,6 +35,7 @@ public class CacheConfig {
 
     cacheManager.registerCustomCache("sunDailyEvents", dailyEventsCache());
     cacheManager.registerCustomCache("moonDailyEvents", dailyEventsCache());
+    cacheManager.registerCustomCache("apiWeather", apiWeatherCache());
 
     return cacheManager;
   }
@@ -44,5 +46,13 @@ public class CacheConfig {
         .expireAfterWrite(Duration.ofHours(48))
         .recordStats()
         .build();
+  }
+
+  private static Cache<Object, Object> apiWeatherCache(){
+    return Caffeine.newBuilder()
+            .maximumSize(1)
+            .expireAfterWrite(Duration.ofMinutes(20))
+            .recordStats()
+            .build();
   }
 }

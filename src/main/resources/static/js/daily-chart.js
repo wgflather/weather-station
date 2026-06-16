@@ -124,7 +124,7 @@ function makeHLPlugin(minIdx, maxIdx, cfg, isMobile) {
             const fSize   = isMobile ? 8 : 9;
 
             ctx.save();
-            ctx.font         = `700 ${fSize}px Nunito, sans-serif`;
+            ctx.font         = `700 ${fSize}px Figtree, sans-serif`;
             ctx.textAlign    = 'center';
             ctx.textBaseline = 'middle';
             ctx.globalAlpha  = 0.88;

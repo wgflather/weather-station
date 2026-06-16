@@ -1,0 +1,268 @@
+// Meteocons animated SVG weather icons, MIT license (https://meteocons.com/)
+
+const METEOCONS_VERSION = '3.0.0-next.10';
+const ICON_ANIMATED = `https://cdn.meteocons.com/${METEOCONS_VERSION}/svg/fill/`;
+const ICON_STATIC   = `https://cdn.meteocons.com/${METEOCONS_VERSION}/svg-static/fill/`;
+
+const HOURS_PAST  = 3;
+const HOURS_AHEAD = 8;
+
+// ==========================================
+// ICON SELECTION
+// Priority: sleet > snow > rain > drizzle > cloud-only
+// ==========================================
+
+function selectIcon(point, isNight) {
+    const cloud  = point.cloudCover          ?? 0;
+    const chance = point.precipitationChance ?? 0;
+    const rain   = (point.rainAmount ?? 0) + (point.showersAmount ?? 0);
+    const snow   = point.snowAmount          ?? 0;
+
+    const n      = isNight ? 'night' : 'day';
+    const prefix = cloud >= 60 ? `overcast-${n}` : `partly-cloudy-${n}`;
+
+    if (snow > 0.1 && rain > 0.1) return `${prefix}-sleet`;
+    if (snow > 0.1)                return `${prefix}-snow`;
+    if (rain > 0.5)                return `${prefix}-rain`;
+    if (rain > 0.1 || chance >= 30) return `${prefix}-drizzle`;
+
+    if (cloud < 15) return `clear-${n}`;
+    if (cloud < 60) return `partly-cloudy-${n}`;
+    return 'overcast';
+}
+
+// ==========================================
+// TOOLTIP CONTENT
+// ==========================================
+
+function cloudCoverLabel(pct) {
+    if (pct < 15) return 'Clear';
+    if (pct < 40) return 'Partly cloudy';
+    if (pct < 70) return 'Mostly cloudy';
+    return 'Overcast';
+}
+
+function precipLabel(point) {
+    const snow = point.snowAmount ?? 0;
+    const rain = (point.rainAmount ?? 0) + (point.showersAmount ?? 0);
+    if (snow > 0.1 && rain > 0.1) return 'sleet';
+    if (snow > 0.1)  return 'snow';
+    if (rain > 0.5)  return 'rain';
+    if (rain > 0.1)  return 'drizzle';
+    return 'precipitation';
+}
+
+function buildTooltipHTML(point) {
+    const cloud  = point.cloudCover          ?? 0;
+    const chance = point.precipitationChance ?? 0;
+    const rain   = (point.rainAmount ?? 0) + (point.showersAmount ?? 0);
+    const snow   = point.snowAmount          ?? 0;
+
+    let html = `<div class="fc-tip-label">${cloudCoverLabel(cloud)}</div>`;
+
+    if (chance > 0) {
+        html += `<div class="fc-tip-row">${Math.round(chance)}% chance of ${precipLabel(point)}</div>`;
+    }
+    if (rain > 0) {
+        html += `<div class="fc-tip-row">${rain.toFixed(1)} mm rain</div>`;
+    }
+    if (snow > 0.1) {
+        html += `<div class="fc-tip-row">${snow.toFixed(1)} cm snow</div>`;
+    }
+    return html;
+}
+
+// ==========================================
+// TOOLTIP ELEMENT
+// ==========================================
+
+const fcTooltip = (() => {
+    const el = document.createElement('div');
+    el.className = 'fc-tooltip';
+    el.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(el);
+    return el;
+})();
+
+let _tooltipSlot = null;
+
+function showTooltip(slotEl, point) {
+    fcTooltip.innerHTML = buildTooltipHTML(point);
+    fcTooltip.classList.add('visible');
+    _tooltipSlot = slotEl;
+    positionTooltip(slotEl);
+}
+
+function hideTooltip() {
+    fcTooltip.classList.remove('visible');
+    _tooltipSlot = null;
+}
+
+function positionTooltip(slotEl) {
+    const r   = slotEl.getBoundingClientRect();
+    const tw  = fcTooltip.offsetWidth;
+    const th  = fcTooltip.offsetHeight;
+    const gap = 8;
+
+    let left = r.left + r.width / 2 - tw / 2;
+    let top  = r.top - th - gap;
+
+    // Flip below if not enough room above
+    if (top < gap) top = r.bottom + gap;
+
+    // Clamp horizontally
+    left = Math.max(gap, Math.min(left, window.innerWidth - tw - gap));
+
+    fcTooltip.style.left = `${Math.round(left)}px`;
+    fcTooltip.style.top  = `${Math.round(top)}px`;
+}
+
+function initTooltip(strip) {
+    // Desktop hover
+    strip.addEventListener('mouseenter', e => {
+        const slot = e.target.closest('.cloud-slot');
+        if (slot?._fcPoint) showTooltip(slot, slot._fcPoint);
+    }, true);
+
+    strip.addEventListener('mouseleave', e => {
+        if (!e.target.closest('.cloud-slot')) return;
+        hideTooltip();
+    }, true);
+
+    // Mobile tap — toggle
+    strip.addEventListener('click', e => {
+        const slot = e.target.closest('.cloud-slot');
+        if (!slot?._fcPoint) return;
+        if (_tooltipSlot === slot) {
+            hideTooltip();
+        } else {
+            e.stopPropagation();
+            showTooltip(slot, slot._fcPoint);
+        }
+    });
+
+    document.addEventListener('click', () => hideTooltip());
+    window.addEventListener('scroll',  () => {
+        if (_tooltipSlot) positionTooltip(_tooltipSlot);
+    }, { passive: true });
+    window.addEventListener('resize',  () => {
+        if (_tooltipSlot) positionTooltip(_tooltipSlot);
+    });
+}
+
+// ==========================================
+// MODULE STATE
+// ==========================================
+
+let _forecastPoints = null;
+let _sunsetMs       = null;
+
+// ==========================================
+// WINDOWING
+// ==========================================
+
+function buildWindow(points) {
+    const now = Date.now();
+    let currentIdx = 0;
+    for (let i = 0; i < points.length; i++) {
+        if (parseMs(points[i].time) <= now) currentIdx = i;
+        else break;
+    }
+    const start = Math.max(0, currentIdx - HOURS_PAST);
+    const end   = Math.min(points.length, currentIdx + HOURS_AHEAD + 1);
+    return { window: points.slice(start, end), currentIdx: currentIdx - start };
+}
+
+function parseMs(isoTime) {
+    // Strip IANA bracket suffix (e.g. "[Europe/Kiev]") that Date() cannot parse.
+    return new Date(String(isoTime).replace(/\[.*]$/, '')).getTime();
+}
+
+// ==========================================
+// RENDER
+// ==========================================
+
+function renderCloudStrip(forecastPoints, sunsetMs) {
+    const strip = document.getElementById('cloud-strip');
+    if (!strip || !forecastPoints.length) return;
+
+    const { window: slots, currentIdx } = buildWindow(forecastPoints);
+
+    let html     = '';
+    let prevDate = null;
+
+    slots.forEach((point, i) => {
+        const slotMs    = parseMs(point.time);
+        const slotDate  = new Date(slotMs);
+        const hour      = slotDate.getHours();
+        const isNight   = sunsetMs != null && slotMs >= sunsetMs;
+        const iconName  = selectIcon(point, isNight);
+        const isCurrent = i === currentIdx;
+        const src       = (isCurrent ? ICON_ANIMATED : ICON_STATIC) + iconName + '.svg';
+
+        const slotDay = slotDate.toDateString();
+        if (prevDate !== null && prevDate !== slotDay) {
+            const label = slotDate.toLocaleDateString('en-GB', { weekday: 'short' });
+            html += `<div class="cloud-day-marker" aria-hidden="true">
+                <div class="cloud-day-line"></div>
+                <span class="cloud-day-label">${label}</span>
+            </div>`;
+        }
+        prevDate = slotDay;
+
+        const cls   = i < currentIdx ? 'past' : isCurrent ? 'current' : 'future';
+        const label = String(hour).padStart(2, '0');
+
+        html += `<div class="cloud-slot ${cls}" data-hour="${hour}">
+            <img src="${src}" alt="${iconName}" width="28" height="28" loading="lazy">
+            <span class="cloud-slot-hour">${label}</span>
+        </div>`;
+    });
+
+    strip.innerHTML = html;
+
+    // Attach point data to each slot element for the tooltip handler.
+    strip.querySelectorAll('.cloud-slot').forEach((el, i) => {
+        el._fcPoint = slots[i];
+    });
+
+    scrollToCurrentHour(strip);
+}
+
+function scrollToCurrentHour(strip) {
+    const current = strip.querySelector('.cloud-slot.current');
+    if (!current) return;
+    strip.scrollLeft = current.offsetLeft - strip.clientWidth / 2 + current.offsetWidth / 2;
+}
+
+// ==========================================
+// PUBLIC — called by fetch-data.js after astronomy loads
+// ==========================================
+
+window.refreshCloudSunset = function (sunsetIso) {
+    if (!sunsetIso) return;
+    const ms = parseMs(sunsetIso);
+    if (isNaN(ms) || ms === _sunsetMs) return;
+    _sunsetMs = ms;
+    if (_forecastPoints) renderCloudStrip(_forecastPoints, _sunsetMs);
+};
+
+// ==========================================
+// FETCH
+// ==========================================
+
+async function loadCloudForecast() {
+    try {
+        const res = await fetch('/api/forecast/clouds');
+        if (!res.ok) return;
+        const data = await res.json();
+        _forecastPoints = data.forecastPoints ?? [];
+        renderCloudStrip(_forecastPoints, _sunsetMs);
+        const strip = document.getElementById('cloud-strip');
+        if (strip) initTooltip(strip);
+    } catch (e) {
+        console.error('Cloud forecast fetch failed:', e);
+    }
+}
+
+loadCloudForecast();

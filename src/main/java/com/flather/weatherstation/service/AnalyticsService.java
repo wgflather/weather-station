@@ -48,11 +48,12 @@ public class AnalyticsService {
   }
 
   public Optional<ZonedDateTime> findLastRecordTime() {
+    WeatherRecord last = sensorStateCache.getLastSavedMeasurement();
+    if (last == null) {
+      return Optional.empty();
+    }
     return Optional.of(
-        sensorStateCache
-            .getLastSavedMeasurement()
-            .getMeasuredAt()
-            .atZone(configurationCache.getLocationContext().zoneId()));
+        last.getMeasuredAt().atZone(configurationCache.getLocationContext().zoneId()));
   }
 
   public long getLagMinutes(ZonedDateTime lastRecord) {

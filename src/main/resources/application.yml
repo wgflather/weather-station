@@ -2,7 +2,8 @@ spring:
   profiles:
     active: local
 
-
+mqtt:
+  enabled: true
 
   jpa:
     hibernate:

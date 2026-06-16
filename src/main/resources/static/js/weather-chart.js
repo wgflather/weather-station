@@ -463,8 +463,8 @@ const minMaxLabelsPlugin = {
         const maxIsNow = validMinMax && maxIndex === latestIndex;
 
         const { ctx, chartArea } = chart;
-        const hlFont   = isMobile ? '700 8px Nunito' : '700 13px Nunito';
-        const nowFont  = isMobile ? '700 8px Nunito' : '700 12px Nunito';
+        const hlFont   = isMobile ? '700 8px Figtree' : '700 13px Figtree';
+        const nowFont  = isMobile ? '700 8px Figtree' : '700 12px Figtree';
         const gap      = isMobile ? 9 : 16;
         const fixedGap = isMobile ? 14 : 16;
 
@@ -1044,8 +1044,8 @@ function createChart(canvasElement, state) {
                     },
                     min:    state.startRange,
                     max:    state.endRange,
-                    ticks:  { stepSize: state.xUnit === 'day' ? state.xTickStep : 3, color: 'rgba(148, 163, 184, 0.6)', font: { size: state.isMobile ? 9 : 11 } },
-                    grid:   { color: 'rgba(255,255,255,0.028)', drawBorder: false },
+                    ticks:  { stepSize: state.xUnit === 'day' ? state.xTickStep : 3, color: 'rgba(255,255,255,0.80)', font: { size: state.isMobile ? 9 : 11 } },
+                    grid:   { color: 'rgba(255,255,255,0.09)', drawBorder: false },
                     border: { display: false },
                 },
                 y: {
@@ -1054,7 +1054,7 @@ function createChart(canvasElement, state) {
                     ticks: {
                         stepSize: state.config.yStep,
                         callback: (val) => `${val}${state.config.yAxisSuffix}`,
-                        color:    'rgba(148, 163, 184, 0.6)',
+                        color:    'rgba(255,255,255,0.80)',
                         font:     { size: state.isMobile ? 9 : 11 },
                     },
                     grid:   { color: 'rgba(255,255,255,0.028)', drawBorder: false },
@@ -1228,7 +1228,7 @@ function createChart(canvasElement, state) {
 
                     const { ctx, chartArea } = chart;
                     const data = chart.data.datasets[1].data;
-                    const font = chart.$state.isMobile ? '500 9px Nunito' : '500 10px Nunito';
+                    const font = chart.$state.isMobile ? '500 9px Figtree' : '500 10px Figtree';
 
                     ctx.save();
                     ctx.fillStyle    = 'rgba(148, 163, 184, 0.4)';

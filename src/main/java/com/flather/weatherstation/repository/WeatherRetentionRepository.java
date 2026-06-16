@@ -42,7 +42,7 @@ public interface WeatherRetentionRepository extends JpaRepository<WeatherRecord,
   @Transactional
   @Query(
       value =
-          """
+"""
           INSERT INTO daily_weather_record (
               device_id,
               temperature_min, temperature_max, temperature_avg,
@@ -65,14 +65,17 @@ public interface WeatherRetentionRepository extends JpaRepository<WeatherRecord,
               MIN(CASE WHEN surface_wetness_data_quality = 'OK' THEN surface_wetness END),
               MAX(CASE WHEN surface_wetness_data_quality = 'OK' THEN surface_wetness END),
               AVG(CASE WHEN surface_wetness_data_quality = 'OK' THEN surface_wetness END),
-              (date_trunc('day', measured_at AT TIME ZONE :timezone))::date
-          FROM weather_records
-          WHERE date_trunc('day', measured_at AT TIME ZONE :timezone)
-                    < date_trunc('day', NOW() AT TIME ZONE :timezone)
-            AND measured_at >= NOW() - INTERVAL '2 days'
-          GROUP BY device_id, (date_trunc('day', measured_at AT TIME ZONE :timezone))::date
+              day_bucket
+          FROM (
+              SELECT *,
+                     (date_trunc('day', measured_at AT TIME ZONE :timezone))::date AS day_bucket
+              FROM weather_records
+              WHERE measured_at >= NOW() - INTERVAL '2 days'
+          ) sub
+          WHERE day_bucket < (date_trunc('day', NOW() AT TIME ZONE :timezone))::date
+          GROUP BY device_id, day_bucket
           ON CONFLICT (device_id, date) DO NOTHING
-          """,
+""",
       nativeQuery = true)
   int rollupDaily(@Param("timezone") String timezone);
 
