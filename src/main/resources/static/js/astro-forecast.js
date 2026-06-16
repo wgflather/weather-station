@@ -62,8 +62,8 @@ const closeBtn = document.getElementById('astro-fc-close');
 const backdrop = document.getElementById('astro-fc-backdrop');
 const openBtn  = document.getElementById('astro-fc-btn');
 
-function openModal()  { modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); closeBtn.focus(); loadAll(); }
-function closeModal() { modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); openBtn.focus(); }
+function openModal()  { modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); closeBtn.focus(); window.setStarFieldModalDim?.(true);  loadAll(); }
+function closeModal() { modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); openBtn.focus(); window.setStarFieldModalDim?.(false); }
 
 openBtn.addEventListener('click', openModal);
 closeBtn.addEventListener('click', closeModal);

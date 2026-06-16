@@ -129,14 +129,17 @@ function initTooltip(strip) {
         hideTooltip();
     }, true);
 
-    // Mobile tap — toggle
+    // Mobile tap — always stop propagation first so that a tap landing on a
+    // gap between slots (very common on narrow touch targets) doesn't escape
+    // to the document-level "click away" handler and close the tooltip before
+    // the slot handler even gets a chance to switch it to the new slot.
     strip.addEventListener('click', e => {
+        e.stopPropagation();
         const slot = e.target.closest('.cloud-slot');
-        if (!slot?._fcPoint) return;
+        if (!slot?._fcPoint) return;   // gap / day-marker: keep current state
         if (_tooltipSlot === slot) {
             hideTooltip();
         } else {
-            e.stopPropagation();
             showTooltip(slot, slot._fcPoint);
         }
     });
@@ -266,3 +269,16 @@ async function loadCloudForecast() {
 }
 
 loadCloudForecast();
+
+// Returns the cloud cover % (0–100) for the current hour, or null if forecast
+// data hasn't loaded yet. Called by star-field.js as a cloud-cover multiplier.
+window.getCurrentCloudCover = function () {
+    if (!_forecastPoints?.length) return null;
+    const now = Date.now();
+    let best = _forecastPoints[0];
+    for (const p of _forecastPoints) {
+        if (parseMs(p.time) <= now) best = p;
+        else break;
+    }
+    return best?.cloudCover ?? null;
+};

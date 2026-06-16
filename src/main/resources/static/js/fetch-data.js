@@ -1,5 +1,6 @@
 import { renderWeatherChart } from './weather-chart.js';
 import { FetchScheduler } from './FetchScheduler.js';
+import { initStarField, updateStarField, setStarFieldModalDim } from './star-field.js';
 
 // ==========================================
 // STATE
@@ -336,8 +337,19 @@ function renderMoonCard(moon) {
     // continuously, see renderAstronomyLive).
 }
 
+// Returns the altitude to use for star visibility. When the user has pinned
+// a static background preset, the actual sun altitude is irrelevant — a midday
+// preset at night must not show stars, and a night preset at noon should show
+// them. Dynamic mode always uses the real sun altitude.
+function getStarAltitude(sunAltDeg) {
+    const pref = loadBgPreference();
+    if (pref.mode === 'static') return SKY_ANCHORS[pref.anchorIndex]?.alt ?? null;
+    return sunAltDeg;
+}
+
 function renderAstronomyLive(sunSnapshot, moonSnapshot) {
     renderSkyBackground(sunSnapshot?.currentAltitude);
+    updateStarField(getStarAltitude(sunSnapshot?.currentAltitude));
 
     if (moonSnapshot?.phase) {
         renderMoonPhase(moonSnapshot.phase);
@@ -764,6 +776,9 @@ function applyBgPreference(pref) {
         const alt = state.sunSnapshot?.currentAltitude;
         if (alt != null) renderSkyBackground(alt);
     }
+    // Star visibility must also reflect the new preference immediately.
+    // getStarAltitude reads the just-saved pref via loadBgPreference().
+    updateStarField(getStarAltitude(state.sunSnapshot?.currentAltitude));
 }
 
 function updateSwatchActive(pref) {
@@ -879,6 +894,7 @@ function openAstroModal(which, trigger) {
     modal.classList.add('open');
     modal.setAttribute('aria-hidden', 'false');
     lockBodyScroll();
+    setStarFieldModalDim(true);
 
     // Focus the close button so keyboard users land somewhere sensible.
     modal.querySelector('.astro-modal-close')?.focus();
@@ -890,6 +906,7 @@ function closeAstroModal() {
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
     unlockBodyScroll();
+    setStarFieldModalDim(false);
     state.openModal = null;
     state.modalReturnFocus?.focus?.();
     state.modalReturnFocus = null;
@@ -1758,5 +1775,7 @@ initDewRiskBadge();
 initAstroModal();
 initHealthPopover();
 initBgPreference();
+initStarField();
+window.setStarFieldModalDim = setStarFieldModalDim;
 loadDaily();
 startPolling(updateLive, 30000);

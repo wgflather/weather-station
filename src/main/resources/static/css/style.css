@@ -3072,5 +3072,66 @@ h3 {
     .af-banner-time { font-size: 0.82rem; }
 }
 
+/* =========================================================
+   STAR FIELD — atmospheric night background
+   Generated once by star-field.js; opacity driven by sun
+   altitude and cloud cover via the existing sky system.
+   Stars sit above the sky gradient (body::before, z:-1)
+   but below all dashboard content (same z-level, earlier
+   in document order so cards paint over it).
+========================================================= */
+#star-field {
+    position: fixed;
+    inset: 0;
+    /* z-index: -1 places the star canvas at the same level as
+       body::before (sky gradient). Cards at z-index: auto sit
+       above both. This eliminates the compositor layer boundary
+       that produced a thin artifact at card edges when the canvas
+       was at z-index: 0.                                          */
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    /* 18s matches the feel of the sky gradient transition —
+       stars fade in and out with the dusk/dawn rhythm.           */
+    transition: opacity 18s ease;
+    will-change: opacity;
+}
 
+#star-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
 
+#star-highlights {
+    position: absolute;
+    inset: 0;
+}
+
+/* Bright highlight stars — a small set of DOM elements
+   each with an independent CSS breathing animation.
+   The parent #star-field opacity provides global control;
+   these animations create organic per-star variation.    */
+.star-hl {
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(250, 254, 255, 1.0);
+    box-shadow:
+        0 0 3px 1px rgba(220, 238, 255, 0.55),
+        0 0 9px 4px rgba(190, 220, 255, 0.20);
+    animation: star-breathe var(--star-duration, 5s) ease-in-out var(--star-delay, 0s) infinite;
+}
+
+@keyframes star-breathe {
+    0%, 100% { opacity: 1;    }
+    50%       { opacity: 0.42; }
+}
+
+/* Respect user motion preference. */
+@media (prefers-reduced-motion: reduce) {
+    #star-field { transition: none !important; }
+    .star-hl    { animation: none !important;  }
+}

@@ -308,6 +308,7 @@ function openHistModal() {
     modal.classList.add('open');
     modal.removeAttribute('aria-hidden');
     document.getElementById('hist-modal-close').focus();
+    window.setStarFieldModalDim?.(true);
     initModal();
 }
 
@@ -319,6 +320,7 @@ function closeHistModal() {
     window.scrollTo(0, savedScrollY);
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
+    window.setStarFieldModalDim?.(false);
 }
 
 document.getElementById('chart-history-btn').addEventListener('click', openHistModal);
