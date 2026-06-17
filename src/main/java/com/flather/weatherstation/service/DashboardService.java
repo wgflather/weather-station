@@ -3,6 +3,7 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.constant.DataProvider;
 import com.flather.weatherstation.domain.constant.DataStatus;
+import com.flather.weatherstation.domain.constant.DewPointRisk;
 import com.flather.weatherstation.dto.analytics.HumidityDto;
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
@@ -11,6 +12,7 @@ import com.flather.weatherstation.dto.analytics.WindDto;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
+import com.flather.weatherstation.util.MeteoMath;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Optional;
@@ -53,6 +55,16 @@ public class DashboardService {
         cfg.uvIndex() == DataProvider.EXTERNAL_API
             ? weatherClientService.getUvIndex()
             : sensorHasData ? analyticsService.getUvIndex() : null;
+
+    // Cross-source dew point: humidity from API, temperature from local sensor (or vice versa).
+    // WeatherClientService only computes it when both come from the API; fill the gap here
+    // where we have both assembled values regardless of origin.
+    if (humidity != null && humidity.dewPoint() == null
+        && temperature != null && temperature.value() != null && humidity.value() != null) {
+      double dp = MeteoMath.calculateDewPoint(temperature.value(), humidity.value());
+      humidity = new HumidityDto(
+          humidity.value(), humidity.dataDetails(), dp, DewPointRisk.classify(temperature.value() - dp));
+    }
 
     return MetricsDashboardDto.builder()
         .temperature(temperature)

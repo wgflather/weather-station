@@ -8,6 +8,7 @@ import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.MetricDataDetails;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,16 +16,24 @@ import org.springframework.stereotype.Component;
 @Component
 public class MetricDataDetailsMapper {
 
+  private static final DateTimeFormatter DISPLAY_FMT =
+      DateTimeFormatter.ofPattern("dd/MM/yyyy, HH:mm:ss");
+
   private final ConfigurationCache configurationCache;
+
+  private String fmt(ZonedDateTime zdt) {
+    return zdt == null ? null : zdt.format(DISPLAY_FMT);
+  }
 
   public MetricDataDetails from(WeatherRecord entity, Metric metric) {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
     HardwareConfig config = configurationCache.getHardwareConfig();
+    String measuredAt = fmt(entity.getMeasuredAt().atZone(zoneId));
     return switch (metric) {
       case TEMPERATURE ->
           new MetricDataDetails(
               entity.getTemperature(),
-              entity.getMeasuredAt().atZone(zoneId),
+              measuredAt,
               entity.getTemperatureDataQuality(),
               config.temperatureSensor(),
               metric.getName(),
@@ -33,7 +42,7 @@ public class MetricDataDetailsMapper {
       case PRESSURE ->
           new MetricDataDetails(
               entity.getPressure(),
-              entity.getMeasuredAt().atZone(zoneId),
+              measuredAt,
               entity.getPressureDataQuality(),
               config.pressureSensor(),
               metric.getName(),
@@ -42,7 +51,7 @@ public class MetricDataDetailsMapper {
       case HUMIDITY ->
           new MetricDataDetails(
               entity.getHumidity(),
-              entity.getMeasuredAt().atZone(zoneId),
+              measuredAt,
               entity.getHumidityDataQuality(),
               config.humiditySensor(),
               metric.getName(),
@@ -51,7 +60,7 @@ public class MetricDataDetailsMapper {
       case SURFACE_WETNESS ->
           new MetricDataDetails(
               entity.getSurfaceWetness(),
-              entity.getMeasuredAt().atZone(zoneId),
+              measuredAt,
               entity.getSurfaceWetnessDataQuality(),
               config.surfaceWetnessSensor(),
               metric.getName(),
@@ -60,7 +69,7 @@ public class MetricDataDetailsMapper {
       case WIND ->
           new MetricDataDetails(
               entity.getWind(),
-              entity.getMeasuredAt().atZone(zoneId),
+              measuredAt,
               entity.getWindDataQuality(),
               config.windSensor(),
               metric.getName(),
@@ -69,7 +78,7 @@ public class MetricDataDetailsMapper {
       case WIND_DIRECTION ->
           new MetricDataDetails(
               entity.getWindDirection(),
-              entity.getMeasuredAt().atZone(zoneId),
+              measuredAt,
               entity.getWindDirectionDataQuality(),
               config.windSensor(),
               metric.getName(),
@@ -78,7 +87,7 @@ public class MetricDataDetailsMapper {
       case UV_INDEX ->
           new MetricDataDetails(
               entity.getUvIndex(),
-              entity.getMeasuredAt().atZone(zoneId),
+              measuredAt,
               entity.getUvIndexDataQuality(),
               config.uvIndexSensor(),
               metric.getName(),
@@ -88,6 +97,6 @@ public class MetricDataDetailsMapper {
 
   public MetricDataDetails fromApi(Metric metric, Double value, ZonedDateTime fetchedAt) {
     return new MetricDataDetails(
-        value, fetchedAt, null, null, metric.getName(), DataProvider.EXTERNAL_API);
+        value, fmt(fetchedAt), null, null, metric.getName(), DataProvider.EXTERNAL_API);
   }
 }

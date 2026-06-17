@@ -222,7 +222,7 @@ body::before {
     /* Single low-contrast border — soft edge, not a bevel.             */
     border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 14px;
-    padding: 20px;
+    padding: 12px 20px;
     box-sizing: border-box;
     width: 100%;
 
@@ -494,8 +494,8 @@ body::before {
     align-items: center;
     min-height: 24px;
     border-bottom: 1px solid var(--divider);
-    padding-bottom: 10px;
-    margin-bottom: 15px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
     flex-shrink: 0;
 }
 
@@ -576,13 +576,12 @@ h3 {
 .metric-content {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* anchor to top so values align across cards of different heights */
+    justify-content: center;
     gap: 0;
     text-align: center;
     width: 100%;
     align-items: center;
     flex-grow: 1;
-    padding-top: 8px;
 }
 
 .align-left {
@@ -887,7 +886,7 @@ h3 {
 .humidity_block {
     display: flex;
     flex-direction: column;
-    padding: 20px;
+    padding: 12px 20px;
 }
 
 .progress-container {
@@ -926,7 +925,7 @@ h3 {
     align-items: baseline;
     justify-content: center;
     gap: 5px;
-    margin-top: 4px;
+    margin-top: 6px;
 }
 
 .humidity-dew-line .dew-label {
@@ -1508,15 +1507,16 @@ h3 {
     .astro-hero-sub   { font-size: 0.72rem; }
 
     /* ── Moon card ─────────────────────────────────────────────────────
-       Text column beside the disk is ~111 px; keep every tier compact. */
+       At ~390 px the meta column is only ~91 px wide — not enough for
+       "Waxing Crescent" on a single line. Allow multi-word phases to
+       wrap to two lines instead of truncating with ellipsis. */
     .moon-glyph-hero            { gap: 8px; }
     .moon-glyph-hero .moon-disk { width: 44px; height: 44px; }
 
     .moon-glyph-meta .phase-name {
-        font-size: 0.88rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        font-size: 0.85rem;
+        line-height: 1.2;
+        overflow-wrap: break-word;
     }
     .moon-glyph-meta .phase-illum { font-size: 0.72rem; }
 
@@ -2170,16 +2170,13 @@ h3 {
 .wind_block {
     display: flex;
     flex-direction: column;
-    padding: 20px;
+    padding: 12px 20px;
 }
 
 .wind-metric-content {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    height: 100%;
-    /* override global metric-content centering */
-    text-align: left;
     align-items: stretch;
 }
 
@@ -2189,7 +2186,6 @@ h3 {
     align-items: stretch;
     gap: 0;
     width: 100%;
-    text-align: left;
 }
 
 /* Left column: hero speed */
@@ -2198,8 +2194,7 @@ h3 {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    flex: 0 0 auto;
-    padding-left: 8px;
+    flex: 1;
     padding-right: 16px;
     min-width: 0;
 }
@@ -2216,7 +2211,6 @@ h3 {
     font-size: 0.78rem;
     font-weight: var(--fw-label);
     color: var(--text-secondary);
-    text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-top: 3px;
 }
@@ -2301,7 +2295,11 @@ h3 {
 .uv_block {
     display: flex;
     flex-direction: column;
-    padding: 20px;
+    padding: 12px 20px;
+}
+
+.uv_block .main-value {
+    margin-bottom: 0;
 }
 
 .uv-level-line {
@@ -2309,7 +2307,7 @@ h3 {
 }
 
 .uv-level-badge {
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -2323,12 +2321,19 @@ h3 {
 .uv-extreme   { color: #c084fc; }
 
 /* =========================================================
-   WETNESS BADGE inside humidity card (compact inline)
+   WETNESS BADGE in cloud-strip-footer — scaled to match astro button
 ========================================================= */
-.humidity_block .wetness-status-badge {
-    margin-top: 8px;
-    font-size: 0.7rem;
-    padding: 3px 10px 3px 8px;
+.cloud-strip-footer .wetness-status-badge {
+    font-size: 0.62rem;
+    font-weight: var(--fw-label);
+    padding: 2px 8px 2px 6px;
+    gap: 5px;
+    border-radius: 20px;
+}
+
+.cloud-strip-footer .wetness-status-dot {
+    width: 6px;
+    height: 6px;
 }
 
 /* =========================================================
@@ -2653,6 +2658,23 @@ h3 {
     .gauge-labels {
         display: none;
     }
+
+    /* Cards are shorter at this width because content shrinks, but the
+       fixed 12px padding makes the header zone proportionally huge.
+       Scale down to keep the header from dominating the card. */
+    .temperature_block,
+    .pressure_block,
+    .humidity_block,
+    .wind_block,
+    .uv_block {
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+
+    .card-header {
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
 }
 
 @media (max-width: 420px) {
@@ -2893,7 +2915,8 @@ h3 {
 ========================================================= */
 .cloud-strip-footer {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     padding-top: 5px;
 }
 

@@ -895,6 +895,25 @@ span.flatpickr-weekday {
     line-height: 1.5;
 }
 
+.provider-dew-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: #facc15;
+    background: rgba(250, 204, 21, 0.08);
+    border: 1px solid rgba(250, 204, 21, 0.25);
+    border-radius: 8px;
+    padding: 9px 12px;
+    margin: 0 0 16px;
+    line-height: 1.5;
+}
+
+/* Our display:flex overrides the browser's [hidden]{display:none} — restore it. */
+.provider-dew-warn[hidden] {
+    display: none;
+}
+
 .provider-note strong {
     color: var(--text-secondary);
 }

@@ -1189,7 +1189,7 @@ function renderPressureTrend(pressureTrend, changeValue) {
 // HUMIDITY + DEW POINT
 // ==========================================
 
-function renderHumidity(humidity) {
+function renderHumidity(humidity, isMixedDew = false) {
     if (!humidity) return;
 
     const humVal = humidity.value;
@@ -1200,14 +1200,14 @@ function renderHumidity(humidity) {
     const dewEl = document.getElementById('humidity-dew-val');
     if (dewEl) {
         dewEl.textContent = humidity.dewPoint != null
-            ? `${humidity.dewPoint.toFixed(1)}°C`
+            ? `${isMixedDew ? '~' : ''}${humidity.dewPoint.toFixed(1)}°C`
             : '--°C';
     }
 
-    renderDewPointGauge(humidity);
+    renderDewPointGauge(humidity, isMixedDew);
 }
 
-function renderDewPointGauge(humidity) {
+function renderDewPointGauge(humidity, isMixedDew = false) {
     const spreadValEl = document.getElementById('dew-spread-val');
     const dewTEl      = document.getElementById('dew-t');
     const dewTdEl     = document.getElementById('dew-td');
@@ -1230,7 +1230,7 @@ function renderDewPointGauge(humidity) {
     const spread  = parseFloat((temp - dewPoint).toFixed(1));
     const percent = Math.min(100, Math.max(0, (spread / 10) * 100));
 
-    spreadValEl.textContent  = `${spread.toFixed(1)}°`;
+    spreadValEl.textContent  = `${isMixedDew ? '~' : ''}${spread.toFixed(1)}°`;
     if (dewTEl)  dewTEl.textContent  = temp.toFixed(1);
     if (dewTdEl) dewTdEl.textContent = dewPoint.toFixed(1);
 
@@ -1238,11 +1238,12 @@ function renderDewPointGauge(humidity) {
     pinEl.setAttribute('data-spread', `${spread.toFixed(1)}°`);
 
     if (badgeEl && risk) {
-        const config      = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
-        badgeEl.className   = `dew-status-badge ${config.cssClass}`;
-        badgeEl.textContent = config.label;
+        const config         = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
+        badgeEl.className    = `dew-status-badge ${config.cssClass}`;
+        badgeEl.textContent  = config.label;
         badgeEl.style.cursor = 'pointer';
-        badgeEl._dewRisk    = risk;
+        badgeEl._dewRisk     = risk;
+        badgeEl._dewMixed    = isMixedDew;
     }
 }
 
@@ -1255,6 +1256,8 @@ function renderSurfaceWetness(wetness) {
     const textEl  = document.getElementById('wetness-status-text');
 
     if (!badgeEl) return;
+
+    badgeEl._wetnessData = wetness ?? null;
 
     const status = wetness?.surfaceWetnessStatus;
 
@@ -1332,9 +1335,12 @@ function renderMetrics(dto, dataStatus) {
     const wind     = dto?.wind;
     const uv       = dto?.uvIndex;
 
+    const isMixedDew = (temp?.dataDetails?.dataProvider ?? 'LOCAL_SENSOR')
+                     !== (humidity?.dataDetails?.dataProvider ?? 'LOCAL_SENSOR');
+
     renderTemperature(temp);
     renderPressure(pressure);
-    renderHumidity(humidity);
+    renderHumidity(humidity, isMixedDew);
     renderSurfaceWetness(wetness);
     renderWind(wind);
     renderUvIndex(uv);
@@ -1345,11 +1351,11 @@ function renderMetrics(dto, dataStatus) {
     populatePopup('wind-card',        wind?.metricDataDetails, dataStatus);
     populatePopup('uv-card',          uv?.dataDetails,       dataStatus);
 
-    setStatusCircleColor(document.querySelector('#temperature-card .status-circle'), temp?.dataDetails?.quality,     dataStatus);
-    setStatusCircleColor(document.querySelector('#pressure-card .status-circle'),    pressure?.dataDetails?.quality, dataStatus);
-    setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality, dataStatus);
-    setStatusCircleColor(document.querySelector('#wind-card .status-circle'),        wind?.metricDataDetails?.quality, dataStatus);
-    setStatusCircleColor(document.querySelector('#uv-card .status-circle'),          uv?.dataDetails?.quality,       dataStatus);
+    setStatusCircleColor(document.querySelector('#temperature-card .status-circle'), temp?.dataDetails?.quality,       dataStatus, temp?.dataDetails?.dataProvider);
+    setStatusCircleColor(document.querySelector('#pressure-card .status-circle'),    pressure?.dataDetails?.quality,   dataStatus, pressure?.dataDetails?.dataProvider);
+    setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality,   dataStatus, humidity?.dataDetails?.dataProvider);
+    setStatusCircleColor(document.querySelector('#wind-card .status-circle'),        wind?.metricDataDetails?.quality, dataStatus, wind?.metricDataDetails?.dataProvider);
+    setStatusCircleColor(document.querySelector('#uv-card .status-circle'),          uv?.dataDetails?.quality,         dataStatus, uv?.dataDetails?.dataProvider);
 
     updateStalenessHints(dataStatus);
 }
@@ -1584,16 +1590,14 @@ function formatTimeSince(isoString) {
 }
 
 function formatArrivedAt(value) {
-    if (!value) return '--';
-    const date = new Date(value);
-    if (isNaN(date.getTime())) return '--';
-    return date.toLocaleString('en-GB', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-    });
+    return value ?? '--';
 }
 
 function buildPopupHTML(details, dataStatus) {
+    if (details.dataProvider === 'EXTERNAL_API') {
+        return buildApiPopupHTML(details, dataStatus);
+    }
+
     const qColor    = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
     const dsColor   = DATA_STATUS_COLORS[dataStatus] ?? '#6b7280';
     const dsInfo    = DATA_STATUS_INFO[dataStatus];
@@ -1639,7 +1643,39 @@ function buildPopupHTML(details, dataStatus) {
     `;
 }
 
-function buildDewRiskPopupHTML(risk) {
+function buildApiPopupHTML(details, dataStatus) {
+    const dsColor   = DATA_STATUS_COLORS[dataStatus] ?? '#6b7280';
+    const dsInfo    = DATA_STATUS_INFO[dataStatus];
+    const timeSince = formatTimeSince(details.arrivedAt);
+
+    const freshnessSection = (dataStatus && dataStatus !== 'LIVE') ? `
+        <div class="popup-divider"></div>
+        <div class="popup-row">
+            <span class="popup-key">Status</span>
+            <span class="popup-val" style="color:${dsColor}; font-weight:700;">${dsInfo?.label ?? dataStatus}</span>
+        </div>
+        ${timeSince ? `
+        <div class="popup-row">
+            <span class="popup-key">Not updated for</span>
+            <span class="popup-val">${timeSince}</span>
+        </div>` : ''}
+    ` : '';
+
+    return `
+        <div class="popup-heading">${details.metricName ?? '--'}</div>
+        <div class="popup-row">
+            <span class="popup-key">Source</span>
+            <span class="popup-val" style="color:#60a5fa; font-weight:600;">Open-Meteo API</span>
+        </div>
+        <div class="popup-row">
+            <span class="popup-key">Forecast updated</span>
+            <span class="popup-val">${formatArrivedAt(details.arrivedAt)}</span>
+        </div>
+        ${freshnessSection}
+    `;
+}
+
+function buildDewRiskPopupHTML(risk, isMixed = false) {
     const info = DEW_POINT_RISK_INFO[risk];
     if (!info) return '';
 
@@ -1652,6 +1688,13 @@ function buildDewRiskPopupHTML(risk) {
            </div>`
         : '';
 
+    const mixedNote = isMixed ? `
+        <div class="popup-divider"></div>
+        <div class="popup-row" style="flex-direction:column; align-items:flex-start; gap:3px;">
+            <span class="popup-key" style="color:#facc15;">⚠ Approximate</span>
+            <span class="popup-val" style="text-align:left; line-height:1.5; font-weight:400; color:rgba(250,204,21,0.8);">Temperature and humidity come from different sources — dew point may be slightly inaccurate.</span>
+        </div>` : '';
+
     return `
         <div class="popup-heading">${info.title}</div>
         <div class="popup-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
@@ -1663,11 +1706,26 @@ function buildDewRiskPopupHTML(risk) {
             <span class="popup-key" style="color:#38bdf8">Tip</span>
             <span class="popup-val" style="text-align:left; line-height:1.6; color:#38bdf8">${info.tip}</span>
         </div>
+        ${mixedNote}
     `;
 }
 
-function setStatusCircleColor(circleEl, quality, dataStatus) {
+function setStatusCircleColor(circleEl, quality, dataStatus, dataProvider) {
     if (!circleEl) return;
+
+    if (dataProvider === 'EXTERNAL_API') {
+        // API-backed cards: blue when data is fresh, staleness color when degraded.
+        // Never pulse — the data is polled, not a live sensor stream.
+        const dSev  = STATUS_SEVERITY[dataStatus] ?? 0;
+        const color = dSev > 0
+            ? (DATA_STATUS_COLORS[dataStatus] ?? DATA_QUALITY_COLORS.MISSING)
+            : '#60a5fa';
+        circleEl.style.backgroundColor = color;
+        circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
+        circleEl.classList.remove('pulsing');
+        return;
+    }
+
     const qSev  = QUALITY_SEVERITY[quality]   ?? 0;
     const dSev  = STATUS_SEVERITY[dataStatus] ?? 0;
     const color = (dSev >= qSev)
@@ -1764,7 +1822,51 @@ function initDewRiskBadge() {
                     && globalPopup._sourceEl === badgeEl;
 
         globalPopup.classList.remove('open');
-        if (!isOpen && risk) openPopup(buildDewRiskPopupHTML(risk), badgeEl);
+        if (!isOpen && risk) openPopup(buildDewRiskPopupHTML(risk, badgeEl._dewMixed), badgeEl);
+    });
+}
+
+function buildWetnessPopupHTML(wetness) {
+    const status  = wetness?.surfaceWetnessStatus;
+    const details = wetness?.dataDetails;
+    const config  = SURFACE_WETNESS_CONFIG[status] ?? SURFACE_WETNESS_CONFIG.DRY;
+    const qColor  = DATA_QUALITY_COLORS[details?.quality] ?? DATA_QUALITY_COLORS.MISSING;
+    const pct     = wetness?.value != null ? wetness.value.toFixed(1) + '%' : '--';
+
+    return `
+        <div class="popup-heading">Surface Wetness</div>
+        <div class="popup-row">
+            <span class="popup-key">Reading</span>
+            <span class="popup-val" style="color:${config.barColor}; font-weight:700;">${pct}</span>
+        </div>
+        <div class="popup-row">
+            <span class="popup-key">Status</span>
+            <span class="popup-val">${config.label}</span>
+        </div>
+        <div class="popup-row">
+            <span class="popup-key">Quality</span>
+            <span class="popup-val" style="color:${qColor}; font-weight:600;">${details?.quality ?? '--'}</span>
+        </div>
+        <div class="popup-row">
+            <span class="popup-key">Measured</span>
+            <span class="popup-val">${formatArrivedAt(details?.arrivedAt)}</span>
+        </div>
+    `;
+}
+
+function initWetnessBadge() {
+    const badgeEl = document.getElementById('wetness-badge');
+    if (!badgeEl) return;
+
+    badgeEl.style.cursor = 'pointer';
+    badgeEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wetness = badgeEl._wetnessData;
+        const isOpen  = globalPopup.classList.contains('open')
+                     && globalPopup._sourceEl === badgeEl;
+
+        globalPopup.classList.remove('open');
+        if (!isOpen && wetness) openPopup(buildWetnessPopupHTML(wetness), badgeEl);
     });
 }
 
@@ -1822,6 +1924,7 @@ window.addEventListener('resize', () => {
 initEventListeners();
 initStatusCircles();
 initDewRiskBadge();
+initWetnessBadge();
 initAstroModal();
 initHealthPopover();
 initBgPreference();

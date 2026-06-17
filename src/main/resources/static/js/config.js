@@ -65,6 +65,7 @@ function populateAll(config) {
     populateValidation(config.validation);
     populateHardware(config.hardware);
     populateProviders(config.dataProviders);
+    checkDewSourceWarning();
 }
 
 function setStatus(panel, message, isError) {
@@ -152,6 +153,12 @@ function enhanceNumberInputs() {
     });
 }
 
+function checkDewSourceWarning() {
+    const warn = $('dew-source-warn');
+    if (!warn) return;
+    warn.hidden = getProviderValue('temperature') === getProviderValue('humidity');
+}
+
 function initProviderToggles() {
     document.querySelectorAll('.provider-toggle').forEach(toggle => {
         toggle.addEventListener('click', (e) => {
@@ -159,6 +166,7 @@ function initProviderToggles() {
             if (!btn) return;
             toggle.querySelectorAll('.provider-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            checkDewSourceWarning();
         });
     });
 }
