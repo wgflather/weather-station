@@ -12,14 +12,31 @@ const HOURS_AHEAD = 8;
 // Priority: sleet > snow > rain > drizzle > cloud-only
 // ==========================================
 
+// WMO thunderstorm codes from Open-Meteo weather_code:
+//   95 — slight/moderate thunderstorm
+//   96 — thunderstorm with slight hail
+//   99 — thunderstorm with heavy hail
+const THUNDER_CODES  = new Set([95]);
+const HAIL_CODES     = new Set([96, 99]);
+
 function selectIcon(point, isNight) {
     const cloud  = point.cloudCover          ?? 0;
     const chance = point.precipitationChance ?? 0;
     const rain   = (point.rainAmount ?? 0) + (point.showersAmount ?? 0);
     const snow   = point.snowAmount          ?? 0;
+    const wc     = point.weatherCode         ?? 0;
 
     const n      = isNight ? 'night' : 'day';
     const prefix = cloud >= 60 ? `overcast-${n}` : `partly-cloudy-${n}`;
+
+    // Weather code is the authoritative model signal — check it first.
+    // Overcast thunderstorm variants don't exist in this icon set, so the
+    // rain variant is used for both overcast and partly-cloudy thunderstorms.
+    if (HAIL_CODES.has(wc))   return `${prefix}-hail`;
+    if (THUNDER_CODES.has(wc)) {
+        if (snow > 0.1) return `thunderstorms-${n}-snow`;
+        return `thunderstorms-${n}-rain`;
+    }
 
     if (snow > 0.1 && rain > 0.1) return `${prefix}-sleet`;
     if (snow > 0.1)                return `${prefix}-snow`;
@@ -158,7 +175,25 @@ function initTooltip(strip) {
 // ==========================================
 
 let _forecastPoints = null;
+let _sunriseMs      = null;
 let _sunsetMs       = null;
+
+// Returns true when a given UTC timestamp falls in a night period.
+// Uses time-of-day (minutes since midnight in local browser time) rather
+// than absolute ms comparison so the logic works correctly for slots that
+// span into the next calendar day — e.g. the 8-hour ahead window showing
+// next morning shouldn't keep showing moon icons after sunrise.
+// Falls back to sunset-only check when only one value is available.
+function isNightHour(slotMs) {
+    if (_sunriseMs == null && _sunsetMs == null) return false;
+    if (_sunriseMs == null) return slotMs >= _sunsetMs;
+
+    const tod = ms => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
+    const slot = tod(slotMs);
+    const rise = tod(_sunriseMs);
+    const set  = tod(_sunsetMs);
+    return slot < rise || slot >= set;
+}
 
 // ==========================================
 // WINDOWING
@@ -185,7 +220,7 @@ function parseMs(isoTime) {
 // RENDER
 // ==========================================
 
-function renderCloudStrip(forecastPoints, sunsetMs) {
+function renderCloudStrip(forecastPoints) {
     const strip = document.getElementById('cloud-strip');
     if (!strip || !forecastPoints.length) return;
 
@@ -198,7 +233,7 @@ function renderCloudStrip(forecastPoints, sunsetMs) {
         const slotMs    = parseMs(point.time);
         const slotDate  = new Date(slotMs);
         const hour      = slotDate.getHours();
-        const isNight   = sunsetMs != null && slotMs >= sunsetMs;
+        const isNight   = isNightHour(slotMs);
         const iconName  = selectIcon(point, isNight);
         const isCurrent = i === currentIdx;
         const src       = (isCurrent ? ICON_ANIMATED : ICON_STATIC) + iconName + '.svg';
@@ -217,7 +252,7 @@ function renderCloudStrip(forecastPoints, sunsetMs) {
         const label = String(hour).padStart(2, '0');
 
         html += `<div class="cloud-slot ${cls}" data-hour="${hour}">
-            <img src="${src}" alt="${iconName}" width="28" height="28" loading="lazy">
+            <img src="${src}" alt="${iconName}" width="34" height="34" loading="lazy">
             <span class="cloud-slot-hour">${label}</span>
         </div>`;
     });
@@ -242,12 +277,15 @@ function scrollToCurrentHour(strip) {
 // PUBLIC — called by fetch-data.js after astronomy loads
 // ==========================================
 
-window.refreshCloudSunset = function (sunsetIso) {
-    if (!sunsetIso) return;
-    const ms = parseMs(sunsetIso);
-    if (isNaN(ms) || ms === _sunsetMs) return;
-    _sunsetMs = ms;
-    if (_forecastPoints) renderCloudStrip(_forecastPoints, _sunsetMs);
+// Receives both sunrise and sunset so the night check can correctly bracket
+// both ends of the day, including next-morning slots in the forecast window.
+window.refreshCloudSunTimes = function (riseIso, setIso) {
+    const riseMs = riseIso ? parseMs(riseIso) : NaN;
+    const setMs  = setIso  ? parseMs(setIso)  : NaN;
+    let changed  = false;
+    if (!isNaN(riseMs) && riseMs !== _sunriseMs) { _sunriseMs = riseMs; changed = true; }
+    if (!isNaN(setMs)  && setMs  !== _sunsetMs)  { _sunsetMs  = setMs;  changed = true; }
+    if (changed && _forecastPoints) renderCloudStrip(_forecastPoints);
 };
 
 // ==========================================
@@ -260,7 +298,7 @@ async function loadCloudForecast() {
         if (!res.ok) return;
         const data = await res.json();
         _forecastPoints = data.forecastPoints ?? [];
-        renderCloudStrip(_forecastPoints, _sunsetMs);
+        renderCloudStrip(_forecastPoints);
         const strip = document.getElementById('cloud-strip');
         if (strip) initTooltip(strip);
     } catch (e) {

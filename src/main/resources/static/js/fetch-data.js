@@ -1311,7 +1311,7 @@ async function loadDaily() {
         state.astronomyDaily   = daily;
         state.dailyKey         = daily.dailyKey;
         renderAstronomyDaily(daily);
-        window.refreshCloudSunset?.(daily.sunDailyEvents?.set);
+        window.refreshCloudSunTimes?.(daily.sunDailyEvents?.rise, daily.sunDailyEvents?.set);
         // Race-condition guard: loadDaily() and the first updateLive() run
         // concurrently at boot. The live endpoint is usually faster, so
         // renderAstronomyLive() often runs before state.astronomyDaily is

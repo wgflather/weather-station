@@ -30,7 +30,7 @@ public class OpenMeteoProvider {
                       .queryParam("longitude", lon)
                       .queryParam(
                           "hourly",
-                          "cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation_probability,rain,showers,snowfall,wind_speed_10m,wind_speed_200hPa")
+                          "weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation_probability,rain,showers,snowfall,wind_speed_10m,wind_speed_200hPa")
                       .queryParam("forecast_days", 2)
                       .build())
           .retrieve()

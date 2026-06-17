@@ -56,6 +56,7 @@ public class WeatherClientService {
             i ->
                 new WeatherConditionPoint(
                     forecast.time().get(i).atZone(zoneId),
+                    safeInt(forecast.weatherCodes(), i),
                     forecast.totalCloudCoverage().get(i),
                     forecast.precipitationProbability().get(i),
                     forecast.rainAmount().get(i),
@@ -66,6 +67,11 @@ public class WeatherClientService {
 
   private static double safe(List<Double> list, int i) {
     if (list == null || i >= list.size() || list.get(i) == null) return 0.0;
+    return list.get(i);
+  }
+
+  private static Integer safeInt(List<Integer> list, int i) {
+    if (list == null || i >= list.size()) return null;
     return list.get(i);
   }
 }

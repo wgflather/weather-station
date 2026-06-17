@@ -6,6 +6,7 @@ import java.util.List;
 
 public record WeatherConditionsForecast(
     List<LocalDateTime> time,
+    @JsonProperty("weather_code") List<Integer> weatherCodes,
     @JsonProperty("cloud_cover") List<Double> totalCloudCoverage,
     @JsonProperty("cloud_cover_low") List<Double> cloudCoverLow,
     @JsonProperty("cloud_cover_mid") List<Double> cloudCoverMid,
