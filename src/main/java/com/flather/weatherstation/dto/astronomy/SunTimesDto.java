@@ -1,6 +1,5 @@
 package com.flather.weatherstation.dto.astronomy;
 
-import com.flather.weatherstation.domain.constant.SolarCondition;
 import java.time.ZonedDateTime;
 
 /**

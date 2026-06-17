@@ -13,5 +13,10 @@ public record UpdateValidationRequest(
     @NotNull(message = "tempSpikeLimit is required") Double tempSpikeLimit,
     @NotNull(message = "pressureSpikeLimit is required") Double pressureSpikeLimit,
     @NotNull(message = "surfaceWetnessWetBaseline is required") Integer surfaceWetnessWetBaseline,
-    @NotNull(message = "surfaceWetnessDryBaseline is required")
-        Integer surfaceWetnessDryBaseline) {}
+    @NotNull(message = "surfaceWetnessDryBaseline is required") Integer surfaceWetnessDryBaseline,
+    @NotNull(message = "windMinimal is required") Double windMinimal,
+    @NotNull(message = "windMaximum is required") Double windMaximum,
+    @NotNull(message = "windSpikeLimit is required") Double windSpikeLimit,
+    @NotNull(message = "uvIndexMinimal is required") Double uvIndexMinimal,
+    @NotNull(message = "uvIndexMaximum is required") Double uvIndexMaximum,
+    @NotNull(message = "uvIndexSpikeLimit is required") Double uvIndexSpikeLimit) {}

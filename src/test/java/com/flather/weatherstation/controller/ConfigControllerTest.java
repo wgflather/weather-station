@@ -40,11 +40,12 @@ class ConfigControllerTest {
     LocationContext location =
         new LocationContext(52.5, 13.4, 34.0, ZoneId.of("Europe/Berlin"), null);
     WeatherValidationConfig validation =
-        new WeatherValidationConfig(-40, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 800, 200);
+        new WeatherValidationConfig(
+            -40, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 800, 200, 0.0, 60.0, 20.0, 0.0, 16.0, 5.0);
     HardwareConfig hardware =
-        new HardwareConfig("Raspberry Pi", "DS18B20", "DHT22", "BMP180", null);
+        new HardwareConfig("Raspberry Pi", "DS18B20", "DHT22", "BMP180", null, null, null);
     StationConfigurationResponse response =
-        new StationConfigurationResponse(location, validation, hardware);
+        new StationConfigurationResponse(location, validation, hardware, null);
 
     given(service.getConfigurationView()).willReturn(response);
 
@@ -124,7 +125,8 @@ class ConfigControllerTest {
   void shouldUpdateValidation_whenRequestIsValid() throws Exception {
     UpdateValidationRequest request =
         new UpdateValidationRequest(
-            -40.0, 60.0, 900.0, 1100.0, 0.0, 100.0, 20.0, 5.0, 10.0, 800, 200);
+            -40.0, 60.0, 900.0, 1100.0, 0.0, 100.0, 20.0, 5.0, 10.0, 800, 200, 0.0, 60.0, 20.0, 0.0,
+            16.0, 5.0);
     StationConfiguration config = new StationConfiguration();
     config.setTempMinimal(-40.0);
     config.setTempMaximum(60.0);
@@ -162,7 +164,7 @@ class ConfigControllerTest {
   @Test
   void shouldUpdateHardware_whenRequestIsValid() throws Exception {
     UpdateHardwareRequest request =
-        new UpdateHardwareRequest("Raspberry Pi", "DS18B20", "DHT22", "BMP180", null);
+        new UpdateHardwareRequest("Raspberry Pi", "DS18B20", "DHT22", "BMP180", null, null, null);
     StationConfiguration config = new StationConfiguration();
     config.setBoard("Raspberry Pi");
 

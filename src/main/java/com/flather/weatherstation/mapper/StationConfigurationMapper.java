@@ -1,5 +1,6 @@
 package com.flather.weatherstation.mapper;
 
+import com.flather.weatherstation.config.DataProviderConfiguration;
 import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.config.LocationContext;
 import com.flather.weatherstation.config.WeatherValidationConfig;
@@ -25,7 +26,13 @@ public class StationConfigurationMapper {
         cfg.getTempSpikeLimit(),
         cfg.getPressureSpikeLimit(),
         cfg.getSurfaceWetnessWetBaseline(),
-        cfg.getSurfaceWetnessDryBaseline());
+        cfg.getSurfaceWetnessDryBaseline(),
+        cfg.getWindMinimal(),
+        cfg.getWindMaximum(),
+        cfg.getWindSpikeLimit(),
+        cfg.getUvIndexMinimal(),
+        cfg.getUvIndexMaximum(),
+        cfg.getUvIndexSpikeLimit());
   }
 
   public LocationContext toLocationContext(StationConfiguration cfg) {
@@ -56,6 +63,17 @@ public class StationConfigurationMapper {
         cfg.getTemperatureSensor(),
         cfg.getHumiditySensor(),
         cfg.getPressureSensor(),
-        cfg.getSurfaceWetnessSensor());
+        cfg.getSurfaceWetnessSensor(),
+        cfg.getWindSensor(),
+        cfg.getUvIndexSensor());
+  }
+
+  public DataProviderConfiguration toDataProviderConfiguration(StationConfiguration cfg) {
+    return new DataProviderConfiguration(
+        cfg.getTemperatureProvider(),
+        cfg.getPressureProvider(),
+        cfg.getHumidityProvider(),
+        cfg.getWindProvider(),
+        cfg.getUvIndexProvider());
   }
 }

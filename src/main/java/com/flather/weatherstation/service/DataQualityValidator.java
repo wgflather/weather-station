@@ -72,13 +72,36 @@ public class DataQualityValidator {
         validation.surfaceWetnessWetBaseline(),
         validation.surfaceWetnessDryBaseline(),
         dataQualityMap);
-    ;
+
+    validateMetric(
+        Metric.WIND,
+        anomalyDto.getWind(),
+        validation.windMinimal(),
+        validation.windMaximum(),
+        dataQualityMap);
+
+    validateMetric(
+        Metric.WIND_DIRECTION,
+        anomalyDto.getWindDirection(),
+        0.0,
+        360.0,
+        dataQualityMap);
+
+    validateMetric(
+        Metric.UV_INDEX,
+        anomalyDto.getUvIndex(),
+        validation.uvIndexMinimal(),
+        validation.uvIndexMaximum(),
+        dataQualityMap);
 
     return new ValidationResult(
         dataQualityMap.get(Metric.TEMPERATURE),
         dataQualityMap.get(Metric.PRESSURE),
         dataQualityMap.get(Metric.HUMIDITY),
-        dataQualityMap.get(Metric.SURFACE_WETNESS));
+        dataQualityMap.get(Metric.SURFACE_WETNESS),
+        dataQualityMap.get(Metric.WIND),
+        dataQualityMap.get(Metric.WIND_DIRECTION),
+        dataQualityMap.get(Metric.UV_INDEX));
   }
 
   private double getSpikeLimit(Metric metric) {
@@ -86,7 +109,9 @@ public class DataQualityValidator {
       case TEMPERATURE -> properties.getValidationConfig().tempSpikeLimit();
       case PRESSURE -> properties.getValidationConfig().pressureSpikeLimit();
       case HUMIDITY -> properties.getValidationConfig().humiditySpikeLimit();
-      default -> throw new IllegalArgumentException("Unknown Metric");
+      case WIND -> properties.getValidationConfig().windSpikeLimit();
+      case UV_INDEX -> properties.getValidationConfig().uvIndexSpikeLimit();
+      default -> throw new IllegalArgumentException("No spike limit configured for: " + metric);
     };
   }
 

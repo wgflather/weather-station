@@ -3,6 +3,9 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.domain.constant.*;
+import com.flather.weatherstation.domain.constant.BeaufortScale;
+import com.flather.weatherstation.domain.constant.UvLevel;
+import com.flather.weatherstation.domain.constant.WindDirectionLabel;
 import com.flather.weatherstation.domain.entity.WeatherRecord;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.analytics.MetricDataDetails;
@@ -104,6 +107,39 @@ public class AnalyticsService {
         trendResult,
         metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.PRESSURE),
         PressureTrend.classify(trendResult));
+  }
+
+  public WindDto getWind() {
+    OptionalDouble gust =
+        sensorStateCache.getMetricsWindow().stream()
+            .filter(r -> r.getWindDataQuality() == DataQuality.OK && r.getWind() != null)
+            .mapToDouble(WeatherRecord::getWind)
+            .max();
+
+    WeatherRecord last = sensorStateCache.getLastSavedMeasurement();
+    Double direction = last != null ? last.getWindDirection() : null;
+    WindDirectionLabel dirLabel =
+        direction != null ? WindDirectionLabel.fromDegrees(direction) : null;
+    Double speed =
+        averageOfFiveLastReadings(WeatherRecord::getWind, WeatherRecord::getWindDataQuality);
+
+    return new WindDto(
+        speed,
+        gust.isPresent() ? Precision.round(gust.getAsDouble(), 1) : null,
+        direction,
+        dirLabel,
+        BeaufortScale.fromMs(speed),
+        metricDataDetailsMapper.from(last, Metric.WIND));
+  }
+
+  public UvIndexDto getUvIndex() {
+    Double value =
+        averageOfFiveLastReadings(
+            WeatherRecord::getUvIndex, WeatherRecord::getUvIndexDataQuality);
+    return new UvIndexDto(
+        value,
+        UvLevel.fromIndex(value),
+        metricDataDetailsMapper.from(sensorStateCache.getLastSavedMeasurement(), Metric.UV_INDEX));
   }
 
   public HumidityDto getHumidity() {

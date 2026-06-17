@@ -20,6 +20,14 @@ public class WeatherRecordCreatedDto {
 
   private Double surfaceWetness;
 
+  private Double wind;
+
+  @JsonProperty("wind_direction")
+  private Double windDirection;
+
+  @JsonProperty("uv_index")
+  private Double uvIndex;
+
   @NotNull
   @JsonProperty("WIFI_RSSI")
   private Double wifiRssi;

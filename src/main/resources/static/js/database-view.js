@@ -66,10 +66,12 @@ function rowHtml(record) {
         <td class="db-id">${record.id}</td>
         <td>${record.deviceId ?? '—'}</td>
         <td class="db-time">${fmtTime(record.measuredAt)}</td>
-        ${metricCell(record.temperature, record.temperatureDataQuality, fmtNum(record.temperature, 1))}
-        ${metricCell(record.pressure, record.pressureDataQuality, fmtNum(record.pressure, 2))}
-        ${metricCell(record.humidity, record.humidityDataQuality, fmtNum(record.humidity, 1))}
-        ${metricCell(record.surfaceWetness, record.surfaceWetnessDataQuality, fmtInt(record.surfaceWetness))}
+        ${metricCell(record.temperature,   record.temperatureDataQuality,   fmtNum(record.temperature, 1))}
+        ${metricCell(record.pressure,      record.pressureDataQuality,      fmtNum(record.pressure, 2))}
+        ${metricCell(record.humidity,      record.humidityDataQuality,      fmtNum(record.humidity, 1))}
+        ${metricCell(record.surfaceWetness,record.surfaceWetnessDataQuality,fmtInt(record.surfaceWetness))}
+        ${metricCell(record.wind,          record.windDataQuality,          fmtNum(record.wind, 1))}
+        ${metricCell(record.uvIndex,       record.uvIndexDataQuality,       fmtNum(record.uvIndex, 1))}
         <td><button type="button" class="db-delete-btn" data-id="${record.id}" title="Delete record">Delete</button></td>
     </tr>`;
 }

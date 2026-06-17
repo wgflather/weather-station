@@ -1247,34 +1247,77 @@ function renderDewPointGauge(humidity) {
 }
 
 // ==========================================
-// SURFACE WETNESS
+// SURFACE WETNESS BADGE (inside humidity card)
 // ==========================================
 
 function renderSurfaceWetness(wetness) {
     const badgeEl = document.getElementById('wetness-badge');
     const textEl  = document.getElementById('wetness-status-text');
-    const pctEl   = document.getElementById('wetness-pct');
-    const barEl   = document.getElementById('wetness-bar');
 
     if (!badgeEl) return;
 
     const status = wetness?.surfaceWetnessStatus;
-    const pct    = wetness?.value;
 
-    if (pct == null || !status) {
+    if (!status) {
+        badgeEl.className  = 'wetness-status-badge wetness-dry';
         textEl.textContent = '--';
-        pctEl.textContent  = 'Wetness --';
-        barEl.style.width  = '0%';
         return;
     }
 
     const config = SURFACE_WETNESS_CONFIG[status] ?? SURFACE_WETNESS_CONFIG.DRY;
+    badgeEl.className  = `wetness-status-badge ${config.cssClass}`;
+    textEl.textContent = config.label;
+}
 
-    badgeEl.className           = `wetness-status-badge ${config.cssClass}`;
-    textEl.textContent          = config.label;
-    pctEl.textContent           = `Wetness ${Math.round(pct)}%`;
-    barEl.style.width           = `${pct.toFixed(1)}%`;
-    barEl.style.backgroundColor = config.barColor;
+// ==========================================
+// WIND
+// ==========================================
+
+const UV_CSS = {
+    LOW: 'uv-low', MODERATE: 'uv-moderate', HIGH: 'uv-high',
+    VERY_HIGH: 'uv-very-high', EXTREME: 'uv-extreme',
+};
+
+function renderWind(wind) {
+    if (!wind) return;
+    document.getElementById('wind-speed').textContent = wind.speed ?? '--';
+    document.getElementById('wind-gusts').textContent = wind.gusts ?? '--';
+
+    const arrowEl = document.getElementById('wind-direction-arrow');
+    const labelEl = document.getElementById('wind-direction-label');
+    const degEl   = document.getElementById('wind-direction-deg');
+
+    if (wind.direction != null) {
+        if (arrowEl) {
+            arrowEl.textContent = '↑';
+            arrowEl.style.transform = `rotate(${wind.direction}deg)`;
+        }
+        if (labelEl) labelEl.textContent = wind.directionLabel ?? '--';
+        if (degEl)   degEl.textContent   = Math.round(wind.direction);
+    } else {
+        if (arrowEl) { arrowEl.textContent = '–'; arrowEl.style.transform = ''; }
+        if (labelEl) labelEl.textContent = '--';
+        if (degEl)   degEl.textContent   = '--';
+    }
+}
+
+// ==========================================
+// UV INDEX
+// ==========================================
+
+function renderUvIndex(uv) {
+    const valEl   = document.getElementById('uv-val');
+    const levelEl = document.getElementById('uv-level');
+    if (!valEl) return;
+
+    const value = uv?.value;
+    valEl.textContent = value != null ? value.toFixed(1) : '--';
+
+    if (levelEl) {
+        const level = uv?.uvLevel ?? null;
+        levelEl.textContent = level ? level.replace('_', ' ') : '--';
+        levelEl.className   = `uv-level-badge ${UV_CSS[level] ?? ''}`;
+    }
 }
 
 // ==========================================
@@ -1286,21 +1329,27 @@ function renderMetrics(dto, dataStatus) {
     const pressure = dto?.pressure;
     const humidity = dto?.humidity;
     const wetness  = dto?.surfaceWetness;
+    const wind     = dto?.wind;
+    const uv       = dto?.uvIndex;
 
     renderTemperature(temp);
     renderPressure(pressure);
     renderHumidity(humidity);
     renderSurfaceWetness(wetness);
+    renderWind(wind);
+    renderUvIndex(uv);
 
     populatePopup('temperature-card', temp?.dataDetails,     dataStatus);
     populatePopup('pressure-card',    pressure?.dataDetails, dataStatus);
     populatePopup('humidity-card',    humidity?.dataDetails, dataStatus);
-    populatePopup('wetness-card',     wetness?.dataDetails,  dataStatus);
+    populatePopup('wind-card',        wind?.metricDataDetails, dataStatus);
+    populatePopup('uv-card',          uv?.dataDetails,       dataStatus);
 
     setStatusCircleColor(document.querySelector('#temperature-card .status-circle'), temp?.dataDetails?.quality,     dataStatus);
     setStatusCircleColor(document.querySelector('#pressure-card .status-circle'),    pressure?.dataDetails?.quality, dataStatus);
     setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality, dataStatus);
-    setStatusCircleColor(document.querySelector('#wetness-card .status-circle'),     wetness?.dataDetails?.quality,  dataStatus);
+    setStatusCircleColor(document.querySelector('#wind-card .status-circle'),        wind?.metricDataDetails?.quality, dataStatus);
+    setStatusCircleColor(document.querySelector('#uv-card .status-circle'),          uv?.dataDetails?.quality,       dataStatus);
 
     updateStalenessHints(dataStatus);
 }
@@ -1636,7 +1685,8 @@ function updateStalenessHints(dataStatus) {
         '#temperature-card .main-value',
         '#pressure-card .main-value',
         '#humidity-card .main-value',
-        '#wetness-card .wetness-meta',
+        '#wind-card .main-value',
+        '#uv-card .main-value',
     ];
     const HINT_LABELS = { DELAYED: '~ delayed', STALE: '~ stale', OFFLINE: '~ offline', EMPTY: '~ no data' };
     const HINT_COLORS = { DELAYED: '#fcd34d',   STALE: '#f97316',  OFFLINE: '#ef4444',   EMPTY: '#6b7280'   };

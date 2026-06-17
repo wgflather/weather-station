@@ -1,4 +1,4 @@
-package com.flather.weatherstation.domain.constant;
+package com.flather.weatherstation.dto.astronomy;
 
 /**
  * Classifies the sun's daily behaviour at the observer's location, used to disambiguate cases where

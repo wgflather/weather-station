@@ -11,4 +11,10 @@ public record WeatherValidationConfig(
     double tempSpikeLimit,
     double pressureSpikeLimit,
     int surfaceWetnessWetBaseline,
-    int surfaceWetnessDryBaseline) {}
+    int surfaceWetnessDryBaseline,
+    double windMinimal,
+    double windMaximum,
+    double windSpikeLimit,
+    double uvIndexMinimal,
+    double uvIndexMaximum,
+    double uvIndexSpikeLimit) {}

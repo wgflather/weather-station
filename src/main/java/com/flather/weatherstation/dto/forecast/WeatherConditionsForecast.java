@@ -16,4 +16,11 @@ public record WeatherConditionsForecast(
     @JsonProperty("showers") List<Double> showerAmount,
     @JsonProperty("snowfall") List<Double> snowFallAmount,
     @JsonProperty("wind_speed_10m") List<Double> windSpeed10m,
-    @JsonProperty("wind_speed_200hPa") List<Double> windSpeed200hPa) {}
+    @JsonProperty("wind_speed_200hPa") List<Double> windSpeed200hPa,
+    // Fields below are only populated when the corresponding metric is on EXTERNAL_API.
+    // Jackson leaves them null when absent from the response — callers must null-check.
+    @JsonProperty("temperature_2m") List<Double> temperature2m,
+    @JsonProperty("relative_humidity_2m") List<Double> relativeHumidity2m,
+    @JsonProperty("surface_pressure") List<Double> surfacePressure,
+    @JsonProperty("wind_gusts_10m") List<Double> windGusts10m,
+    @JsonProperty("uv_index") List<Double> uvIndex) {}

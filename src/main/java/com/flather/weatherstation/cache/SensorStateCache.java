@@ -54,14 +54,18 @@ public class SensorStateCache {
         Map.of(
             Metric.TEMPERATURE, new ArrayDeque<>(),
             Metric.PRESSURE, new ArrayDeque<>(),
-            Metric.HUMIDITY, new ArrayDeque<>());
+            Metric.HUMIDITY, new ArrayDeque<>(),
+            Metric.WIND, new ArrayDeque<>(),
+            Metric.UV_INDEX, new ArrayDeque<>());
 
     consecutiveSpikes =
         new EnumMap<>(
             Map.of(
                 Metric.TEMPERATURE, 0,
                 Metric.PRESSURE, 0,
-                Metric.HUMIDITY, 0));
+                Metric.HUMIDITY, 0,
+                Metric.WIND, 0,
+                Metric.UV_INDEX, 0));
   }
 
   @Scheduled(fixedRate = 20_000)
@@ -101,6 +105,8 @@ public class SensorStateCache {
     addSpikeIfPresent(Metric.TEMPERATURE, dto.getTemperature());
     addSpikeIfPresent(Metric.PRESSURE, dto.getPressure());
     addSpikeIfPresent(Metric.HUMIDITY, dto.getHumidity());
+    addSpikeIfPresent(Metric.WIND, dto.getWind());
+    addSpikeIfPresent(Metric.UV_INDEX, dto.getUvIndex());
   }
 
   void loadCacheSnapshot(List<WeatherRecord> dtos, ExtremesProjection extremesProjection) {

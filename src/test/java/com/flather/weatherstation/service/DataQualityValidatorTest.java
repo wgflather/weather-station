@@ -28,7 +28,8 @@ class DataQualityValidatorTest {
   @InjectMocks DataQualityValidator validator;
 
   private static final WeatherValidationConfig CONFIG =
-      new WeatherValidationConfig(-40, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 400, 800);
+      new WeatherValidationConfig(
+          -40, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 400, 800, 0.0, 60.0, 20.0, 0.0, 16.0, 5.0);
 
   @BeforeEach
   void setup() {

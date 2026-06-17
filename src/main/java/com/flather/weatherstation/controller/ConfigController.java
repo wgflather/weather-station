@@ -2,6 +2,7 @@ package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.domain.entity.StationConfiguration;
 import com.flather.weatherstation.dto.configuration.StationConfigurationResponse;
+import com.flather.weatherstation.dto.configuration.UpdateDataProviderRequest;
 import com.flather.weatherstation.dto.configuration.UpdateHardwareRequest;
 import com.flather.weatherstation.dto.configuration.UpdateLocationRequest;
 import com.flather.weatherstation.dto.configuration.UpdateValidationRequest;
@@ -38,5 +39,11 @@ public class ConfigController {
   public ResponseEntity<StationConfiguration> updateHardwareConfiguration(
       @Valid @RequestBody UpdateHardwareRequest request) {
     return ResponseEntity.ok(service.updateHardware(request));
+  }
+
+  @PutMapping("/config/providers")
+  public ResponseEntity<StationConfiguration> updateDataProviderConfiguration(
+      @Valid @RequestBody UpdateDataProviderRequest request) {
+    return ResponseEntity.ok(service.updateDataProviders(request));
   }
 }

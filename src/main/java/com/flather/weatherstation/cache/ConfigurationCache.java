@@ -1,5 +1,6 @@
 package com.flather.weatherstation.cache;
 
+import com.flather.weatherstation.config.DataProviderConfiguration;
 import com.flather.weatherstation.config.HardwareConfig;
 import com.flather.weatherstation.config.LocationContext;
 import com.flather.weatherstation.config.WeatherValidationConfig;
@@ -20,10 +21,13 @@ public class ConfigurationCache {
 
   @Getter private volatile HardwareConfig hardwareConfig;
 
+  @Getter private volatile DataProviderConfiguration dataProviderConfiguration;
+
   public void apply(StationConfiguration cfg) {
     locationContext = mapper.toLocationContext(cfg);
     validationConfig = mapper.toValidationConfig(cfg);
     hardwareConfig = mapper.toHardwareConfig(cfg);
+    dataProviderConfiguration = mapper.toDataProviderConfiguration(cfg);
   }
 
   public Double getLatitude() {

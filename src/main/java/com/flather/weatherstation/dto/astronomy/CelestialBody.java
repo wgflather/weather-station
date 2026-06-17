@@ -1,4 +1,4 @@
-package com.flather.weatherstation.domain.constant;
+package com.flather.weatherstation.dto.astronomy;
 
 import io.github.cosinekitty.astronomy.Body;
 

@@ -89,7 +89,13 @@ class WeatherServiceTest {
     given(qualityValidator.detectDataAnomaly(dto))
         .willReturn(
             new ValidationResult(
-                DataQuality.ANOMALY, DataQuality.OK, DataQuality.OK, DataQuality.OK));
+                DataQuality.ANOMALY,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK));
     given(sensorStateCache.getLastSavedMeasurement()).willReturn(null);
 
     service.saveWeatherRecord(dto);
@@ -103,7 +109,13 @@ class WeatherServiceTest {
     given(qualityValidator.detectDataAnomaly(dto))
         .willReturn(
             new ValidationResult(
-                DataQuality.OK, DataQuality.OK, DataQuality.MISSING, DataQuality.OK));
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.MISSING,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK));
     given(sensorStateCache.getLastSavedMeasurement()).willReturn(null);
 
     service.saveWeatherRecord(dto);
@@ -165,7 +177,13 @@ class WeatherServiceTest {
     given(qualityValidator.detectDataAnomaly(dto))
         .willReturn(
             new ValidationResult(
-                DataQuality.ANOMALY, DataQuality.OK, DataQuality.OK, DataQuality.OK));
+                DataQuality.ANOMALY,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK,
+                DataQuality.OK));
     given(sensorStateCache.getLastSavedMeasurement()).willReturn(null);
 
     service.saveWeatherRecord(dto);
@@ -178,6 +196,13 @@ class WeatherServiceTest {
   // ---- helpers ----
 
   private ValidationResult allOk() {
-    return new ValidationResult(DataQuality.OK, DataQuality.OK, DataQuality.OK, DataQuality.OK);
+    return new ValidationResult(
+        DataQuality.OK,
+        DataQuality.OK,
+        DataQuality.OK,
+        DataQuality.OK,
+        DataQuality.OK,
+        DataQuality.OK,
+        DataQuality.OK);
   }
 }

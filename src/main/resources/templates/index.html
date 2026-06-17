@@ -145,7 +145,7 @@
     </div>
 </div>
 
-<div class="dashboard-row row-full">
+<div class="metrics-grid">
     <div class="temperature_block unified-card" id="temperature-card">
         <div class="card-header">
             <h3>
@@ -202,10 +202,39 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- row-metric: pressure + humidity stay side by side; wetness wraps below on small screens -->
-<div class="dashboard-row row-metric">
+    <div class="wind_block unified-card" id="wind-card">
+        <div class="card-header">
+            <h3>
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>
+                <span>Wind</span>
+            </h3>
+            <span class="status-circle"></span>
+            <div class="details-popup"></div>
+        </div>
+        <div class="metric-content wind-metric-content">
+            <div class="wind-layout">
+                <div class="wind-left">
+                    <span class="wind-speed-value" id="wind-speed">--</span>
+                    <span class="wind-speed-unit">m/s</span>
+                </div>
+                <div class="wind-col-divider"></div>
+                <div class="wind-right">
+                    <span class="wind-gusts-tag">Gusts</span>
+                    <div class="wind-gusts-value-row">
+                        <span class="wind-gusts-value" id="wind-gusts">--</span>
+                        <span class="wind-gusts-unit">m/s</span>
+                    </div>
+                    <div class="wind-direction-line">
+                        <span id="wind-direction-arrow" class="wind-direction-arrow">–</span>
+                        <span id="wind-direction-label" class="wind-direction-label">--</span>
+                        <span class="wind-direction-deg">(<span id="wind-direction-deg">--</span>°)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="pressure_block unified-card" id="pressure-card">
         <div class="card-header">
             <h3>
@@ -240,28 +269,28 @@
                 <span class="dew-label">Dew point:</span>
                 <span class="dew-value" id="humidity-dew-val">--°C</span>
             </div>
+            <div class="wetness-status-badge wetness-dry" id="wetness-badge">
+                <span class="wetness-status-dot"></span>
+                <span id="wetness-status-text">Dry</span>
+            </div>
         </div>
     </div>
 
-    <div class="wetness_block unified-card" id="wetness-card">
+    <div class="uv_block unified-card" id="uv-card">
         <div class="card-header">
             <h3>
-                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 4.24 7 3c-.29 1.24-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05Z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>
-                <span>Surface Wetness</span>
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                <span>UV Index</span>
             </h3>
             <span class="status-circle"></span>
             <div class="details-popup"></div>
         </div>
         <div class="metric-content">
-            <div class="wetness-status-badge wetness-dry" id="wetness-badge">
-                <span class="wetness-status-dot"></span>
-                <span id="wetness-status-text">Dry</span>
+            <div class="main-value">
+                <span id="uv-val">--</span>
             </div>
-            <div class="wetness-meta">
-                <span class="wetness-pct" id="wetness-pct">Wetness --</span>
-                <div class="wetness-track">
-                    <div class="wetness-bar" id="wetness-bar" style="width: 0%;"></div>
-                </div>
+            <div class="uv-level-line">
+                <span id="uv-level" class="uv-level-badge">--</span>
             </div>
         </div>
     </div>

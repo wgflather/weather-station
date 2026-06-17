@@ -1,6 +1,5 @@
 package com.flather.weatherstation.dto.astronomy;
 
-import com.flather.weatherstation.domain.constant.CelestialBody;
 import com.flather.weatherstation.domain.constant.DailyCurveResolution;
 import java.util.List;
 

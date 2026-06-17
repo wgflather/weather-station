@@ -2,9 +2,6 @@ spring:
   profiles:
     active: local
 
-mqtt:
-  enabled: true
-
   jpa:
     hibernate:
       ddl-auto: validate
@@ -19,4 +16,6 @@ mqtt:
     max-lifetime: 1800000
     connection-timeout: 20000
 
+mqtt:
+  enabled: true
 

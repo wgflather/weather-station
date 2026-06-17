@@ -33,6 +33,7 @@
                 <button type="button" class="config-tab active" data-tab="location">Location</button>
                 <button type="button" class="config-tab" data-tab="validation">Validation</button>
                 <button type="button" class="config-tab" data-tab="hardware">Hardware</button>
+                <button type="button" class="config-tab" data-tab="providers">Data Providers</button>
             </div>
 
             <form class="config-panel" data-panel="location" id="config-form-location" hidden>
@@ -129,6 +130,42 @@
                     </div>
                 </fieldset>
 
+                <fieldset class="config-fieldset">
+                    <legend>Wind</legend>
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="cfg-wind-min">Min (m/s)</label>
+                            <input type="number" id="cfg-wind-min" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-wind-max">Max (m/s)</label>
+                            <input type="number" id="cfg-wind-max" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-wind-spike">Spike limit (m/s)</label>
+                            <input type="number" id="cfg-wind-spike" step="0.1" min="0" required>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="config-fieldset">
+                    <legend>UV Index</legend>
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="cfg-uv-min">Min</label>
+                            <input type="number" id="cfg-uv-min" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-uv-max">Max</label>
+                            <input type="number" id="cfg-uv-max" step="0.1" required>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-uv-spike">Spike limit</label>
+                            <input type="number" id="cfg-uv-spike" step="0.1" min="0" required>
+                        </div>
+                    </div>
+                </fieldset>
+
                 <div class="config-actions">
                     <button type="submit" class="config-save-btn">Save Validation</button>
                     <span class="config-status" data-status="validation"></span>
@@ -157,10 +194,71 @@
                         <label for="cfg-wetness-sensor">Surface Wetness Sensor</label>
                         <input type="text" id="cfg-wetness-sensor">
                     </div>
+                    <div class="config-field">
+                        <label for="cfg-wind-sensor">Wind Sensor</label>
+                        <input type="text" id="cfg-wind-sensor">
+                    </div>
+                    <div class="config-field">
+                        <label for="cfg-uv-sensor">UV Index Sensor</label>
+                        <input type="text" id="cfg-uv-sensor">
+                    </div>
                 </div>
                 <div class="config-actions">
                     <button type="submit" class="config-save-btn">Save Hardware</button>
                     <span class="config-status" data-status="hardware"></span>
+                </div>
+            </form>
+
+            <form class="config-panel" data-panel="providers" id="config-form-providers" hidden>
+                <p class="provider-note">
+                    Choose the data source for each metric.
+                    <strong>Open-Meteo</strong> fetches real-time values from the external API.
+                    Surface Wetness has no Open-Meteo equivalent and always uses the local sensor.
+                </p>
+                <div class="provider-rows">
+                    <div class="provider-row">
+                        <span class="provider-label">Temperature</span>
+                        <div class="provider-toggle" id="prov-temperature">
+                            <button type="button" class="provider-btn active" data-value="LOCAL_SENSOR">Local Sensor</button>
+                            <button type="button" class="provider-btn" data-value="EXTERNAL_API">Open-Meteo</button>
+                        </div>
+                    </div>
+                    <div class="provider-row">
+                        <span class="provider-label">Pressure</span>
+                        <div class="provider-toggle" id="prov-pressure">
+                            <button type="button" class="provider-btn active" data-value="LOCAL_SENSOR">Local Sensor</button>
+                            <button type="button" class="provider-btn" data-value="EXTERNAL_API">Open-Meteo</button>
+                        </div>
+                    </div>
+                    <div class="provider-row">
+                        <span class="provider-label">Humidity</span>
+                        <div class="provider-toggle" id="prov-humidity">
+                            <button type="button" class="provider-btn active" data-value="LOCAL_SENSOR">Local Sensor</button>
+                            <button type="button" class="provider-btn" data-value="EXTERNAL_API">Open-Meteo</button>
+                        </div>
+                    </div>
+                    <div class="provider-row">
+                        <span class="provider-label">Wind</span>
+                        <div class="provider-toggle" id="prov-wind">
+                            <button type="button" class="provider-btn active" data-value="LOCAL_SENSOR">Local Sensor</button>
+                            <button type="button" class="provider-btn" data-value="EXTERNAL_API">Open-Meteo</button>
+                        </div>
+                    </div>
+                    <div class="provider-row">
+                        <span class="provider-label">UV Index</span>
+                        <div class="provider-toggle" id="prov-uvIndex">
+                            <button type="button" class="provider-btn active" data-value="LOCAL_SENSOR">Local Sensor</button>
+                            <button type="button" class="provider-btn" data-value="EXTERNAL_API">Open-Meteo</button>
+                        </div>
+                    </div>
+                    <div class="provider-row provider-row-locked">
+                        <span class="provider-label">Surface Wetness</span>
+                        <span class="provider-locked-label">Local Sensor only</span>
+                    </div>
+                </div>
+                <div class="config-actions">
+                    <button type="submit" class="config-save-btn">Save Providers</button>
+                    <span class="config-status" data-status="providers"></span>
                 </div>
             </form>
         </div>
@@ -192,6 +290,8 @@
                             <option value="pressure">Pressure</option>
                             <option value="humidity">Humidity</option>
                             <option value="surfaceWetness">Surface Wetness</option>
+                            <option value="wind">Wind</option>
+                            <option value="uvIndex">UV Index</option>
                         </select>
                     </div>
                     <div class="db-date-group">
@@ -225,6 +325,8 @@
                                 <th>Pressure (hPa)</th>
                                 <th>Humidity (%)</th>
                                 <th>Wetness (raw)</th>
+                                <th>Wind (m/s)</th>
+                                <th>UV Index</th>
                                 <th></th>
                             </tr>
                         </thead>

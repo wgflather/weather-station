@@ -5,7 +5,6 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.flather.weatherstation.domain.constant.CelestialBody;
 import com.flather.weatherstation.domain.constant.DailyCurveResolution;
 import com.flather.weatherstation.dto.astronomy.*;
 import com.flather.weatherstation.service.AstronomySearch;
@@ -64,7 +63,7 @@ class AstronomyControllerTest {
             DailyCurveResolution.CARD,
             List.of(new AstronomyPoint(ZonedDateTime.parse("2026-06-16T06:00Z"), 10.0)));
 
-    given(astronomySearch.getPoints(CelestialBody.SUN, DailyCurveResolution.CARD))
+    given(astronomySearch.getPointsForOffset(CelestialBody.SUN, DailyCurveResolution.CARD, 0))
         .willReturn(curve);
 
     mockMvc
@@ -74,7 +73,7 @@ class AstronomyControllerTest {
         .andExpect(jsonPath("$.resolution").value("CARD"))
         .andExpect(jsonPath("$.points[0].altitude").value(10.0));
 
-    verify(astronomySearch).getPoints(CelestialBody.SUN, DailyCurveResolution.CARD);
+    verify(astronomySearch).getPointsForOffset(CelestialBody.SUN, DailyCurveResolution.CARD, 0);
   }
 
   @Test
@@ -82,7 +81,9 @@ class AstronomyControllerTest {
     AstronomyCurveDto curve =
         new AstronomyCurveDto(CelestialBody.MOON, DailyCurveResolution.FULL_CHART, List.of());
 
-    given(astronomySearch.getPoints(CelestialBody.MOON, DailyCurveResolution.FULL_CHART))
+    given(
+            astronomySearch.getPointsForOffset(
+                CelestialBody.MOON, DailyCurveResolution.FULL_CHART, 0))
         .willReturn(curve);
 
     mockMvc
@@ -95,7 +96,8 @@ class AstronomyControllerTest {
         .andExpect(jsonPath("$.body").value("MOON"))
         .andExpect(jsonPath("$.resolution").value("FULL_CHART"));
 
-    verify(astronomySearch).getPoints(CelestialBody.MOON, DailyCurveResolution.FULL_CHART);
+    verify(astronomySearch)
+        .getPointsForOffset(CelestialBody.MOON, DailyCurveResolution.FULL_CHART, 0);
   }
 
   @Test

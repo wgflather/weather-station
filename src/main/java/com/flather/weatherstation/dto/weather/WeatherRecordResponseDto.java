@@ -18,5 +18,11 @@ public class WeatherRecordResponseDto {
 
   private Double surfaceWetness;
 
+  private Double wind;
+
+  private Double windDirection;
+
+  private Double uvIndex;
+
   private ZonedDateTime measuredAtTimeZoned;
 }

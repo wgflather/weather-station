@@ -60,8 +60,10 @@ class StationConfigurationServiceTest {
   void getConfigurationView_returnsFromCache() {
     LocationContext location = new LocationContext(52.5, 13.4, 34.0, ZoneId.of("UTC"), null);
     WeatherValidationConfig validation =
-        new WeatherValidationConfig(-40, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 400, 800);
-    HardwareConfig hardware = new HardwareConfig("RPi", "DS18B20", "DHT22", "BMP180", null);
+        new WeatherValidationConfig(
+            -40, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 400, 800, 0.0, 60.0, 20.0, 0.0, 16.0, 5.0);
+    HardwareConfig hardware =
+        new HardwareConfig("RPi", "DS18B20", "DHT22", "BMP180", null, null, null);
 
     given(configurationCache.getLocationContext()).willReturn(location);
     given(configurationCache.getValidationConfig()).willReturn(validation);
@@ -107,7 +109,8 @@ class StationConfigurationServiceTest {
 
     UpdateValidationRequest request =
         new UpdateValidationRequest(
-            -40.0, 60.0, 900.0, 1100.0, 0.0, 100.0, 20.0, 5.0, 10.0, 400, 800);
+            -40.0, 60.0, 900.0, 1100.0, 0.0, 100.0, 20.0, 5.0, 10.0, 400, 800, 0.0, 60.0, 20.0, 0.0,
+            16.0, 5.0);
 
     StationConfiguration result = service.updateValidation(request);
 
@@ -131,7 +134,8 @@ class StationConfigurationServiceTest {
     given(stationConfigurationRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
     UpdateHardwareRequest request =
-        new UpdateHardwareRequest("Raspberry Pi", "DS18B20", "DHT22", "BMP180", "YL-69");
+        new UpdateHardwareRequest(
+            "Raspberry Pi", "DS18B20", "DHT22", "BMP180", "YL-69", null, null);
 
     StationConfiguration result = service.updateHardware(request);
 

@@ -7,7 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
+import com.flather.weatherstation.config.DataProviderConfiguration;
 import com.flather.weatherstation.config.LocationContext;
+import com.flather.weatherstation.domain.constant.DataProvider;
 import com.flather.weatherstation.domain.constant.DataStatus;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
@@ -29,14 +31,24 @@ import org.mockito.quality.Strictness;
 class DashboardServiceTest {
 
   @Mock AnalyticsService analyticsService;
+  @Mock WeatherClientService weatherClientService;
   @Mock AstronomySearch astronomySearchService;
   @Mock ConfigurationCache configurationCache;
   @InjectMocks DashboardService service;
+
+  private static final DataProviderConfiguration ALL_LOCAL =
+      new DataProviderConfiguration(
+          DataProvider.LOCAL_SENSOR,
+          DataProvider.LOCAL_SENSOR,
+          DataProvider.LOCAL_SENSOR,
+          DataProvider.LOCAL_SENSOR,
+          DataProvider.LOCAL_SENSOR);
 
   @BeforeEach
   void setup() {
     LocationContext location = new LocationContext(52.5, 13.4, 0.0, ZoneId.of("UTC"), null);
     given(configurationCache.getLocationContext()).willReturn(location);
+    given(configurationCache.getDataProviderConfiguration()).willReturn(ALL_LOCAL);
     given(astronomySearchService.getSunSnapshot(any(ZonedDateTime.class))).willReturn(null);
     given(astronomySearchService.getMoonSnapshot(any(ZonedDateTime.class))).willReturn(null);
     given(astronomySearchService.dailyKey()).willReturn("2026-06-16@UTC");

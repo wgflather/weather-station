@@ -7,4 +7,6 @@ public record UpdateHardwareRequest(
     String temperatureSensor,
     String humiditySensor,
     String pressureSensor,
-    String surfaceWetnessSensor) {}
+    String surfaceWetnessSensor,
+    String windSensor,
+    String uvIndexSensor) {}

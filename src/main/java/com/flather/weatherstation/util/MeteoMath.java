@@ -85,6 +85,14 @@ public class MeteoMath {
     return new TrendResult(hourlyChange, direction);
   }
 
+  public static TrendResult trendFromHourlyChange(double hourlyChange) {
+    if (Math.abs(hourlyChange) < TREND_THRESHOLD) {
+      return new TrendResult(0.0, TrendDirection.STABLE);
+    }
+    TrendDirection dir = hourlyChange > 0 ? TrendDirection.UP : TrendDirection.DOWN;
+    return new TrendResult(Math.round(hourlyChange * 10.0) / 10.0, dir);
+  }
+
   public static double rawToWetnessPct(double raw, int dryBaseline, int wetBaseline) {
     double range = dryBaseline - wetBaseline;
     double clamped = Math.min(dryBaseline, Math.max(wetBaseline, raw));

@@ -1,16 +1,9 @@
 package com.flather.weatherstation.service;
 
-import static com.flather.weatherstation.util.AstroUtil.convertAuToKm;
-import static com.flather.weatherstation.util.AstroUtil.getMoonAgeDays;
-import static com.flather.weatherstation.util.AstroUtil.getMoonPhasePercentage;
-import static com.flather.weatherstation.util.AstroUtil.getPhaseName;
-import static com.flather.weatherstation.util.AstroUtil.round2;
 import static com.flather.weatherstation.util.TimeUtil.toTime;
 import static com.flather.weatherstation.util.TimeUtil.toZoned;
 
-import com.flather.weatherstation.domain.constant.CelestialBody;
 import com.flather.weatherstation.domain.constant.DailyCurveResolution;
-import com.flather.weatherstation.domain.constant.SolarCondition;
 import com.flather.weatherstation.dto.astronomy.*;
 import io.github.cosinekitty.astronomy.Body;
 import io.github.cosinekitty.astronomy.Direction;
@@ -288,5 +281,44 @@ public class AstronomySearch {
       return noonAlt > 0 ? SolarCondition.POLAR_DAY : SolarCondition.POLAR_NIGHT;
     }
     return SolarCondition.NORMAL;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // ASTRONOMY MATH — inlined from the former AstroUtil class; no dependencies
+  // ────────────────────────────────────────────────────────────────────────────
+
+  private static final double LUNAR_CYCLE_DAYS = 29.53059;
+  private static final double AU_TO_KM = 149_597_870.7;
+
+  private static double convertAuToKm(double au) {
+    return au * AU_TO_KM;
+  }
+
+  private static double round2(double value) {
+    return Math.round(value * 100.0) / 100.0;
+  }
+
+  private static double getMoonPhasePercentage(double phaseDegrees) {
+    return phaseDegrees * 100.0;
+  }
+
+  private static double getMoonAgeDays(double phaseDegrees) {
+    return (phaseDegrees / 360.0) * LUNAR_CYCLE_DAYS;
+  }
+
+  /**
+   * Maps a lunar phase angle (degrees) to a human-readable name. The 360° cycle is divided into 8
+   * named regions centred on the four cardinal phases, with a ±10° tolerance around each cardinal.
+   */
+  private static String getPhaseName(double degrees) {
+    degrees = (degrees % 360 + 360) % 360;
+    if (degrees < 10 || degrees > 350) return "New Moon";
+    if (degrees < 80) return "Waxing Crescent";
+    if (degrees < 100) return "First Quarter";
+    if (degrees < 170) return "Waxing Gibbous";
+    if (degrees < 190) return "Full Moon";
+    if (degrees < 260) return "Waning Gibbous";
+    if (degrees < 280) return "Last Quarter";
+    return "Waning Crescent";
   }
 }

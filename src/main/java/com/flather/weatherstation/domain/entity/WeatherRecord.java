@@ -32,6 +32,14 @@ public class WeatherRecord {
 
   private Double surfaceWetness;
 
+  private Double wind;
+
+  @Column(name = "wind_direction")
+  private Double windDirection;
+
+  @Column(name = "uv_index")
+  private Double uvIndex;
+
   @NotNull
   @Column(name = "wifi_rssi")
   private Double wifiRssi;
@@ -51,6 +59,18 @@ public class WeatherRecord {
   @Column(name = "surface_wetness_data_quality")
   @Enumerated(EnumType.STRING)
   private DataQuality surfaceWetnessDataQuality;
+
+  @Column(name = "wind_data_quality")
+  @Enumerated(EnumType.STRING)
+  private DataQuality windDataQuality;
+
+  @Column(name = "wind_direction_data_quality")
+  @Enumerated(EnumType.STRING)
+  private DataQuality windDirectionDataQuality;
+
+  @Column(name = "uv_index_data_quality")
+  @Enumerated(EnumType.STRING)
+  private DataQuality uvIndexDataQuality;
 
   @CreationTimestamp
   @Column(name = "measured_at")

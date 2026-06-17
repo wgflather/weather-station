@@ -8,6 +8,6 @@ import org.springframework.stereotype.Component;
 public class MetricConverter implements Converter<String, Metric> {
   @Override
   public Metric convert(String apiKey) {
-    return Metric.fromApiKey(apiKey);
+    return Metric.fromRequestKey(apiKey);
   }
 }

@@ -3,7 +3,11 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.entity.StationConfiguration;
 import com.flather.weatherstation.domain.event.ConfigurationUpdatedEvent;
-import com.flather.weatherstation.dto.configuration.*;
+import com.flather.weatherstation.dto.configuration.StationConfigurationResponse;
+import com.flather.weatherstation.dto.configuration.UpdateDataProviderRequest;
+import com.flather.weatherstation.dto.configuration.UpdateHardwareRequest;
+import com.flather.weatherstation.dto.configuration.UpdateLocationRequest;
+import com.flather.weatherstation.dto.configuration.UpdateValidationRequest;
 import com.flather.weatherstation.repository.StationConfigurationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,11 +28,11 @@ public class StationConfigurationService {
   }
 
   public StationConfigurationResponse getConfigurationView() {
-
     return new StationConfigurationResponse(
         configurationCache.getLocationContext(),
         configurationCache.getValidationConfig(),
-        configurationCache.getHardwareConfig());
+        configurationCache.getHardwareConfig(),
+        configurationCache.getDataProviderConfiguration());
   }
 
   @Transactional
@@ -64,12 +68,18 @@ public class StationConfigurationService {
     cfg.setSurfaceWetnessWetBaseline(request.surfaceWetnessWetBaseline());
     cfg.setSurfaceWetnessDryBaseline(request.surfaceWetnessDryBaseline());
 
+    cfg.setWindMinimal(request.windMinimal());
+    cfg.setWindMaximum(request.windMaximum());
+    cfg.setWindSpikeLimit(request.windSpikeLimit());
+    cfg.setUvIndexMinimal(request.uvIndexMinimal());
+    cfg.setUvIndexMaximum(request.uvIndexMaximum());
+    cfg.setUvIndexSpikeLimit(request.uvIndexSpikeLimit());
+
     return persistAndRefreshCache(cfg);
   }
 
   @Transactional
   public StationConfiguration updateHardware(UpdateHardwareRequest request) {
-
     StationConfiguration cfg = getConfiguration();
 
     cfg.setBoard(request.board());
@@ -77,6 +87,21 @@ public class StationConfigurationService {
     cfg.setHumiditySensor(request.humiditySensor());
     cfg.setPressureSensor(request.pressureSensor());
     cfg.setSurfaceWetnessSensor(request.surfaceWetnessSensor());
+    cfg.setWindSensor(request.windSensor());
+    cfg.setUvIndexSensor(request.uvIndexSensor());
+
+    return persistAndRefreshCache(cfg);
+  }
+
+  @Transactional
+  public StationConfiguration updateDataProviders(UpdateDataProviderRequest request) {
+    StationConfiguration cfg = getConfiguration();
+
+    cfg.setTemperatureProvider(request.temperature());
+    cfg.setPressureProvider(request.pressure());
+    cfg.setHumidityProvider(request.humidity());
+    cfg.setWindProvider(request.wind());
+    cfg.setUvIndexProvider(request.uvIndex());
 
     return persistAndRefreshCache(cfg);
   }

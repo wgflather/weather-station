@@ -3,6 +3,7 @@ package com.flather.weatherstation.config;
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.event.ConfigurationUpdatedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,7 @@ public class ConfigurationEventListener {
   private final ConfigurationCache configurationCache;
 
   @EventListener
+  @CacheEvict(value = "apiWeather", allEntries = true)
   public void onUpdated(ConfigurationUpdatedEvent updatedEvent) {
     configurationCache.apply(updatedEvent.configuration());
   }

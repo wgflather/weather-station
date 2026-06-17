@@ -35,17 +35,21 @@ public class WeatherService {
   }
 
   private DataQuality validateIfOk(Metric metric, ValidationResult validationResult, Double value) {
-
     DataQuality quality = validationResult.getByMetric(metric);
 
     if (quality.equals(DataQuality.OK) && sensorStateCache.getLastSavedMeasurement() == null) {
       return DataQuality.OK;
     }
 
-    return quality == DataQuality.OK ? validateMetric(metric, validationResult, value) : quality;
+    // Can't do spike detection without a value — anomaly detection already marks null as MISSING.
+    return quality == DataQuality.OK && value != null
+        ? validateMetric(metric, validationResult, value)
+        : quality;
   }
 
   private void updateCache(DataQuality dataQuality, Metric metric, Double value) {
+    if (value == null) return;
+
     if (dataQuality == DataQuality.OK) {
       sensorStateCache.updateSpikeState(metric, dataQuality, value);
       sensorStateCache.updateCachedMeasurement(metric, value);
@@ -98,11 +102,18 @@ public class WeatherService {
         validateIfOk(
             Metric.HUMIDITY, anomalyAndMissingValidationResult, weatherRecordDto.getHumidity());
 
+    DataQuality windQuality =
+        validateIfOk(Metric.WIND, anomalyAndMissingValidationResult, weatherRecordDto.getWind());
+
     record.setTemperatureDataQuality(tempQuality);
     record.setPressureDataQuality(pressureQuality);
     record.setHumidityDataQuality(humidityQuality);
     record.setSurfaceWetnessDataQuality(
         anomalyAndMissingValidationResult.getByMetric(Metric.SURFACE_WETNESS));
+    record.setWindDataQuality(windQuality);
+    record.setWindDirectionDataQuality(
+        anomalyAndMissingValidationResult.getByMetric(Metric.WIND_DIRECTION));
+    record.setUvIndexDataQuality(anomalyAndMissingValidationResult.getByMetric(Metric.UV_INDEX));
 
     // ============================
     // persist
@@ -113,6 +124,7 @@ public class WeatherService {
     updateCache(pressureQuality, Metric.PRESSURE, record.getPressure());
     updateCache(tempQuality, Metric.TEMPERATURE, record.getTemperature());
     updateCache(humidityQuality, Metric.HUMIDITY, record.getHumidity());
+    updateCache(windQuality, Metric.WIND, record.getWind());
 
     // ============================
     // metadata update

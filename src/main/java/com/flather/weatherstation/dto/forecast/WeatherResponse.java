@@ -4,4 +4,5 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public record WeatherResponse(
     @JsonProperty("hourly") WeatherConditionsForecast hourly,
-    @JsonProperty("hourly_units") WeatherHourlyUnits units) {}
+    @JsonProperty("hourly_units") WeatherHourlyUnits units,
+    @JsonProperty("current") CurrentWeather currentWeather) {}

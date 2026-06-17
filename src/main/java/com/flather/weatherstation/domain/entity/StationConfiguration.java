@@ -1,9 +1,7 @@
 package com.flather.weatherstation.domain.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import com.flather.weatherstation.domain.constant.DataProvider;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -40,6 +38,8 @@ public class StationConfiguration {
   private String humiditySensor;
   private String pressureSensor;
   private String surfaceWetnessSensor;
+  private String windSensor;
+  private String uvIndexSensor;
 
   private Double tempMinimal;
   private Double tempMaximum;
@@ -56,6 +56,39 @@ public class StationConfiguration {
 
   private Integer surfaceWetnessWetBaseline;
   private Integer surfaceWetnessDryBaseline;
+
+  private Double windMinimal;
+  private Double windMaximum;
+  private Double windSpikeLimit;
+
+  @Column(name = "uv_index_minimal")
+  private Double uvIndexMinimal;
+
+  @Column(name = "uv_index_maximum")
+  private Double uvIndexMaximum;
+
+  @Column(name = "uv_index_spike_limit")
+  private Double uvIndexSpikeLimit;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "temperature_provider", nullable = false)
+  private DataProvider temperatureProvider;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "pressure_provider", nullable = false)
+  private DataProvider pressureProvider;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "humidity_provider", nullable = false)
+  private DataProvider humidityProvider;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "wind_provider", nullable = false)
+  private DataProvider windProvider;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "uv_index_provider", nullable = false)
+  private DataProvider uvIndexProvider;
 
   private Instant createdAt;
   private Instant updatedAt;
