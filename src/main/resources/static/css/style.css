@@ -740,20 +740,15 @@ h3 {
     flex: 1 1 auto;
     min-width: 0;
     max-width: 55%;
+    box-sizing: border-box;
     border-left: 1px solid rgba(255, 255, 255, 0.18);
     padding-left: 20px;
+    padding-right: 20px;
     margin-left: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-}
-
-.dew-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0;
+    gap: 8px;
 }
 
 .dew-title-group {
@@ -798,86 +793,73 @@ h3 {
     min-width: 0;
 }
 
-
-/* Condensation indicator — kept visible, but lighter and quieter. */
+/* =========================================================
+   DEW STATUS BANNER — full-width tinted strip; the primary risk indicator
+   now that the spread gauge is gone. The colour comes from a risk-* class
+   added by JS (risk-saturated, risk-likely, risk-possible, risk-unlikely).
+========================================================= */
 .dew-status-badge {
-    border: 1px solid rgba(239, 169, 140, 0.55);
-    color: #e6b09a;
-    border-radius: 12px;
-    padding: 3px 10px;
-    font-size: 0.68rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
     font-weight: var(--fw-label);
+    letter-spacing: 0.4px;
     text-transform: uppercase;
     white-space: nowrap;
-    flex-shrink: 0;
-}
-
-/* =========================================================
-   DEW POINT GAUGE
-========================================================= */
-.gauge-container {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 2px;
-    padding-bottom: 8px; /* keeps marker dot (5px radius) inside panel's overflow:hidden */
-}
-
-.gauge-track {
-    position: relative;
-    height: 8px;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #f87171 0%, #fbbf24 35%, #4ade80 70%, #2dd4bf 100%);
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
-    /* remove padding */
-}
-
-.gauge-track-inner {
-    position: absolute;
-    inset: 0 5px;  /* 5px inset on left and right — pin stays inside */
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.gauge-marker {
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: #ffffff;
-    border: 3px solid #38bdf8;
-    transition: left 0.3s var(--ease-standard);
+    overflow: hidden;
+    text-overflow: ellipsis;
     cursor: pointer;
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+    transition: background 0.25s var(--ease-standard),
+                border-color 0.25s var(--ease-standard),
+                color 0.25s var(--ease-standard);
 }
 
-.gauge-marker:hover::after {
-    content: attr(data-spread);
-    position: absolute;
-    bottom: 160%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1e3e7a;
-    color: #ffffff;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 700;
+/* Status dot — colour follows the parent risk class via currentColor. */
+.dew-status-badge::before {
+    content: '';
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* Text node inside badge — needs a block-level wrapper for text-overflow to work
+   inside a flex container. flex:1 + min-width:0 allows it to shrink and truncate. */
+.dew-badge-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    border: 1px solid #38bdf8;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    pointer-events: none;
-    z-index: 10;
 }
 
-.gauge-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    font-weight: 600;
+.dew-status-badge.risk-saturated {
+    background: rgba(248, 113, 113, 0.15);
+    border-color: rgba(248, 113, 113, 0.40);
+    color: #f87171;
+}
+.dew-status-badge.risk-likely {
+    background: rgba(251, 146, 60, 0.15);
+    border-color: rgba(251, 146, 60, 0.40);
+    color: #fb923c;
+}
+.dew-status-badge.risk-possible {
+    background: rgba(251, 191, 36, 0.13);
+    border-color: rgba(251, 191, 36, 0.35);
+    color: #fbbf24;
+}
+.dew-status-badge.risk-unlikely {
+    background: rgba(74, 222, 128, 0.13);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: #4ade80;
 }
 
 /* =========================================================
@@ -2567,6 +2549,7 @@ h3 {
     .dew-point-section {
         max-width: 52%;
         padding-left: 12px;
+        padding-right: 12px;
     }
     .dew-main { font-size: 1.15rem; }
     .dew-sub  { font-size: 0.62rem; }
@@ -2629,23 +2612,22 @@ h3 {
         font-size: 0.6rem;
     }
 
-    /* badge has no room beside the title once the temp card is this narrow */
-    .dew-status-badge {
-        display: none;
-    }
-
+    /* wider section + smaller badge text so the full label fits */
     .dew-point-section {
         min-width: 0;
+        max-width: 62%;
         padding-left: 10px;
+        padding-right: 10px;
+    }
+    .dew-status-badge {
+        padding: 4px 7px;
+        font-size: 0.58rem;
+        letter-spacing: 0;
+        gap: 6px;
     }
     .temp-section {
         padding-right: 10px;
         align-items: center;
-    }
-
-    /* hide gauge labels to reduce noise */
-    .gauge-labels {
-        display: none;
     }
 
     /* Cards are shorter at this width because content shrinks, but the
@@ -2712,6 +2694,19 @@ h3 {
 
     .dew-values {
         gap: 4px;
+    }
+
+    .dew-point-section {
+        max-width: 64%;
+    }
+    .dew-status-badge {
+        padding: 3px 6px;
+        font-size: 0.55rem;
+        gap: 5px;
+    }
+    .dew-status-badge::before {
+        width: 7px;
+        height: 7px;
     }
 
     /* Hide the text label next to the status dot — the dot colour and

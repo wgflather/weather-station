@@ -73,10 +73,10 @@ const PRESSURE_TREND_CONFIG = {
 };
 
 const DEW_POINT_RISK_CONFIG = {
-    SATURATED:   { label: 'Condensation Imminent', cssClass: 'trend-up'     },
-    VERY_LIKELY: { label: 'Condensation Likely',   cssClass: 'trend-up'     },
-    POSSIBLE:    { label: 'Condensation Possible', cssClass: 'trend-stable' },
-    UNLIKELY:    { label: 'Condensation Unlikely', cssClass: 'trend-stable' },
+    SATURATED:   { label: 'Condensation Imminent', cssClass: 'risk-saturated' },
+    VERY_LIKELY: { label: 'Condensation Likely',   cssClass: 'risk-likely'    },
+    POSSIBLE:    { label: 'Condensation Possible', cssClass: 'risk-possible'  },
+    UNLIKELY:    { label: 'Condensation Unlikely', cssClass: 'risk-unlikely'  },
 };
 
 const SURFACE_WETNESS_CONFIG = {
@@ -1244,17 +1244,16 @@ function renderHumidity(humidity, isMixedDew = false) {
             : '--°C';
     }
 
-    renderDewPointGauge(humidity, isMixedDew);
+    renderDewPointStatus(humidity, isMixedDew);
 }
 
-function renderDewPointGauge(humidity, isMixedDew = false) {
+function renderDewPointStatus(humidity, isMixedDew = false) {
     const spreadValEl = document.getElementById('dew-spread-val');
     const dewTEl      = document.getElementById('dew-t');
     const dewTdEl     = document.getElementById('dew-td');
     const badgeEl     = document.getElementById('dew-status');
-    const pinEl       = document.getElementById('gauge-pin');
 
-    if (!spreadValEl || !pinEl) return;
+    if (!spreadValEl) return;
 
     const dewPoint = humidity?.dewPoint;
     const risk     = humidity?.dewPointRisk;
@@ -1267,23 +1266,19 @@ function renderDewPointGauge(humidity, isMixedDew = false) {
         return;
     }
 
-    const spread  = parseFloat((temp - dewPoint).toFixed(1));
-    const percent = Math.min(100, Math.max(0, (spread / 10) * 100));
+    const spread = parseFloat((temp - dewPoint).toFixed(1));
 
-    spreadValEl.textContent  = `${isMixedDew ? '~' : ''}${spread.toFixed(1)}°`;
+    spreadValEl.textContent = `${isMixedDew ? '~' : ''}${spread.toFixed(1)}°`;
     if (dewTEl)  dewTEl.textContent  = temp.toFixed(1);
     if (dewTdEl) dewTdEl.textContent = dewPoint.toFixed(1);
 
-    pinEl.style.left = `${percent}%`;
-    pinEl.setAttribute('data-spread', `${spread.toFixed(1)}°`);
-
     if (badgeEl && risk) {
-        const config         = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
-        badgeEl.className    = `dew-status-badge ${config.cssClass}`;
-        badgeEl.textContent  = config.label;
-        badgeEl.style.cursor = 'pointer';
-        badgeEl._dewRisk     = risk;
-        badgeEl._dewMixed    = isMixedDew;
+        const config      = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
+        badgeEl.className = `dew-status-badge ${config.cssClass}`;
+        // Wrap in a span so text-overflow:ellipsis works inside the flex container.
+        badgeEl.innerHTML = `<span class="dew-badge-text">${config.label}</span>`;
+        badgeEl._dewRisk  = risk;
+        badgeEl._dewMixed = isMixedDew;
     }
 }
 
