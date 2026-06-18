@@ -1934,23 +1934,59 @@ function startPolling(fn, interval) {
 // BOOT
 // ==========================================
 
+// Safari tints its liquid-glass chrome by sampling the fixed .safari-*-anchor
+// strips (theme-color only drives the iPhone status bar). After the app is
+// backgrounded and resumed, the TOP strip's composited layer can come back
+// stale or dropped, so Safari re-samples the wrong colour and the top chrome
+// ends up matching the BOTTOM strip. Switching tabs fixes it by forcing a full
+// re-composite — we reproduce that by hiding and re-showing the strips, which
+// drops and rebuilds their layers and makes Safari take a fresh sample. The
+// strips are 6px and sit behind the chrome, so the toggle is invisible.
+function forceChromeRepaint() {
+    const els = [
+        document.querySelector('.safari-top-anchor'),
+        document.querySelector('.safari-bottom-anchor'),
+    ].filter(Boolean);
+    if (!els.length) return;
+
+    const cycle = () => {
+        els.forEach(el => { el.style.display = 'none'; });
+        void document.documentElement.offsetHeight; // commit the hide before re-show
+        requestAnimationFrame(() => {
+            els.forEach(el => { el.style.display = ''; });
+        });
+    };
+
+    requestAnimationFrame(cycle);
+    // Safari can take its chrome sample a beat after the tab becomes visible,
+    // so run a second cycle shortly after to catch that later timing too.
+    setTimeout(cycle, 250);
+}
+
 // When iOS Safari restores a tab from the Back-Forward Cache (bfcache), JS
 // doesn't re-run and the 30s poll timer is frozen — so theme-color stays at
 // whatever it was when the tab was frozen, even if the sky has since changed.
 // pageshow (e.persisted) fires on every bfcache restore; visibilitychange
 // catches switching back to the tab without a full bfcache restore. Both
 // re-stamp theme-color from the localStorage cache immediately, before the
-// next poll tick, so the status bar matches the current sky on first glance.
+// next poll tick, so the status bar matches the current sky on first glance,
+// and force the anchor strips to re-sample so the top chrome can't get stuck
+// on the bottom colour.
 function refreshChromeColorFromCache() {
     try {
         const c = JSON.parse(localStorage.getItem('skyColors') || 'null');
         if (c?.version === '2' && c.topHex) setBrowserChromeColor(c.topHex);
     } catch (_) {}
+    forceChromeRepaint();
 }
 window.addEventListener('pageshow', (e) => { if (e.persisted) refreshChromeColorFromCache(); });
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refreshChromeColorFromCache();
 });
+// macOS Safari can regain focus on an app-switch without firing
+// visibilitychange (the window was never marked hidden), yet the chrome sample
+// can still be stale — so re-sample on window focus as well.
+window.addEventListener('focus', refreshChromeColorFromCache);
 
 document.addEventListener('click', () => globalPopup.classList.remove('open'));
 
