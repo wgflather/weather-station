@@ -37,11 +37,11 @@ public enum BeaufortScale {
   /** Converts m/s to Beaufort using the WMO upper-bound table. */
   public static BeaufortScale fromMs(Double speedMs) {
     if (speedMs == null) return null;
-    if (speedMs < 0.3)  return BFT_0;
-    if (speedMs < 1.6)  return BFT_1;
-    if (speedMs < 3.4)  return BFT_2;
-    if (speedMs < 5.5)  return BFT_3;
-    if (speedMs < 8.0)  return BFT_4;
+    if (speedMs < 0.3) return BFT_0;
+    if (speedMs < 1.6) return BFT_1;
+    if (speedMs < 3.4) return BFT_2;
+    if (speedMs < 5.5) return BFT_3;
+    if (speedMs < 8.0) return BFT_4;
     if (speedMs < 10.8) return BFT_5;
     if (speedMs < 13.9) return BFT_6;
     if (speedMs < 17.2) return BFT_7;

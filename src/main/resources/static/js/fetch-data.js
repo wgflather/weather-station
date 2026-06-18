@@ -210,9 +210,16 @@ function startChart(metric) {
 // ==========================================
 
 async function fetchDashboardDaily() {
-    const response = await fetch('/api/astronomy/daily');
-    if (!response.ok) throw new Error('Daily dashboard fetch failed');
-    return await response.json();
+    const [dailyRes, curveRes] = await Promise.all([
+        fetch('/api/astronomy/daily'),
+        fetch('/api/astronomy/curve?body=SUN&resolution=CARD'),
+    ]);
+    if (!dailyRes.ok) throw new Error('Daily dashboard fetch failed');
+    if (!curveRes.ok) throw new Error('Sun curve fetch failed');
+    const daily = await dailyRes.json();
+    const curve = await curveRes.json();
+    if (daily.sunDailyEvents) daily.sunDailyEvents.sunCurve = curve.points;
+    return daily;
 }
 
 async function fetchDashboardLive() {

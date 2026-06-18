@@ -1,5 +1,6 @@
 package com.flather.weatherstation.dto.astronomy;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -16,6 +17,8 @@ import java.util.List;
  *     plus sunrise and sunset bundled together.
  * @param dayLengthSeconds length of the day from sunrise to sunset, in seconds.
  * @param nightLengthSeconds length of astronomical night (sun below -18°), in seconds.
+ * @param sunCurve full-resolution altitude curve; excluded from the /api/astronomy/daily response
+ *     (served separately via /api/astronomy/curve at the caller's requested resolution).
  */
 public record SunDailyEvents(
     ZonedDateTime rise,
@@ -24,4 +27,4 @@ public record SunDailyEvents(
     SunTimesDto times,
     long dayLengthSeconds,
     long nightLengthSeconds,
-    List<AstronomyPoint> sunCurve) {}
+    @JsonIgnore List<AstronomyPoint> sunCurve) {}

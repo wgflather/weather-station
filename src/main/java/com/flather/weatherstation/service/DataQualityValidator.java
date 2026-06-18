@@ -81,11 +81,7 @@ public class DataQualityValidator {
         dataQualityMap);
 
     validateMetric(
-        Metric.WIND_DIRECTION,
-        anomalyDto.getWindDirection(),
-        0.0,
-        360.0,
-        dataQualityMap);
+        Metric.WIND_DIRECTION, anomalyDto.getWindDirection(), 0.0, 360.0, dataQualityMap);
 
     validateMetric(
         Metric.UV_INDEX,

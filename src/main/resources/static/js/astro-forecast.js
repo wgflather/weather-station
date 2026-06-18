@@ -80,10 +80,10 @@ async function loadAll() {
     try {
         const [astro, sunT, sunN, moonT, moonN] = await Promise.all([
             fetch('/api/forecast/astro').then(r => r.json()),
-            fetch('/api/astronomy/curve?body=SUN&resolution=CARD').then(r => r.json()),
-            fetch('/api/astronomy/curve?body=SUN&resolution=CARD&daysOffset=1').then(r => r.json()),
-            fetch('/api/astronomy/curve?body=MOON&resolution=CARD').then(r => r.json()),
-            fetch('/api/astronomy/curve?body=MOON&resolution=CARD&daysOffset=1').then(r => r.json()),
+            fetch('/api/astronomy/curve?body=SUN&resolution=FULL_CHART').then(r => r.json()),
+            fetch('/api/astronomy/curve?body=SUN&resolution=FULL_CHART&daysOffset=1').then(r => r.json()),
+            fetch('/api/astronomy/curve?body=MOON&resolution=FULL_CHART').then(r => r.json()),
+            fetch('/api/astronomy/curve?body=MOON&resolution=FULL_CHART&daysOffset=1').then(r => r.json()),
         ]);
         const sunCurve  = [...(sunT.points ?? []),  ...(sunN.points ?? [])];
         const moonCurve = [...(moonT.points ?? []), ...(moonN.points ?? [])];

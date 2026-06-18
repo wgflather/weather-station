@@ -14,10 +14,12 @@ import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
+import com.flather.weatherstation.dto.forecast.WeatherResponse;
 import com.flather.weatherstation.util.MeteoMath;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Optional;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -31,41 +33,52 @@ public class DashboardService {
 
   public MetricsDashboardDto getMetricsDashboard(DataStatus status) {
     var cfg = configurationCache.getDataProviderConfiguration();
+
+    // Fetched at most once, lazily, only when a metric actually sources from the external API.
+    Supplier<WeatherResponse> weatherResponse = memoize(weatherClientService::getWeatherResponse);
+
     boolean sensorHasData = status != DataStatus.EMPTY;
 
     TemperatureDto temperature =
         cfg.temperature() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getTemperature()
+            ? weatherClientService.getTemperature(weatherResponse.get())
             : sensorHasData ? analyticsService.getTemperature() : null;
 
     PressureDto pressure =
         cfg.pressure() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getPressure()
+            ? weatherClientService.getPressure(weatherResponse.get())
             : sensorHasData ? analyticsService.getPressure() : null;
 
     HumidityDto humidity =
         cfg.humidity() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getHumidity()
+            ? weatherClientService.getHumidity(weatherResponse.get())
             : sensorHasData ? analyticsService.getHumidity() : null;
 
     WindDto wind =
         cfg.wind() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getWind()
+            ? weatherClientService.getWind(weatherResponse.get())
             : sensorHasData ? analyticsService.getWind() : null;
 
     UvIndexDto uvIndex =
         cfg.uvIndex() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getUvIndex()
+            ? weatherClientService.getUvIndex(weatherResponse.get())
             : sensorHasData ? analyticsService.getUvIndex() : null;
 
     // Cross-source dew point: humidity from API, temperature from local sensor (or vice versa).
     // WeatherClientService only computes it when both come from the API; fill the gap here
     // where we have both assembled values regardless of origin.
-    if (humidity != null && humidity.dewPoint() == null
-        && temperature != null && temperature.value() != null && humidity.value() != null) {
+    if (humidity != null
+        && humidity.dewPoint() == null
+        && temperature != null
+        && temperature.value() != null
+        && humidity.value() != null) {
       double dp = MeteoMath.calculateDewPoint(temperature.value(), humidity.value());
-      humidity = new HumidityDto(
-          humidity.value(), humidity.dataDetails(), dp, DewPointRisk.classify(temperature.value() - dp));
+      humidity =
+          new HumidityDto(
+              humidity.value(),
+              humidity.dataDetails(),
+              dp,
+              DewPointRisk.classify(temperature.value() - dp));
     }
 
     return MetricsDashboardDto.builder()
@@ -127,7 +140,9 @@ public class DashboardService {
    * rollover and re-fetch the daily endpoint.
    */
   public DashboardLiveDto getDashboardLive() {
+    var cfg = configurationCache.getDataProviderConfiguration();
     SystemHealthDashboardDto systemHealth = getSystemHealth();
+
     MetricsDashboardDto metrics = getMetricsDashboard(systemHealth.getStatus());
 
     ZonedDateTime time = Instant.now().atZone(configurationCache.getLocationContext().zoneId());
@@ -137,5 +152,21 @@ public class DashboardService {
         astronomySearchService.getSunSnapshot(time),
         astronomySearchService.getMoonSnapshot(time),
         astronomySearchService.dailyKey());
+  }
+
+  /** Wraps a supplier so the delegate is invoked at most once, on first {@code get()}. */
+  private static <T> Supplier<T> memoize(Supplier<T> delegate) {
+    var holder =
+        new Object() {
+          T value;
+          boolean done;
+        };
+    return () -> {
+      if (!holder.done) {
+        holder.value = delegate.get();
+        holder.done = true;
+      }
+      return holder.value;
+    };
   }
 }

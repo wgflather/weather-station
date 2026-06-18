@@ -136,8 +136,7 @@ public class AnalyticsService {
 
   public UvIndexDto getUvIndex() {
     Double value =
-        averageOfFiveLastReadings(
-            WeatherRecord::getUvIndex, WeatherRecord::getUvIndexDataQuality);
+        averageOfFiveLastReadings(WeatherRecord::getUvIndex, WeatherRecord::getUvIndexDataQuality);
     return new UvIndexDto(
         value,
         UvLevel.fromIndex(value),
@@ -240,7 +239,7 @@ public class AnalyticsService {
       nextBucketExpectedAt = getNextExpectedBucketEpochMillis(dtos.getLast().hour(), resolution);
     }
 
-    return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt, "LOCAL_SENSOR");
+    return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt, DataProvider.LOCAL_SENSOR);
   }
 
   private Instant getNextExpectedBucketEpochMillis(ZonedDateTime zonedDateTime, int resolution) {

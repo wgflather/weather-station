@@ -15,18 +15,26 @@ public record DataProviderConfiguration(
     DataProvider wind,
     DataProvider uvIndex) {
 
-  public String generateApiQueryParam() {
+  private Stream<Map.Entry<Metric, DataProvider>> getProviders() {
     return Stream.of(
-            Map.entry(Metric.TEMPERATURE, temperature),
-            Map.entry(Metric.PRESSURE, pressure),
-            Map.entry(Metric.HUMIDITY, humidity),
-            Map.entry(Metric.WIND, wind),
-            Map.entry(Metric.UV_INDEX, uvIndex))
+        Map.entry(Metric.TEMPERATURE, temperature),
+        Map.entry(Metric.PRESSURE, pressure),
+        Map.entry(Metric.HUMIDITY, humidity),
+        Map.entry(Metric.WIND, wind),
+        Map.entry(Metric.UV_INDEX, uvIndex));
+  }
+
+  public String generateApiQueryParam() {
+    return getProviders()
         .filter(e -> e.getValue() == DataProvider.EXTERNAL_API)
         .map(e -> e.getKey().getProviderKeys())
         .filter(Objects::nonNull)
         .flatMap(List::stream)
         .distinct()
         .collect(Collectors.joining(","));
+  }
+
+  public boolean usesExternalProvider() {
+    return getProviders().anyMatch(c -> c.getValue().equals(DataProvider.EXTERNAL_API));
   }
 }

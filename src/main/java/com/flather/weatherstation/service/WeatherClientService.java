@@ -15,7 +15,6 @@ import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.forecast.*;
 import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
 import com.flather.weatherstation.util.MeteoMath;
-
 import java.time.*;
 import java.util.ArrayList;
 import java.util.DoubleSummaryStatistics;
@@ -67,9 +66,7 @@ public class WeatherClientService {
     return new AstroForecastDto(points);
   }
 
-  public TemperatureDto getTemperature() {
-    WeatherResponse response =
-        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+  public TemperatureDto getTemperature(WeatherResponse response) {
     CurrentWeather current = response.currentWeather();
     WeatherConditionsForecast hourly = response.hourly();
     ZoneId zone = configurationCache.getLocationContext().zoneId();
@@ -105,9 +102,7 @@ public class WeatherClientService {
             Metric.TEMPERATURE, current.temperature(), current.time().atZone(zone)));
   }
 
-  public PressureDto getPressure() {
-    WeatherResponse response =
-        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+  public PressureDto getPressure(WeatherResponse response) {
     CurrentWeather current = response.currentWeather();
     WeatherConditionsForecast hourly = response.hourly();
     ZoneId zone = configurationCache.getLocationContext().zoneId();
@@ -121,9 +116,7 @@ public class WeatherClientService {
     return new PressureDto(current.pressure(), trend, details, PressureTrend.classify(trend));
   }
 
-  public HumidityDto getHumidity() {
-    WeatherResponse response =
-        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+  public HumidityDto getHumidity(WeatherResponse response) {
     CurrentWeather current = response.currentWeather();
     ZoneId zone = configurationCache.getLocationContext().zoneId();
 
@@ -131,7 +124,8 @@ public class WeatherClientService {
     DewPointRisk dewPointRisk = null;
 
     boolean tempAlsoFromApi =
-        configurationCache.getDataProviderConfiguration().temperature() == DataProvider.EXTERNAL_API;
+        configurationCache.getDataProviderConfiguration().temperature()
+            == DataProvider.EXTERNAL_API;
     if (tempAlsoFromApi && current.temperature() != null && current.humidity() != null) {
       dewPoint = MeteoMath.calculateDewPoint(current.temperature(), current.humidity());
       dewPointRisk = DewPointRisk.classify(current.temperature() - dewPoint);
@@ -144,9 +138,7 @@ public class WeatherClientService {
     return new HumidityDto(current.humidity(), details, dewPoint, dewPointRisk);
   }
 
-  public WindDto getWind() {
-    WeatherResponse response =
-        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+  public WindDto getWind(WeatherResponse response) {
     CurrentWeather current = response.currentWeather();
     ZoneId zone = configurationCache.getLocationContext().zoneId();
 
@@ -163,37 +155,40 @@ public class WeatherClientService {
     return new WindDto(speed, guests, direction, dirLabel, BeaufortScale.fromMs(speed), details);
   }
 
-  public UvIndexDto getUvIndex() {
-    WeatherResponse response =
-        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+  public UvIndexDto getUvIndex(WeatherResponse response) {
     CurrentWeather current = response.currentWeather();
     ZoneId zone = configurationCache.getLocationContext().zoneId();
 
     MetricDataDetails details =
-        metricDataDetailsMapper.fromApi(Metric.UV_INDEX, current.uvIndex(), current.time().atZone(zone));
+        metricDataDetailsMapper.fromApi(
+            Metric.UV_INDEX, current.uvIndex(), current.time().atZone(zone));
 
     return new UvIndexDto(current.uvIndex(), UvLevel.fromIndex(current.uvIndex()), details);
   }
 
-  public ChartDto getChart(Metric metric){
+  public ChartDto getChart(Metric metric) {
     WeatherResponse response =
-            client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
     WeatherConditionsForecast forecast = response.hourly();
 
     List<LocalDateTime> time = forecast.time();
 
-    List<ChartPointDto> points = switch (metric){
-      case TEMPERATURE -> mapToChartPoints(time, forecast.temperature2m());
-      case PRESSURE -> mapToChartPoints(time, forecast.surfacePressure());
-      case HUMIDITY -> mapToChartPoints(time, forecast.relativeHumidity2m());
-      case WIND -> mapToChartPoints(time, forecast.windSpeed10m());
+    List<ChartPointDto> points =
+        switch (metric) {
+          case TEMPERATURE -> mapToChartPoints(time, forecast.temperature2m());
+          case PRESSURE -> mapToChartPoints(time, forecast.surfacePressure());
+          case HUMIDITY -> mapToChartPoints(time, forecast.relativeHumidity2m());
+          case WIND -> mapToChartPoints(time, forecast.windSpeed10m());
 
-      case UV_INDEX -> mapToChartPoints(time, forecast.uvIndex());
-      default -> throw new IllegalArgumentException("This metric is not supported for charts");
-    };
+          case UV_INDEX -> mapToChartPoints(time, forecast.uvIndex());
+          default -> throw new IllegalArgumentException("This metric is not supported for charts");
+        };
 
-    return new ChartDto(metric.toString(), points, Instant.now().plus(FORECAST_CHART_TTL), "EXTERNAL_API");
-
+    return new ChartDto(
+        metric.toString(),
+        points,
+        Instant.now().plus(FORECAST_CHART_TTL),
+        DataProvider.EXTERNAL_API);
   }
 
   private TrendResult computeHourlyTrend(
@@ -220,7 +215,7 @@ public class WeatherClientService {
     return MeteoMath.trendFromHourlyChange(cur - prev);
   }
 
-  private List<ChartPointDto> mapToChartPoints(List<LocalDateTime> time, List<Double> values){
+  private List<ChartPointDto> mapToChartPoints(List<LocalDateTime> time, List<Double> values) {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
 
     if (time == null || values == null || time.isEmpty() || values.isEmpty()) {
@@ -238,6 +233,10 @@ public class WeatherClientService {
     }
 
     return points;
+  }
+
+  public WeatherResponse getWeatherResponse() {
+    return client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
   }
 
   private List<WeatherConditionPoint> mapToConditionPoints(WeatherConditionsForecast forecast) {
@@ -261,7 +260,6 @@ public class WeatherClientService {
                     safeNullable(forecast.uvIndex(), i)))
         .toList();
   }
-
 
   // Returns null when the list is absent (metric not on external API) rather than 0.0,
   // so the frontend can distinguish "no data" from "value is zero".
