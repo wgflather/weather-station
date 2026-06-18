@@ -10,7 +10,10 @@ export class FetchScheduler {
 
         this.timers = {
             temperature: null,
-            pressure: null
+            pressure:    null,
+            humidity:    null,
+            wind:        null,
+            uvIndex:     null,
         };
     }
 
@@ -31,7 +34,7 @@ export class FetchScheduler {
 
                 if (!chartDto) return;
 
-                this.renderFn(chartDto.chartPoints, metric);
+                this.renderFn(chartDto, metric);
                 this.schedule(metric, chartDto.nextBucketExpectedAt, getChartFn);
 
             } catch (err) {

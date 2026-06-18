@@ -1151,6 +1151,12 @@ h3 {
     color: rgba(226, 238, 255, 0.35) !important;
 }
 
+.resolution-dropdown:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* =========================================================
    MOBILE PANEL (FLAT LIST STYLE)
 ========================================================= */
@@ -2200,7 +2206,7 @@ h3 {
 }
 
 .wind-speed-value {
-    font-size: 2.4rem;
+    font-size: 2rem;   /* matches .main-value (temperature / pressure / etc.) */
     font-weight: var(--fw-hero, 800);
     color: var(--text-primary);
     line-height: 1;
@@ -2518,11 +2524,14 @@ h3 {
         flex-wrap: nowrap;
         gap: 15px;
     }
-
-    .wind-speed-value { font-size: 2rem; }
 }
 
-@media (max-width: 600px) {
+/* The grid drops to 2 columns here so the single metric cards never get squeezed
+   into a too-narrow 3-column layout (which previously forced content to overflow
+   the card borders between ~600–720px). This is the single mid-tier of card
+   sizing: every value steps down once from its base size, then steps down again
+   at ≤480px — so element sizes only ever shrink as the screen narrows. */
+@media (max-width: 720px) {
     .metrics-grid {
         grid-template-columns: 1fr 1fr;
     }
@@ -2532,26 +2541,10 @@ h3 {
         grid-row: 1;
     }
 
-    .wind-direction-deg {
-        font-size: 0.5rem;
-    }
-
-    .wind-direction-arrow {
-        font-size: 0.75rem;
-
-    }
-
-    .wind-direction-label {
-        font-size: 0.75rem;
-    }
-
-
     .metrics-grid .wind_block     { grid-column: 1; grid-row: 2; }
     .metrics-grid .pressure_block { grid-column: 2; grid-row: 2; }
     .metrics-grid .humidity_block { grid-column: 1; grid-row: 3; }
     .metrics-grid .uv_block       { grid-column: 2; grid-row: 3; }
-
-    .wind-speed-value { font-size: 1.8rem; }
 
     .temperature_block,
     .pressure_block,
@@ -2560,54 +2553,39 @@ h3 {
         min-width: 0;
     }
 
-     .selector-label {
-            display: none; /* drop the "VIEW:" label to save space */
-        }
-
-     .metric-dropdown,
-      .resolution-dropdown {
-          flex: 0 0 auto;      /* don't grow */
-          width: fit-content;  /* size to content */
-          min-width: unset;
-      }
-
-        .metric-selector {
-            gap: 6px;
-        }
-
-    
-    .dew-main {
-        font-size: 1.15rem;  /* was 1.2rem override — shrink further */
+    /* shared hero value (pressure / humidity / uv / temperature / wind) */
+    .main-value,
+    .wind-speed-value {
+        font-size: 1.6rem;
     }
 
-    .dew-sub {
-        font-size: 0.65rem;
-    }
-
+    /* temperature card: tighten the two-column split + dew block */
+    .temp-section { padding-right: 12px; }
     .dew-point-section {
         max-width: 52%;
         padding-left: 12px;
     }
-
-    .temp-section {
-        padding-right: 12px;
-    }
-
-    /* hide the badge to save horizontal space */
-    .dew-status-badge {
-        display: none;
-    }
-
-    /* unified value size across all three cards at this width */
-    .main-value {
-        font-size: 1.6rem;
-    }
-
-    /* temp trend smaller so it doesn't compete with the value — pressure trend unchanged */
+    .dew-main { font-size: 1.15rem; }
+    .dew-sub  { font-size: 0.62rem; }
     #temp-trend .trend-arrow { font-size: 0.7rem; }
     #temp-trend .trend-val   { font-size: 0.6rem; }
 
+    /* wind card inner layout */
+    .wind-left  { padding-right: 12px; }
+    .wind-right { padding-left: 12px; }
+    .wind-direction-arrow { font-size: 0.85rem; }
+    .wind-direction-label { font-size: 0.85rem; }
+    .wind-direction-deg   { font-size: 0.6rem; }
 
+    /* chart controls: reclaim header space */
+    .selector-label { display: none; }
+    .metric-dropdown,
+    .resolution-dropdown {
+        flex: 0 0 auto;
+        width: fit-content;
+        min-width: unset;
+    }
+    .metric-selector { gap: 6px; }
 }
 
 @media (max-width: 480px) {
@@ -2620,14 +2598,17 @@ h3 {
         flex-wrap: wrap;
     }
 
-    .main-value {
+    .main-value,
+    .wind-speed-value {
         font-size: 1.4rem;
         justify-content: center;
     }
 
-    .wind-speed-value { font-size: 1.5rem; }
-    .wind-left        { padding-right: 10px; }
-    .wind-right       { padding-left: 10px; }
+    .wind-left            { padding-right: 10px; }
+    .wind-right           { padding-left: 10px; }
+    .wind-direction-arrow { font-size: 0.75rem; }
+    .wind-direction-label { font-size: 0.75rem; }
+    .wind-direction-deg   { font-size: 0.5rem; }
 
     /* temp trend even smaller at narrowest screens */
     #temp-trend .trend-arrow { font-size: 0.6rem; }
@@ -2638,11 +2619,16 @@ h3 {
     }
 
     .dew-main {
-        font-size: 1rem;
+        font-size: 1.05rem;
     }
 
     .dew-sub {
         font-size: 0.6rem;
+    }
+
+    /* badge has no room beside the title once the temp card is this narrow */
+    .dew-status-badge {
+        display: none;
     }
 
     .dew-point-section {
@@ -2671,6 +2657,17 @@ h3 {
         padding-bottom: 8px;
     }
 
+    /* Equalize every metric card to the today block's height. --today-card-h is
+       measured at runtime (equalize-card-height.js); grid items stretch to fill
+       their row, so each card ends up at the same height as the today block. */
+    .metrics-grid .temperature_block,
+    .metrics-grid .wind_block,
+    .metrics-grid .pressure_block,
+    .metrics-grid .humidity_block,
+    .metrics-grid .uv_block {
+        min-height: var(--today-card-h, 120px);
+    }
+
     .card-header {
         padding-bottom: 8px;
         margin-bottom: 8px;
@@ -2679,7 +2676,7 @@ h3 {
 
 @media (max-width: 420px) {
     .dew-main {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .dew-sub {
@@ -2702,7 +2699,7 @@ h3 {
 
 @media (max-width: 390px) {
     .dew-main {
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
 
     .dew-sub {

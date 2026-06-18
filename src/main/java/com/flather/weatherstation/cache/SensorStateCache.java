@@ -109,7 +109,7 @@ public class SensorStateCache {
     addSpikeIfPresent(Metric.UV_INDEX, dto.getUvIndex());
   }
 
-  void loadCacheSnapshot(List<WeatherRecord> dtos, ExtremesProjection extremesProjection) {
+  void loadCacheSnapshot(List<WeatherRecord> dtos, ExtremesProjection extremesProjection, WeatherRecord latestMeasurement) {
 
     log.info(
         "[CACHE_INIT] Loading cache snapshot: {} records, min={}, max={}",
@@ -127,6 +127,8 @@ public class SensorStateCache {
 
     todayMaxTemp = extremesProjection.max();
     todayMinTemp = extremesProjection.min();
+
+    lastSavedMeasurement = latestMeasurement;
 
     log.info(
         "[CACHE_INIT] Cache initialized successfully. metricsWindowSize={}", metricsWindow.size());

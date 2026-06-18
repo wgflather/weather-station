@@ -32,6 +32,22 @@ const COLOR_SCALES = {
         { stop: 1025, r: 110, g: 231, b: 183 },
         { stop: 1040, r: 251, g: 191, b:  36 },
     ],
+    // calm (pale sky) -> light breeze (cyan) -> moderate (teal) -> strong (amber) -> storm (red)
+    wind: [
+        { stop:  0, r: 224, g: 242, b: 254 },
+        { stop:  3, r: 103, g: 232, b: 249 },
+        { stop:  8, r:  52, g: 211, b: 153 },
+        { stop: 14, r: 251, g: 191, b:  36 },
+        { stop: 20, r: 239, g:  68, b:  68 },
+    ],
+    // safe (green) -> moderate (yellow) -> high (orange) -> very high (red) -> extreme (violet)
+    uvIndex: [
+        { stop:  0, r: 134, g: 239, b: 172 },
+        { stop:  3, r: 253, g: 224, b:  71 },
+        { stop:  6, r: 251, g: 146, b:  60 },
+        { stop:  8, r: 239, g:  68, b:  68 },
+        { stop: 11, r: 167, g: 139, b: 250 },
+    ],
 };
 
 function scaleToRgb(scale, value) {
@@ -102,6 +118,34 @@ const METRIC_CONFIG = {
         minNodeColor:  '#0ea5e9',
         innerBorder:   '#e0f2fe',
         closeThreshold: 2,
+    },
+    wind: {
+        label:          'Wind',
+        tooltipSuffix:  ' m/s',
+        yAxisSuffix:    '',
+        yStep:          2,
+        lineColor:      null,
+        shadowColor:    'rgba(103, 232, 249, 0.25)',
+        fillTop:        null,
+        fillMid:        null,
+        maxNodeColor:   '#ef4444',
+        minNodeColor:   '#a5f3fc',
+        innerBorder:    '#cffafe',
+        closeThreshold: 0.5,
+    },
+    uvIndex: {
+        label:          'UV Index',
+        tooltipSuffix:  '',
+        yAxisSuffix:    '',
+        yStep:          1,
+        lineColor:      null,
+        shadowColor:    'rgba(251, 191, 36, 0.25)',
+        fillTop:        null,
+        fillMid:        null,
+        maxNodeColor:   '#fb923c',
+        minNodeColor:   '#86efac',
+        innerBorder:    '#fef3c7',
+        closeThreshold: 0.2,
     },
 };
 
@@ -185,14 +229,20 @@ function getDynamicYBounds(points, metric) {
     if (!real.length) {
         if (metric === 'humidity') return { suggestedMin: 20,  suggestedMax: 100  };
         if (metric === 'pressure') return { suggestedMin: 990, suggestedMax: 1030 };
+        if (metric === 'wind')     return { suggestedMin: 0,   suggestedMax: 15   };
+        if (metric === 'uvIndex')  return { suggestedMin: 0,   suggestedMax: 10   };
         return { suggestedMin: 10, suggestedMax: 30 };
     }
 
     const values = real.map(p => p.y);
     const pad    = metric === 'humidity' ? 3 : 2;
+    const rawMin = Math.min(...values) - pad;
+    const rawMax = Math.max(...values) + pad;
+
+    const floorAtZero = metric === 'wind' || metric === 'uvIndex';
     return {
-        suggestedMin: Math.min(...values) - pad,
-        suggestedMax: Math.max(...values) + pad,
+        suggestedMin: floorAtZero ? Math.max(0, rawMin) : rawMin,
+        suggestedMax: rawMax,
     };
 }
 
@@ -250,13 +300,16 @@ function createDynamicGradient(ctx, chartArea, yAxis, scale) {
 function buildAreaFill(ctx, chartArea, state) {
     const grad = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
 
-    if (state.metric === 'temperature') {
-        const real    = state.chartPoints.filter(p => p.y != null);
-        const avgTemp = real.length
+    if (state.config.fillTop == null) {
+        // Value-based fill: derive the colour from the dataset's average value so
+        // the area tint matches the dynamic gradient line (temperature, wind, uvIndex).
+        const real   = state.chartPoints.filter(p => p.y != null);
+        const midStop = (state.scale[0].stop + state.scale[state.scale.length - 1].stop) / 2;
+        const avgVal = real.length
             ? real.reduce((s, p) => s + p.y, 0) / real.length
-            : 15;
-        grad.addColorStop(0,   scaleToRgbString(state.scale, avgTemp, 0.28));
-        grad.addColorStop(0.5, scaleToRgbString(state.scale, avgTemp, 0.07));
+            : midStop;
+        grad.addColorStop(0,   scaleToRgbString(state.scale, avgVal, 0.28));
+        grad.addColorStop(0.5, scaleToRgbString(state.scale, avgVal, 0.07));
         grad.addColorStop(1,   'rgba(255,255,255,0)');
     } else {
         grad.addColorStop(0,    state.config.fillTop);
@@ -382,6 +435,8 @@ const COLLISION_STATE = {
     temperature: { triple: false, maxAbsorbed: false, minAbsorbed: false },
     pressure:    { triple: false, maxAbsorbed: false, minAbsorbed: false },
     humidity:    { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    wind:        { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    uvIndex:     { triple: false, maxAbsorbed: false, minAbsorbed: false },
 };
 
 // Decide how today's High/Low pins relate to "Now": 'triple' (H and L both
@@ -841,6 +896,7 @@ function computeChartState(backendData, metric, resolutionMinutes, options = {})
     const xUnit    = options.xUnit ?? 'hour';
     // showNow only applies to hourly (live) charts
     const showNow  = options.showNow !== false && xUnit === 'hour';
+    const apiMode  = options.apiMode === true;
 
     // ── Time range ──────────────────────────────────────────
     const today       = new Date();
@@ -874,6 +930,13 @@ function computeChartState(backendData, metric, resolutionMinutes, options = {})
         endRange.setTime(lastTime + 5 * 60 * 1000);
     }
 
+    // API charts deliver a fixed 24-hour set ending at 23:00 — trim the axis to
+    // match so the line reaches the right edge instead of leaving an empty hour.
+    if (apiMode && rawPoints.length > 0) {
+        const lastTime = rawPoints[rawPoints.length - 1].x.getTime();
+        endRange.setTime(lastTime + 5 * 60 * 1000);
+    }
+
     // ── X-axis tick step for daily charts ──────────────────
     const daySpan   = xUnit === 'day'
         ? Math.round((endRange.getTime() - startRange.getTime()) / 86400000)
@@ -897,13 +960,24 @@ function computeChartState(backendData, metric, resolutionMinutes, options = {})
     let latestIndex = chartPoints.length - 1;
     while (latestIndex > 0 && chartPoints[latestIndex]?.y == null) latestIndex--;
 
+    // For API charts the backend returns all 24 hours including future predictions.
+    // Snap the "Now" marker to the most recent past data point instead of the last one.
+    if (apiMode) {
+        const nowMs = Date.now();
+        let apiNowIdx = -1;
+        for (let i = 0; i < chartPoints.length; i++) {
+            if (chartPoints[i]?.y != null && chartPoints[i].x.getTime() <= nowMs) apiNowIdx = i;
+        }
+        if (apiNowIdx !== -1) latestIndex = apiNowIdx;
+    }
+
     const scenario = resolveCollisionScenario(
         metric, chartPoints, minIndex, maxIndex, latestIndex,
         validMinMax, resolutionMinutes, config
     );
 
     return {
-        metric, resolutionMinutes, config, scale, isMobile, showNow,
+        metric, resolutionMinutes, config, scale, isMobile, showNow, apiMode,
         today, startRange, endRange,
         xUnit, xTickStep,
         chartPoints, gapPoints, yBounds,
@@ -940,6 +1014,20 @@ function buildDatasets(state) {
             const st = chart.$state;
             if (!chartArea) return st.config.lineColor ?? '#7dd3fc';
             return createDynamicGradient(chart.ctx, chartArea, scales.y, st.scale);
+        },
+
+        // API charts show a full-day forecast: the future is the relevant part,
+        // so the already-elapsed (past) portion of the line is greyed out. Each
+        // segment up to the "Now" marker returns a flat grey; everything after
+        // returns undefined to fall back to the value-based gradient above.
+        segment: {
+            borderColor: (ctx) => {
+                const st = ctx.chart.$state;
+                if (!st?.apiMode) return undefined;
+                return ctx.p1DataIndex <= st.latestIndex
+                    ? 'rgba(148, 163, 184, 0.45)'
+                    : undefined;
+            },
         },
 
         pointRadius: (context) => {
@@ -1175,23 +1263,36 @@ function createChart(canvasElement, state) {
                     const lastReal = st.chartPoints[st.latestIndex];
                     if (!lastReal) return;
 
-                    // Start the "future" shading at now — any gap between
-                    // the last reading and now is rendered as a missing-data
-                    // bridge instead (see extractGapSegments)
-                    const anchor       = Math.max(st.today.getTime(), lastReal.x.getTime());
-                    const latestX      = scales.x.getPixelForValue(new Date(anchor));
-                    const overlayStart = latestX + 3;
+                    const nowX = scales.x.getPixelForValue(
+                        new Date(Math.max(st.today.getTime(), lastReal.x.getTime()))
+                    );
 
                     ctx.save();
                     ctx.fillStyle = 'rgba(255,255,255,0.045)';
-                    ctx.fillRect(
-                        overlayStart, chartArea.top,
-                        chartArea.right - overlayStart,
-                        chartArea.bottom - chartArea.top
-                    );
+                    if (st.apiMode) {
+                        // Forecast chart: the elapsed (past) side is shaded —
+                        // mirror of the sensor chart's future overlay.
+                        const overlayEnd = nowX - 3;
+                        ctx.fillRect(
+                            chartArea.left, chartArea.top,
+                            overlayEnd - chartArea.left,
+                            chartArea.bottom - chartArea.top
+                        );
+                    } else {
+                        // Sensor chart: shade the not-yet-recorded future. Any gap
+                        // between the last reading and now is rendered as a
+                        // missing-data bridge instead (see extractGapSegments).
+                        const overlayStart = nowX + 3;
+                        ctx.fillRect(
+                            overlayStart, chartArea.top,
+                            chartArea.right - overlayStart,
+                            chartArea.bottom - chartArea.top
+                        );
+                    }
+
                     ctx.beginPath();
-                    ctx.moveTo(latestX, chartArea.top);
-                    ctx.lineTo(latestX, chartArea.bottom);
+                    ctx.moveTo(nowX, chartArea.top);
+                    ctx.lineTo(nowX, chartArea.bottom);
                     ctx.strokeStyle = 'rgba(255,255,255,0.10)';
                     ctx.lineWidth   = 1;
                     ctx.setLineDash([4, 4]);

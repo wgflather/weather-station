@@ -45,7 +45,7 @@ public class WeatherHistoryService {
         dailyRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
             .map(r -> new ChartPointDto(r.getDate().atStartOfDay(zoneId), metricValue(r, metric)))
             .toList();
-    return new ChartDto(metric.getName(), dtos, null);
+    return new ChartDto(metric.getName(), dtos, null, "LOCAL_SENSOR");
   }
 
   public ChartDto getChart(Metric metric, Instant from, Instant to) {
@@ -56,7 +56,7 @@ public class WeatherHistoryService {
             ? toChartDtos(findHourlyDataPoints(metric, from, to))
             : analyticsService.getMetricChart(from, to, metric, 60);
 
-    return new ChartDto(metric.getName(), dtos, null);
+    return new ChartDto(metric.getName(), dtos, null, "LOCAL_SENSOR");
   }
 
   public List<HourlyWeatherRecordDto> getHourlyHistory(Instant from, Instant to) {

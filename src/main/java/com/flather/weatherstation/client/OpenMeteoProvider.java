@@ -36,6 +36,7 @@ public class OpenMeteoProvider {
                 var b =
                     uriBuilder
                         .path("/forecast")
+                            .queryParam("wind_speed_unit", "ms")
                         .queryParam("latitude", lat)
                         .queryParam("longitude", lon)
                         .queryParam("hourly", hourlyQuery)

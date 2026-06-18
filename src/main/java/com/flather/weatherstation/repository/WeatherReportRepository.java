@@ -87,6 +87,8 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
       @Param("to") Instant to,
       @Param("bucketInterval") String bucketInterval);
 
+  Optional<WeatherRecord> findFirstByOrderByMeasuredAtDesc();
+
   @Query(
       value =
           """
@@ -102,6 +104,44 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
                   """,
       nativeQuery = true)
   List<DataPoint> findChartPressure(
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("bucketInterval") String bucketInterval);
+
+  @Query(
+      value =
+          """
+                  SELECT
+                      date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
+                      ROUND(AVG(wind)::numeric, 1)::double precision AS value
+                  FROM weather_records
+                  WHERE wind_data_quality = 'OK'
+                    AND measured_at >= :from
+                    AND measured_at < :to
+                  GROUP BY bucket
+                  ORDER BY bucket ASC
+                  """,
+      nativeQuery = true)
+  List<DataPoint> findChartWind(
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("bucketInterval") String bucketInterval);
+
+  @Query(
+      value =
+          """
+                  SELECT
+                      date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
+                      ROUND(AVG(uv_index)::numeric, 1)::double precision AS value
+                  FROM weather_records
+                  WHERE uv_index_data_quality = 'OK'
+                    AND measured_at >= :from
+                    AND measured_at < :to
+                  GROUP BY bucket
+                  ORDER BY bucket ASC
+                  """,
+      nativeQuery = true)
+  List<DataPoint> findChartUvIndex(
       @Param("from") Instant from,
       @Param("to") Instant to,
       @Param("bucketInterval") String bucketInterval);

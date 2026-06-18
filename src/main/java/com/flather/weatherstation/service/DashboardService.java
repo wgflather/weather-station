@@ -4,11 +4,13 @@ import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.constant.DataProvider;
 import com.flather.weatherstation.domain.constant.DataStatus;
 import com.flather.weatherstation.domain.constant.DewPointRisk;
+import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.analytics.HumidityDto;
 import com.flather.weatherstation.dto.analytics.PressureDto;
 import com.flather.weatherstation.dto.analytics.TemperatureDto;
 import com.flather.weatherstation.dto.analytics.UvIndexDto;
 import com.flather.weatherstation.dto.analytics.WindDto;
+import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.dashboard.MetricsDashboardDto;
 import com.flather.weatherstation.dto.dashboard.SystemHealthDashboardDto;
@@ -74,6 +76,23 @@ public class DashboardService {
         .wind(wind)
         .uvIndex(uvIndex)
         .build();
+  }
+
+  public ChartDto getChart(Metric metric, String since, int resolution) {
+    var cfg = configurationCache.getDataProviderConfiguration();
+    DataProvider provider =
+        switch (metric) {
+          case TEMPERATURE -> cfg.temperature();
+          case PRESSURE -> cfg.pressure();
+          case HUMIDITY -> cfg.humidity();
+          case WIND -> cfg.wind();
+          case UV_INDEX -> cfg.uvIndex();
+          default -> DataProvider.LOCAL_SENSOR;
+        };
+
+    return provider == DataProvider.EXTERNAL_API
+        ? weatherClientService.getChart(metric)
+        : analyticsService.returnChart(metric, since, resolution);
   }
 
   public SystemHealthDashboardDto getSystemHealth() {

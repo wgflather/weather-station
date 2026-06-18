@@ -51,7 +51,9 @@ public class AnalyticsService {
   }
 
   public Optional<ZonedDateTime> findLastRecordTime() {
+
     WeatherRecord last = sensorStateCache.getLastSavedMeasurement();
+
     if (last == null) {
       return Optional.empty();
     }
@@ -203,6 +205,12 @@ public class AnalyticsService {
       case HUMIDITY -> {
         return dataPointToDto(repository.findChartHumidity(from, to, bucketInterval));
       }
+      case WIND -> {
+        return dataPointToDto(repository.findChartWind(from, to, bucketInterval));
+      }
+      case UV_INDEX -> {
+        return dataPointToDto(repository.findChartUvIndex(from, to, bucketInterval));
+      }
       default -> throw new IllegalArgumentException("Unknown Metric");
     }
   }
@@ -232,7 +240,7 @@ public class AnalyticsService {
       nextBucketExpectedAt = getNextExpectedBucketEpochMillis(dtos.getLast().hour(), resolution);
     }
 
-    return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt);
+    return new ChartDto(metric.getName(), dtos, nextBucketExpectedAt, "LOCAL_SENSOR");
   }
 
   private Instant getNextExpectedBucketEpochMillis(ZonedDateTime zonedDateTime, int resolution) {

@@ -5,7 +5,6 @@ import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
-import com.flather.weatherstation.service.AnalyticsService;
 import com.flather.weatherstation.service.DashboardService;
 import com.flather.weatherstation.service.WeatherService;
 import java.net.URI;
@@ -25,7 +24,6 @@ public class WeatherController {
   public static final String DASHBOARD_LIVE_PATH = BASE_PATH + "/dashboard/live";
 
   private final WeatherService service;
-  private final AnalyticsService analyticsService;
   private final DashboardService dashboardService;
 
   @PostMapping(BASE_PATH)
@@ -45,6 +43,6 @@ public class WeatherController {
       @RequestParam(value = "metric", defaultValue = "temperature") Metric metric,
       @RequestParam(value = "resolution", defaultValue = "10") int resolution,
       @RequestParam(required = false, value = "since") String since) {
-    return ResponseEntity.ok(analyticsService.returnChart(metric, since, resolution));
+    return ResponseEntity.ok(dashboardService.getChart(metric, since, resolution));
   }
 }

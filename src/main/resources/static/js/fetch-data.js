@@ -23,7 +23,13 @@ const state = {
         temperature: null,
         pressure:    null,
         humidity:    null,
-    }
+        wind:        null,
+        uvIndex:     null,
+    },
+
+    // Cached provider per metric, populated on first chart response.
+    // Used to lock the resolution selector and pass apiMode to the renderer.
+    metricProviders: {},
 };
 
 // ==========================================
@@ -142,31 +148,58 @@ const scheduler = new FetchScheduler(
         return await response.json();
     },
 
-    (newChartPoints, metric) => {
+    (chartDto, metric) => {
+        const newChartPoints = chartDto.chartPoints ?? [];
+        const dataProvider   = chartDto.dataProvider ?? 'LOCAL_SENSOR';
+        const isApi          = dataProvider === 'EXTERNAL_API';
+
+        state.metricProviders[metric] = dataProvider;
+
         if (!state.charts[metric]) state.charts[metric] = [];
 
-        // Only repaint when the dataset actually changed — an unchanged poll
-        // would otherwise force a pointless chart redraw every cycle.
         let changed = false;
-        if (state.charts[metric].length === 0) {
+
+        if (isApi) {
+            // Always replace — the full 24-hour forecast is returned each time,
+            // and future-hour predictions can update between polls.
             state.charts[metric] = newChartPoints;
             changed = newChartPoints.length > 0;
         } else {
-            const existingHours = new Set(state.charts[metric].map(p => p.hour));
-            const uniqueDeltas  = newChartPoints.filter(p => !existingHours.has(p.hour));
-            if (uniqueDeltas.length > 0) {
-                state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
-                changed = true;
+            // Incremental append — only add buckets that haven't arrived yet.
+            if (state.charts[metric].length === 0) {
+                state.charts[metric] = newChartPoints;
+                changed = newChartPoints.length > 0;
+            } else {
+                const existingHours = new Set(state.charts[metric].map(p => p.hour));
+                const uniqueDeltas  = newChartPoints.filter(p => !existingHours.has(p.hour));
+                if (uniqueDeltas.length > 0) {
+                    state.charts[metric] = [...state.charts[metric], ...uniqueDeltas];
+                    changed = true;
+                }
             }
         }
 
         if (changed && metric === state.currentMetric) {
-            renderWeatherChart(state.charts[metric], metric, state.currentResolution);
+            syncResolutionForProvider(dataProvider);
+            // API data is always hourly — pass resolution=60 so gap detection
+            // doesn't treat the 1-hour cadence as missing data.
+            const effectiveRes = isApi ? 60 : state.currentResolution;
+            renderWeatherChart(state.charts[metric], metric, effectiveRes, { apiMode: isApi });
         }
     },
 
     20000
 );
+
+// Locks the resolution selector when a metric is served by the external API
+// (hourly cadence is fixed; custom resolution has no effect).
+function syncResolutionForProvider(provider) {
+    const resSelect = document.getElementById('resolution-selector');
+    if (!resSelect) return;
+    const isApi = provider === 'EXTERNAL_API';
+    resSelect.disabled = isApi;
+    resSelect.title    = isApi ? 'Resolution is fixed at 1 hour for API data' : '';
+}
 
 function startChart(metric) {
     scheduler.start(metric, (m) => state.charts[m], state.currentResolution);
@@ -1512,9 +1545,13 @@ function syncResolutionOptions(select) {
 }
 
 function restartChartWithCurrentResolution() {
-    state.charts[state.currentMetric] = [];
-    renderWeatherChart([], state.currentMetric, state.currentResolution);
-    startChart(state.currentMetric);
+    const metric   = state.currentMetric;
+    const provider = state.metricProviders[metric] ?? 'LOCAL_SENSOR';
+    const isApi    = provider === 'EXTERNAL_API';
+    state.charts[metric] = [];
+    const effectiveRes = isApi ? 60 : state.currentResolution;
+    renderWeatherChart([], metric, effectiveRes, { apiMode: isApi });
+    startChart(metric);
 }
 
 function initResolutionControls() {
@@ -1535,6 +1572,9 @@ function initResolutionControls() {
     });
 
     window.addEventListener('resize', () => {
+        // Re-apply the API lock on top of the mobile-resolution sync so the
+        // disabled state is never lost after a viewport change.
+        syncResolutionForProvider(state.metricProviders[state.currentMetric] ?? 'LOCAL_SENSOR');
         if (!syncResolutionOptions(select)) return;
 
         state.currentResolution = Number(select.value);
@@ -1555,8 +1595,13 @@ function initEventListeners() {
         const value         = e.target.value;
         state.currentMetric = value;
 
+        const knownProvider = state.metricProviders[value] ?? 'LOCAL_SENSOR';
+        const isApi         = knownProvider === 'EXTERNAL_API';
+        syncResolutionForProvider(knownProvider);
+
         if (!state.charts[value]) state.charts[value] = [];
-        renderWeatherChart(state.charts[value], value, state.currentResolution);
+        const effectiveRes = isApi ? 60 : state.currentResolution;
+        renderWeatherChart(state.charts[value], value, effectiveRes, { apiMode: isApi });
         startChart(value);
     });
 }

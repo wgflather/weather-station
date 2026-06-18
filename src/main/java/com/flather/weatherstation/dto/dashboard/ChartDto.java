@@ -5,4 +5,4 @@ import java.time.Instant;
 import java.util.List;
 
 public record ChartDto(
-    String metric, List<ChartPointDto> chartPoints, Instant nextBucketExpectedAt) {}
+    String metric, List<ChartPointDto> chartPoints, Instant nextBucketExpectedAt, String dataProvider) {}

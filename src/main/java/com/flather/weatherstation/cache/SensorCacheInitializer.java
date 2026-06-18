@@ -40,7 +40,7 @@ public class SensorCacheInitializer implements ApplicationRunner {
 
     ExtremesProjection extremesProjection =
         repository.temperatureExtremes(todayZonedRange.startTime(), todayZonedRange.endTime());
-
-    sensorStateCache.loadCacheSnapshot(initRecords, extremesProjection);
+    WeatherRecord latestRecord = repository.findFirstByOrderByMeasuredAtDesc().orElse(null);
+    sensorStateCache.loadCacheSnapshot(initRecords, extremesProjection, latestRecord);
   }
 }

@@ -11,12 +11,13 @@ import com.flather.weatherstation.domain.constant.TrendDirection;
 import com.flather.weatherstation.domain.constant.UvLevel;
 import com.flather.weatherstation.domain.constant.WindDirectionLabel;
 import com.flather.weatherstation.dto.analytics.*;
+import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.forecast.*;
 import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
 import com.flather.weatherstation.util.MeteoMath;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+
+import java.time.*;
+import java.util.ArrayList;
 import java.util.DoubleSummaryStatistics;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -30,6 +31,7 @@ public class WeatherClientService {
   private final OpenMeteoProvider client;
   private final ConfigurationCache configurationCache;
   private final MetricDataDetailsMapper metricDataDetailsMapper;
+  private final Duration FORECAST_CHART_TTL = Duration.ofMinutes(10);
 
   public ForecastDto getForecast() {
     WeatherResponse response =
@@ -148,16 +150,17 @@ public class WeatherClientService {
     CurrentWeather current = response.currentWeather();
     ZoneId zone = configurationCache.getLocationContext().zoneId();
 
-    Double speedMs = kmhToMs(current.windSpeed());
-    Double gustsMs = kmhToMs(current.windGusts());
     Double direction = current.windDirection();
     WindDirectionLabel dirLabel =
         direction != null ? WindDirectionLabel.fromDegrees(direction) : null;
 
-    MetricDataDetails details =
-        metricDataDetailsMapper.fromApi(Metric.WIND, speedMs, current.time().atZone(zone));
+    Double speed = current.windSpeed();
+    Double guests = current.windGusts();
 
-    return new WindDto(speedMs, gustsMs, direction, dirLabel, BeaufortScale.fromMs(speedMs), details);
+    MetricDataDetails details =
+        metricDataDetailsMapper.fromApi(Metric.WIND, speed, current.time().atZone(zone));
+
+    return new WindDto(speed, guests, direction, dirLabel, BeaufortScale.fromMs(speed), details);
   }
 
   public UvIndexDto getUvIndex() {
@@ -170,6 +173,27 @@ public class WeatherClientService {
         metricDataDetailsMapper.fromApi(Metric.UV_INDEX, current.uvIndex(), current.time().atZone(zone));
 
     return new UvIndexDto(current.uvIndex(), UvLevel.fromIndex(current.uvIndex()), details);
+  }
+
+  public ChartDto getChart(Metric metric){
+    WeatherResponse response =
+            client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+    WeatherConditionsForecast forecast = response.hourly();
+
+    List<LocalDateTime> time = forecast.time();
+
+    List<ChartPointDto> points = switch (metric){
+      case TEMPERATURE -> mapToChartPoints(time, forecast.temperature2m());
+      case PRESSURE -> mapToChartPoints(time, forecast.surfacePressure());
+      case HUMIDITY -> mapToChartPoints(time, forecast.relativeHumidity2m());
+      case WIND -> mapToChartPoints(time, forecast.windSpeed10m());
+
+      case UV_INDEX -> mapToChartPoints(time, forecast.uvIndex());
+      default -> throw new IllegalArgumentException("This metric is not supported for charts");
+    };
+
+    return new ChartDto(metric.toString(), points, Instant.now().plus(FORECAST_CHART_TTL), "EXTERNAL_API");
+
   }
 
   private TrendResult computeHourlyTrend(
@@ -194,6 +218,26 @@ public class WeatherClientService {
     if (cur == null || prev == null) return new TrendResult(0.0, TrendDirection.STABLE);
 
     return MeteoMath.trendFromHourlyChange(cur - prev);
+  }
+
+  private List<ChartPointDto> mapToChartPoints(List<LocalDateTime> time, List<Double> values){
+    ZoneId zoneId = configurationCache.getLocationContext().zoneId();
+
+    if (time == null || values == null || time.isEmpty() || values.isEmpty()) {
+      return List.of();
+    }
+
+    int count = Math.min(24, Math.min(time.size(), values.size()));
+
+    List<ChartPointDto> points = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      Double val = values.get(i);
+      if (val != null) {
+        points.add(new ChartPointDto(time.get(i).atZone(zoneId), val));
+      }
+    }
+
+    return points;
   }
 
   private List<WeatherConditionPoint> mapToConditionPoints(WeatherConditionsForecast forecast) {
@@ -234,10 +278,5 @@ public class WeatherClientService {
   private static Integer safeInt(List<Integer> list, int i) {
     if (list == null || i >= list.size()) return null;
     return list.get(i);
-  }
-
-  private static Double kmhToMs(Double kmh) {
-    if (kmh == null) return null;
-    return Precision.round(kmh / 3.6, 1);
   }
 }
