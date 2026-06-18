@@ -6,6 +6,9 @@ public record WeatherConditionPoint(
     ZonedDateTime time,
     Integer weatherCode, // Open-Meteo: weather_code (WMO code)
     Double cloudCover, // Open-Meteo: cloud_cover (%)
+    Double cloudCoverLow, // Open-Meteo: cloud_cover_low (%) — surface to ~3 km
+    Double cloudCoverMid, // Open-Meteo: cloud_cover_mid (%) — ~3 km to ~8 km
+    Double cloudCoverHigh, // Open-Meteo: cloud_cover_high (%) — above ~8 km (cirrus)
     Double precipitationChance, // Open-Meteo: precipitation_probability (%)
     Double rainAmount, // Open-Meteo: rain (mm)
     Double snowAmount, // Open-Meteo: snowfall (cm)

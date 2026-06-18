@@ -8,56 +8,104 @@ const HOURS_PAST  = 3;
 const HOURS_AHEAD = 8;
 
 // ==========================================
-// ICON SELECTION
-// Priority: sleet > snow > rain > drizzle > cloud-only
+// SKY CLASSIFIER — shared by the icon picker and the tooltip header so they
+// can never disagree (e.g. a sun icon with "Mostly cloudy" underneath).
+// Priority: WMO weather_code (authoritative) > opaque (low+mid) cloud cover.
 // ==========================================
 
-// WMO thunderstorm codes from Open-Meteo weather_code:
-//   95 — slight/moderate thunderstorm
-//   96 — thunderstorm with slight hail
-//   99 — thunderstorm with heavy hail
-const THUNDER_CODES  = new Set([95]);
-const HAIL_CODES     = new Set([96, 99]);
+// Returns one of: 'clear' | 'haze' | 'partly' | 'overcast' | 'fog' | 'thunder'.
+function classifySky(point) {
+    const cloudHi = point.cloudCoverHigh ?? 0;
+    const cloudMd = point.cloudCoverMid  ?? 0;
+    const cloudLo = point.cloudCoverLow  ?? 0;
+    const wc      = point.weatherCode;
+    // Opaque (low+mid) cloud — what actually blocks the sun/moon. Thin cirrus
+    // alone shouldn't promote a clear sky into "partly cloudy".
+    const opaque  = Math.max(cloudLo, cloudMd);
+
+    if (wc === 45 || wc === 48) return 'fog';
+    if (wc === 95 || wc === 96 || wc === 99) return 'thunder';
+
+    // WMO cloud-only codes (0–3) describe the sky directly. For 0/1, demote to
+    // 'haze' if the only cloud is cirrus — matches the haze-{n} icon.
+    if (wc === 0 || wc === 1) {
+        return cloudHi >= 40 && opaque < 15 ? 'haze' : 'clear';
+    }
+    if (wc === 2) return 'partly';
+    if (wc === 3) return 'overcast';
+
+    // Precip codes or missing — derive from opaque cloud cover.
+    if (opaque >= 60) return 'overcast';
+    if (opaque >= 15) return 'partly';
+    return cloudHi >= 40 ? 'haze' : 'clear';
+}
+
+const SKY_LABELS = {
+    clear:    'Clear',
+    haze:     'Hazy',
+    partly:   'Partly cloudy',
+    overcast: 'Overcast',
+    fog:      'Fog',
+    thunder:  'Thunderstorm',
+};
+
+// ==========================================
+// ICON SELECTION
+// ==========================================
 
 function selectIcon(point, isNight) {
-    const cloud  = point.cloudCover          ?? 0;
+    const sky    = classifySky(point);
+    const wc     = point.weatherCode;
     const chance = point.precipitationChance ?? 0;
     const rain   = (point.rainAmount ?? 0) + (point.showersAmount ?? 0);
     const snow   = point.snowAmount          ?? 0;
-    const wc     = point.weatherCode         ?? 0;
-
     const n      = isNight ? 'night' : 'day';
-    const prefix = cloud >= 60 ? `overcast-${n}` : `partly-cloudy-${n}`;
 
-    // Weather code is the authoritative model signal — check it first.
-    // Overcast thunderstorm variants don't exist in this icon set, so the
-    // rain variant is used for both overcast and partly-cloudy thunderstorms.
-    if (HAIL_CODES.has(wc))   return `${prefix}-hail`;
-    if (THUNDER_CODES.has(wc)) {
-        if (snow > 0.1) return `thunderstorms-${n}-snow`;
-        return `thunderstorms-${n}-rain`;
+    if (sky === 'fog') return `fog-${n}`;
+
+    // The overcast thunderstorm variant doesn't exist in this icon set, so the
+    // rain variant covers both overcast and partly-cloudy thunderstorm cases.
+    if (sky === 'thunder') {
+        if (wc === 96 || wc === 99) {
+            const opaque = Math.max(point.cloudCoverLow ?? 0, point.cloudCoverMid ?? 0);
+            const hailPrefix = opaque >= 60 ? `overcast-${n}` : `partly-cloudy-${n}`;
+            return `${hailPrefix}-hail`;
+        }
+        return snow > 0.1 ? `thunderstorms-${n}-snow` : `thunderstorms-${n}-rain`;
     }
 
-    if (snow > 0.1 && rain > 0.1) return `${prefix}-sleet`;
-    if (snow > 0.1)                return `${prefix}-snow`;
-    if (rain > 0.5)                return `${prefix}-rain`;
-    if (rain > 0.1 || chance >= 30) return `${prefix}-drizzle`;
+    // Precipitation icons are built from the cloud-cover prefix.
+    const prefix = sky === 'overcast' ? `overcast-${n}` : `partly-cloudy-${n}`;
 
-    if (cloud < 15) return `clear-${n}`;
-    if (cloud < 60) return `partly-cloudy-${n}`;
-    return 'overcast';
+    switch (wc) {
+        case 56: case 57:
+        case 66: case 67: return `${prefix}-sleet`;
+        case 71: case 73: case 75: case 77:
+        case 85: case 86: return `${prefix}-snow`;
+        case 61: case 63: case 65:
+        case 80: case 81: case 82: return `${prefix}-rain`;
+        case 51: case 53: case 55: return `${prefix}-drizzle`;
+    }
+
+    // Safety net for cloud-only codes (0–3) or a missing code: if the model
+    // still reports precipitation amounts, prefer the precip icon.
+    if (snow > 0.1 && rain > 0.1)   return `${prefix}-sleet`;
+    if (snow > 0.1)                  return `${prefix}-snow`;
+    if (rain > 0.5)                  return `${prefix}-rain`;
+    if (rain > 0.1 || chance >= 30)  return `${prefix}-drizzle`;
+
+    // Dry sky — use the classifier directly.
+    switch (sky) {
+        case 'clear':    return `clear-${n}`;
+        case 'haze':     return `haze-${n}`;
+        case 'partly':   return `partly-cloudy-${n}`;
+        case 'overcast': return `overcast-${n}`;
+    }
 }
 
 // ==========================================
 // TOOLTIP CONTENT
 // ==========================================
-
-function cloudCoverLabel(pct) {
-    if (pct < 15) return 'Clear';
-    if (pct < 40) return 'Partly cloudy';
-    if (pct < 70) return 'Mostly cloudy';
-    return 'Overcast';
-}
 
 function precipLabel(point) {
     const snow = point.snowAmount ?? 0;
@@ -70,12 +118,11 @@ function precipLabel(point) {
 }
 
 function buildTooltipHTML(point) {
-    const cloud  = point.cloudCover          ?? 0;
     const chance = point.precipitationChance ?? 0;
     const rain   = (point.rainAmount ?? 0) + (point.showersAmount ?? 0);
     const snow   = point.snowAmount          ?? 0;
 
-    let html = `<div class="fc-tip-label">${cloudCoverLabel(cloud)}</div>`;
+    let html = `<div class="fc-tip-label">${SKY_LABELS[classifySky(point)]}</div>`;
 
     if (chance > 0) {
         html += `<div class="fc-tip-row">${Math.round(chance)}% chance of ${precipLabel(point)}</div>`;
