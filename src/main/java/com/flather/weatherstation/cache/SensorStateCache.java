@@ -215,7 +215,7 @@ public class SensorStateCache {
 
       int spikes = consecutiveSpikes.get(metric);
       spikes++;
-      log.info("spikes {}", spikes);
+      log.debug("[SPIKE_COUNTER][{}] consecutive={}", metric, spikes);
 
       consecutiveSpikes.put(metric, spikes);
 

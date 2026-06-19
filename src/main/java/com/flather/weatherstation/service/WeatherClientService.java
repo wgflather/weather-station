@@ -30,7 +30,7 @@ public class WeatherClientService {
   private final OpenMeteoProvider client;
   private final ConfigurationCache configurationCache;
   private final MetricDataDetailsMapper metricDataDetailsMapper;
-  private final Duration FORECAST_CHART_TTL = Duration.ofMinutes(10);
+  private final Duration forecastChartTtl = Duration.ofMinutes(10);
 
   public ForecastDto getForecast() {
     WeatherResponse response =
@@ -187,13 +187,13 @@ public class WeatherClientService {
     return new ChartDto(
         metric.toString(),
         points,
-        Instant.now().plus(FORECAST_CHART_TTL),
+        Instant.now().plus(forecastChartTtl),
         DataProvider.EXTERNAL_API);
   }
 
   private TrendResult computeHourlyTrend(
       List<Double> values, List<LocalDateTime> times, LocalDateTime now) {
-    if (values == null || values.size() < 2) {
+    if (values == null || times == null || values.size() < 2) {
       return new TrendResult(0.0, TrendDirection.STABLE);
     }
 

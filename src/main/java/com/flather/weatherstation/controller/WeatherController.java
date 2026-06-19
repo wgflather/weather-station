@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = "http://127.0.0.1:5500")
 public class WeatherController {
 
   public static final String BASE_PATH = "/api/weather";

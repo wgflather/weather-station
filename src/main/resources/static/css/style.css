@@ -2642,6 +2642,13 @@ h3 {
         padding-bottom: 8px;
     }
 
+    /* Temperature card is full-width so its content doesn't fill the
+       card height the way narrow cards do. justify-content:center (set
+       at 850px) adds space above the header; pin to flex-start instead. */
+    .temperature_block {
+        justify-content: flex-start;
+    }
+
     /* Equalize every metric card to the today block's height. --today-card-h is
        measured at runtime (equalize-card-height.js); grid items stretch to fill
        their row, so each card ends up at the same height as the today block. */

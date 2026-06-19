@@ -258,7 +258,7 @@ public class AstronomySearch {
     // up to the moment the sun finally rises through -18°.
     if (nightStart == null) {
       ZonedDateTime night = toZoned(nightEnd, zone);
-      return Duration.between(LocalDate.now().atStartOfDay(night.getZone()), night).getSeconds();
+      return Duration.between(LocalDate.now(zone).atStartOfDay(zone), night).getSeconds();
     }
 
     // Sun never climbs back above -18° — night runs for the full 24 hours.

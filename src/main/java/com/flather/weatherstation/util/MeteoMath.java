@@ -99,8 +99,4 @@ public class MeteoMath {
     return ((dryBaseline - clamped) / range) * 100.0;
   }
 
-  private static Double medianOf(Deque<Double> spikeWindow) {
-    Median median = new Median();
-    return median.evaluate(spikeWindow.stream().mapToDouble(Double::doubleValue).toArray());
-  }
 }
