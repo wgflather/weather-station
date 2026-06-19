@@ -131,16 +131,16 @@ public class AstronomySearch {
     double moonDistanceKm = round2(convertAuToKm(engine.getObjectDistance(Body.Moon)));
     String constellation = engine.getMoonConstellation();
 
-    // Phase angle (0°–360°): 0° = new moon, 90° = first quarter, 180° = full, 270° = last quarter.
     double phaseDegrees = engine.getMoonPhaseDegrees(time);
+    double parallacticAngle = round2(engine.getMoonParallacticAngle(time));
 
     IlluminationInfo info = engine.getMoonIllumination(time);
     double phasePercentage = round2(getMoonPhasePercentage(info.getPhaseFraction()));
     double moonAgeDays = round2(getMoonAgeDays(phaseDegrees));
     String phaseName = getPhaseName(phaseDegrees);
-    MoonPhase moonPhase = new MoonPhase(phasePercentage, moonAgeDays, phaseName);
+    MoonPhase moonPhase = new MoonPhase(phasePercentage, moonAgeDays, phaseName, round2(phaseDegrees));
 
-    return new MoonSnapshot(currentAlt, moonDistanceKm, moonPhase, constellation);
+    return new MoonSnapshot(currentAlt, moonDistanceKm, moonPhase, constellation, parallacticAngle);
   }
 
   /** Today's lunar events: rise, set, and the peak (transit) of the moon. */

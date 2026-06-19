@@ -1218,24 +1218,31 @@ h3 {
     padding-top: 4px;
 }
 
-/* Moon card body lays out as a vertical stack with consistent spacing. */
+/* Moon card body lays out text on the left and a hero-size moon disk on the
+   right. At ≤480px (single-column dashboard) it stacks: moon centered above,
+   text centered below, countdown hidden — see responsive overrides further down. */
 .moon-card-content {
-    gap: 12px;
-}
-
-/* Moon's glyph-led hero: phase disk on the left, phase name + percent
-   stacked to the right. The disk is the visual anchor of the moon card
-   (its identity), so it gets prime real estate in the same way the
-   countdown does on the sun card. */
-.moon-glyph-hero {
-    display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 14px;
+    justify-content: space-between;
+    gap: 18px;
 }
 
-.moon-glyph-hero .moon-disk {
-    width: 64px;
-    height: 64px;
+.moon-text-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.moon-card-content .moon-disk-wrapper {
+    flex-shrink: 0;
+}
+
+.moon-card-content .moon-disk {
+    width: 140px;
+    height: 140px;
 }
 
 .moon-glyph-meta {
@@ -1401,13 +1408,47 @@ h3 {
     background: rgba(255, 255, 255, 0.30);
 }
 
+/* Wrapper receives the drop-shadow glow so the canvas inside can blit its
+   pixels 1:1 to the compositor without any filter pipeline in between.
+   Applying filter directly to a canvas forces the browser to rasterize it
+   to an intermediate texture first (sometimes at CSS-pixel resolution),
+   which is the root cause of DPR-dependent sharpness loss. */
+.moon-disk-wrapper {
+    position: relative;
+    display: block;
+    line-height: 0;   /* suppress baseline gap (canvas was display:block) */
+    flex-shrink: 0;
+}
+
+/* Atmospheric corona. Rendered as a box-shadow on a circular pseudo-element that
+   matches the disc and sits *behind* the canvas — never as a `filter` on the canvas
+   or an ancestor. An ancestor filter rasterizes the canvas into an intermediate
+   buffer whose resolution tracks page zoom, softening the disc at 100% zoom while
+   200% stays sharp. box-shadow composites without touching the canvas raster path.
+   The three alpha stops are driven by JS via --moon-glow-a* (faded in daylight);
+   the fallbacks below are the night (full-glow) values. */
+.moon-disk-wrapper::before {
+    content: "";
+    position: absolute;
+    inset: 4%;            /* disc spans 92% of the box (radius = 0.46) */
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    box-shadow:
+        0 0  4px rgba(235, 240, 250, var(--moon-glow-a1, 0.20)),
+        0 0 11px rgba(225, 232, 245, var(--moon-glow-a2, 0.085)),
+        0 0 24px rgba(215, 225, 240, var(--moon-glow-a3, 0.03));
+}
+
 /* Default .moon-disk size — used by the modal hero. The card variant
-   overrides this in .moon-glyph-hero .moon-disk above. */
+   overrides this in .moon-card-content .moon-disk above. */
 .moon-disk {
+    position: relative;
+    z-index: 1;     /* above the ::before corona */
+    display: block; /* canvas is inline by default; block removes the baseline gap */
     width: 56px;
     height: 56px;
-    flex-shrink: 0;
-    filter: drop-shadow(0 0 6px rgba(252, 211, 77, 0.18));
+    will-change: transform; /* own compositing layer — keeps canvas pixels sharp */
 }
 
 /* Modal still uses these — see .modal-moon-hero below. */
@@ -1475,9 +1516,27 @@ h3 {
         margin-bottom: 8px;
     }
 
-    /* Tighter vertical rhythm inside both cards. */
+    /* Tighter vertical rhythm inside the sun card. */
     .astro-card-content { gap: 8px; padding-top: 2px; }
-    .moon-card-content  { gap: 6px; }
+
+    /* Moon card collapses into a vertical hero: moon centered above, text
+       centered below. Source order is text-then-moon (so desktop renders text
+       on the left, moon on the right) — flipping to column-reverse here puts
+       the moon on top without changing the DOM. The countdown is dropped at
+       this size — moon rise/set is not as time-critical as sunset, so the
+       rise/set line carries enough info on its own. Gaps and text scaled to
+       keep the total card height in line with the sun card. */
+    .moon-card-content {
+        flex-direction: column-reverse;
+        align-items: center;
+        gap: 6px;
+    }
+    .moon-text-block {
+        align-items: center;
+        text-align: center;
+        gap: 2px;
+    }
+    .moon-card-countdown { display: none; }
 
     /* ── Sun card ──────────────────────────────────────────────────────
        Remove the rise, set and now markers — no timestamps so no context.
@@ -1495,24 +1554,19 @@ h3 {
     .astro-hero-sub   { font-size: 0.72rem; }
 
     /* ── Moon card ─────────────────────────────────────────────────────
-       At ~390 px the meta column is only ~91 px wide — not enough for
-       "Waxing Crescent" on a single line. Allow multi-word phases to
-       wrap to two lines instead of truncating with ellipsis. */
-    .moon-glyph-hero            { gap: 8px; }
-    .moon-glyph-hero .moon-disk { width: 44px; height: 44px; }
+       Hero moon size at mobile — large enough to remain the visual centrepiece,
+       small enough to keep the card height in line with the sun card. */
+    .moon-card-content .moon-disk { width: 60px; height: 60px; }
 
     .moon-glyph-meta .phase-name {
-        font-size: 0.85rem;
-        line-height: 1.2;
+        font-size: 0.8rem;
+        line-height: 1.15;
         overflow-wrap: break-word;
     }
-    .moon-glyph-meta .phase-illum { font-size: 0.72rem; }
-
-    .moon-card-countdown { font-size: 0.85rem; }
 
     /* Rise/set line: smaller font + tighter separator keeps
        "Rise 20:14 · Set 08:30" on one line at 163 px. */
-    .moon-card-times { font-size: 0.75rem; }
+    .moon-card-times { font-size: 0.7rem; }
     .moon-time-sep   { margin: 0 3px; }
 
     /* Modal moon disk — larger context, keep it readable. */

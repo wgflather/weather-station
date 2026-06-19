@@ -8,8 +8,16 @@ package com.flather.weatherstation.dto.astronomy;
  *     below the horizon).
  * @param distanceKm geocentric distance to the moon in kilometres (converted from the astronomy
  *     library's astronomical-unit value).
- * @param phase lunar phase: illumination %, age in days, and human-readable phase name.
+ * @param phase lunar phase: illumination %, age in days, human-readable name, and precise phase
+ *     degrees.
  * @param constellation name of the constellation the moon is currently inside.
+ * @param parallacticAngle rotation of the terminator in degrees as seen from the observer's
+ *     latitude. Derived from the moon's hour angle and declination. Used by the frontend canvas
+ *     renderer to tilt the moon correctly for the observer's geographic position.
  */
 public record MoonSnapshot(
-    double currentAltitude, double distanceKm, MoonPhase phase, String constellation) {}
+    double currentAltitude,
+    double distanceKm,
+    MoonPhase phase,
+    String constellation,
+    double parallacticAngle) {}

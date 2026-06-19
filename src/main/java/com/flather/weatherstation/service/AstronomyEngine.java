@@ -85,6 +85,33 @@ public class AstronomyEngine {
     return Astronomy.moonPhase(toTime(time));
   }
 
+  /**
+   * Parallactic angle of the moon in degrees — the rotation of the terminator as seen from the
+   * observer's latitude. Computed from the moon's hour angle (H), declination (δ), and the
+   * observer's latitude (φ):
+   *
+   * <pre>q = atan2(sin H, tan φ · cos δ − sin δ · cos H)</pre>
+   *
+   * Positive when the moon is west of the meridian (terminator tilts right in northern hemisphere).
+   */
+  public double getMoonParallacticAngle(ZonedDateTime time) {
+    Time t = toTime(time);
+    double hHours = Astronomy.hourAngle(Body.Moon, t, observer());
+    // Library returns 0–24 sidereal hours; convert to signed −12…+12 (positive = west).
+    if (hHours > 12.0) hHours -= 24.0;
+    double hRad = Math.toRadians(hHours * 15.0);
+
+    Equatorial equ =
+        Astronomy.equator(Body.Moon, t, observer(), EquatorEpoch.J2000, Aberration.Corrected);
+    double decRad = Math.toRadians(equ.getDec());
+    double latRad = Math.toRadians(configurationCache.getLatitude());
+
+    return Math.toDegrees(
+        Math.atan2(
+            Math.sin(hRad),
+            Math.tan(latRad) * Math.cos(decRad) - Math.sin(decRad) * Math.cos(hRad)));
+  }
+
   /** Topocentric horizontal coordinates (azimuth / altitude) of a body, refraction-corrected. */
   public Topocentric getBodyPosition(Body body, Observer observer, Time time) {
     Equatorial equ =

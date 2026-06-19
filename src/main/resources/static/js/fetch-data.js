@@ -1,6 +1,7 @@
 import { renderWeatherChart } from './weather-chart.js';
 import { FetchScheduler } from './FetchScheduler.js';
 import { initStarField, updateStarField, setStarFieldModalDim } from './star-field.js';
+import { drawMoon } from './moon-canvas.js';
 
 // ==========================================
 // STATE
@@ -281,63 +282,6 @@ function renderPressure(pressure) {
 // ASTRONOMY
 // ==========================================
 
-// Derives the moon's phase angle (0–360°) from the illumination percentage
-// and the phase name. illuminationPercent = (1 − cos θ) / 2 × 100, so
-// θ = arccos(1 − 2k) which maps to [0°, 180°]. Waning phases mirror into
-// [180°, 360°] using the name string. Accurate to < 0.5° — imperceptible
-// at card or modal size.
-function moonPhaseAngle(illuminationPercent, phaseName) {
-    const k = Math.max(0, Math.min(100, illuminationPercent ?? 0)) / 100;
-    let theta = Math.acos(Math.max(-1, Math.min(1, 1 - 2 * k))) * 180 / Math.PI;
-    if (phaseName && phaseName.includes('Waning')) theta = 360 - theta;
-    return theta;
-}
-
-// Generates SVG inner-HTML for a moon disk of radius r centred at (50,50)
-// in a 100×100 viewBox, accurately representing any phase angle.
-//
-// The lit portion is bounded by two arcs:
-//   • One semicircle — the outer lit edge (right for waxing, left for waning)
-//   • One terminator ellipse — horizontal semi-axis = r × |cos θ|, which
-//     collapses to a straight line at quarters and expands to r at new/full.
-// An edge ring is layered on top so the dark-side boundary reads as a disk
-// rather than a void.
-function moonPhaseSVG(phaseDeg) {
-    const r = 47, cx = 50, cy = 50;
-    const DARK = '#1a2842', LIT = '#fcd34d';
-    const top = `${cx} ${cy - r}`, bot = `${cx} ${cy + r}`;
-    const ring = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#3a4d72" stroke-width="1.5"/>`;
-
-    // Edge cases — full circle saves the path math and avoids degenerate arcs.
-    if (phaseDeg < 1)
-        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}" stroke="#3a4d72" stroke-width="1.5"/>`;
-    if (phaseDeg > 179 && phaseDeg < 181)
-        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/>${ring}`;
-
-    // Terminator ellipse horizontal semi-axis. 0 at quarters, r at new/full.
-    const atx = (r * Math.abs(Math.cos(phaseDeg * Math.PI / 180))).toFixed(2);
-
-    // Each case: background fill first, then the terminator+outer path,
-    // then the edge ring so the disk outline is always visible.
-    if (phaseDeg < 90) {
-        // Waxing crescent: dark bg → lit path = right-arc CW + terminator CCW
-        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}"/>
-<path d="M${top} A${r},${r} 0 0,1 ${bot} A${atx},${r} 0 0,0 ${top}Z" fill="${LIT}"/>${ring}`;
-    }
-    if (phaseDeg < 180) {
-        // Waxing gibbous: lit bg → dark sliver = terminator CW + right-arc CW
-        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/>
-<path d="M${top} A${atx},${r} 0 0,1 ${bot} A${r},${r} 0 0,1 ${top}Z" fill="${DARK}"/>${ring}`;
-    }
-    if (phaseDeg < 270) {
-        // Waning gibbous: lit bg → dark sliver = terminator CCW + left-arc CCW
-        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/>
-<path d="M${top} A${atx},${r} 0 0,0 ${bot} A${r},${r} 0 0,0 ${top}Z" fill="${DARK}"/>${ring}`;
-    }
-    // Waning crescent: dark bg → lit path = left-arc CCW + terminator CW
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}"/>
-<path d="M${top} A${r},${r} 0 0,0 ${bot} A${atx},${r} 0 0,1 ${top}Z" fill="${LIT}"/>${ring}`;
-}
 
 function formatTimeOfDay(isoString) {
     if (!isoString) return '--:--';
@@ -392,7 +336,11 @@ function renderAstronomyLive(sunSnapshot, moonSnapshot) {
     updateStarField(getStarAltitude(sunSnapshot?.currentAltitude));
 
     if (moonSnapshot?.phase) {
-        renderMoonPhase(moonSnapshot.phase);
+        renderMoonPhase(
+            moonSnapshot.phase,
+            moonSnapshot.parallacticAngle ?? 0,
+            moonAmbientFor(sunSnapshot?.currentAltitude),
+        );
     }
 
     // Refresh the time-dependent bits every tick — countdown text and
@@ -740,6 +688,50 @@ function computeSkyColors(altitudeDeg) {
     return null;
 }
 
+// Normalized sky brightness from sun altitude: 0 = night, 0.5 = twilight,
+// 1 = bright daytime. Smoothstepped so the moon's daytime adaptation eases in
+// rather than snapping. Mirrors the perceptual reality that the moon only
+// washes out once the sun is genuinely up — civil twilight and below read dark.
+function skyBrightnessForAltitude(altitudeDeg) {
+    if (altitudeDeg == null) return 0;
+    const smooth = (t) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
+    if (altitudeDeg <= -6) return 0;            // civil twilight and below: dark
+    if (altitudeDeg >= 12) return 1;            // sun well up: full daylight
+    if (altitudeDeg <= 0) return 0.5 * smooth((altitudeDeg + 6) / 6);       // -6°→0° : 0 → 0.5
+    return 0.5 + 0.5 * smooth(altitudeDeg / 12);                            // 0°→12° : 0.5 → 1
+}
+
+// Interpolated bottom-of-sky RGB at a given altitude — the live background hue
+// the moon's lit disc is tinted toward in daylight. Uses the same anchor table
+// and clamping as computeSkyColors so the tint always matches the visible sky.
+function skyBottomRgbAt(altitudeDeg) {
+    if (altitudeDeg == null) return null;
+    const first = SKY_ANCHORS[0];
+    const last  = SKY_ANCHORS[SKY_ANCHORS.length - 1];
+    if (altitudeDeg <= first.alt) return first.bottom.slice();
+    if (altitudeDeg >= last.alt)  return last.bottom.slice();
+    for (let i = 0; i < SKY_ANCHORS.length - 1; i++) {
+        const lo = SKY_ANCHORS[i];
+        const hi = SKY_ANCHORS[i + 1];
+        if (altitudeDeg >= lo.alt && altitudeDeg <= hi.alt) {
+            const t = (altitudeDeg - lo.alt) / (hi.alt - lo.alt);
+            return lerpTriplet(lo.bottom, hi.bottom, t);
+        }
+    }
+    return last.bottom.slice();
+}
+
+// Sky adaptation passed to drawMoon. Uses the *effective* altitude (the same one
+// that drives star visibility) so a pinned static background preset washes the
+// moon to match the displayed sky rather than the real sun position.
+function moonAmbientFor(sunAltDeg) {
+    const effAlt = getStarAltitude(sunAltDeg);
+    return {
+        brightness: skyBrightnessForAltitude(effAlt),
+        skyTint:    skyBottomRgbAt(effAlt),
+    };
+}
+
 let skyBackgroundPrimed = false;
 
 // Shared DOM-writer used by both the dynamic renderer and the static
@@ -819,6 +811,15 @@ function applyBgPreference(pref) {
     // Star visibility must also reflect the new preference immediately.
     // getStarAltitude reads the just-saved pref via loadBgPreference().
     updateStarField(getStarAltitude(state.sunSnapshot?.currentAltitude));
+    // Moon appearance (brightness, sky tint, glow) depends on the ambient sky,
+    // so re-render immediately rather than waiting for the next 30s poll.
+    if (state.moonSnapshot?.phase) {
+        renderMoonPhase(
+            state.moonSnapshot.phase,
+            state.moonSnapshot.parallacticAngle ?? 0,
+            moonAmbientFor(state.sunSnapshot?.currentAltitude),
+        );
+    }
 }
 
 function updateSwatchActive(pref) {
@@ -986,8 +987,20 @@ function unlockBodyScroll() {
 function renderActiveModal() {
     const body = document.getElementById('astro-modal-body');
     if (!body) return;
-    if (state.openModal === 'sun')  body.innerHTML = buildSunModalHTML();
-    if (state.openModal === 'moon') body.innerHTML = buildMoonModalHTML();
+    if (state.openModal === 'sun') {
+        body.innerHTML = buildSunModalHTML();
+    }
+    if (state.openModal === 'moon') {
+        body.innerHTML = buildMoonModalHTML();
+        // Canvas is now in the DOM — draw into it on the next frame so CSS
+        // layout has resolved and offsetWidth/Height are non-zero.
+        requestAnimationFrame(() => {
+            const canvas = document.getElementById('moon-modal-canvas');
+            if (!canvas) return;
+            const snap = state.moonSnapshot;
+            drawMoon(canvas, snap?.phase?.phaseDegrees ?? 0, snap?.parallacticAngle ?? 0);
+        });
+    }
 }
 
 function buildSunModalHTML() {
@@ -1076,9 +1089,6 @@ function buildMoonModalHTML() {
     const snapshot = state.moonSnapshot;
     const phase    = snapshot?.phase;
 
-    const phaseSvg = moonPhaseSVG(
-        moonPhaseAngle(phase?.illuminationPercent ?? 0, phase?.phaseName ?? ''));
-
     const illumPct = phase?.illuminationPercent != null
         ? `${phase.illuminationPercent.toFixed(1)}%`
         : '--';
@@ -1100,7 +1110,9 @@ function buildMoonModalHTML() {
     return `
         <div class="modal-section">
             <div class="modal-moon-hero">
-                <svg class="moon-disk" viewBox="0 0 100 100" aria-hidden="true">${phaseSvg}</svg>
+                <div class="moon-disk-wrapper">
+                    <canvas class="moon-disk" id="moon-modal-canvas" aria-hidden="true"></canvas>
+                </div>
                 <div class="moon-phase-meta">
                     <span class="phase-name">${phase?.phaseName ?? '--'}</span>
                     <span class="phase-illum">${illumPct} illuminated · ${ageDays} old</span>
@@ -1183,23 +1195,17 @@ function initAstroModal() {
     });
 }
 
-function renderMoonPhase(phase) {
-    const disk = document.getElementById('moon-disk');
-    const name = document.getElementById('moon-phase-name');
-    const pct  = document.getElementById('moon-phase-illum');
-    if (!disk || !name || !pct) return;
+function renderMoonPhase(phase, parallacticAngle = 0, ambient = null) {
+    const canvas = document.getElementById('moon-canvas');
+    const name   = document.getElementById('moon-phase-name');
+    const pct    = document.getElementById('moon-phase-illum');
+    if (!canvas || !name || !pct) return;
 
-    // Redraw when illumination changes by more than 0.2% — continuous
-    // rendering at any precision, without DOM churn on every tick.
-    const illum = phase.illuminationPercent ?? 0;
-    if (Math.abs((disk._lastIllum ?? -1) - illum) > 0.2) {
-        const phaseDeg = moonPhaseAngle(illum, phase.phaseName);
-        disk.innerHTML  = moonPhaseSVG(phaseDeg);
-        disk._lastIllum = illum;
-    }
+    const phaseDeg = phase.phaseDegrees ?? 0;
+    drawMoon(canvas, phaseDeg, parallacticAngle, ambient);
 
     name.textContent = phase.phaseName ?? '--';
-    pct.textContent  = illum != null ? illum.toFixed(0) : '--';
+    pct.textContent  = (phase.illuminationPercent ?? 0).toFixed(0);
 }
 
 function renderPressureTrend(pressureTrend, changeValue) {
