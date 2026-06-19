@@ -178,7 +178,7 @@ function _renderProcedural(ctx, W, H, phaseDeg, parallacticAngle, brightness, sk
     // correctly for the observer's latitude and the moon's position in the sky.
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(parallacticAngle * Math.PI / 180);
+    ctx.rotate(-parallacticAngle * Math.PI / 180);
     ctx.translate(-cx, -cy);
 
     ctx.beginPath();
@@ -264,7 +264,7 @@ function _sphereProject(W, H, phaseDeg, parallacticAngle, brightness = 0, skyTin
     const cx = W / 2, cy = H / 2;
     const haze = _hazeFromSky(skyTint);
 
-    const aRot = -parallacticAngle * Math.PI / 180;
+    const aRot = parallacticAngle * Math.PI / 180;
     const cosA = Math.cos(aRot), sinA = Math.sin(aRot);
 
     const phRad = phaseDeg * Math.PI / 180;

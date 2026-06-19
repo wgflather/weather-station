@@ -1241,8 +1241,8 @@ h3 {
 }
 
 .moon-card-content .moon-disk {
-    width: 140px;
-    height: 140px;
+    width: 150px;
+    height: 150px;
 }
 
 .moon-glyph-meta {
@@ -1556,7 +1556,7 @@ h3 {
     /* ── Moon card ─────────────────────────────────────────────────────
        Hero moon size at mobile — large enough to remain the visual centrepiece,
        small enough to keep the card height in line with the sun card. */
-    .moon-card-content .moon-disk { width: 60px; height: 60px; }
+    .moon-card-content .moon-disk { width: 74px; height: 74px; }
 
     .moon-glyph-meta .phase-name {
         font-size: 0.8rem;
@@ -1783,27 +1783,34 @@ h3 {
     margin-left: 4px;
 }
 
-/* Moon modal hero: phase glyph + name. */
+/* Moon modal hero: large centred disc with phase name + illumination below. */
 .modal-moon-hero {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 18px;
-    padding: 6px 0 4px 0;
+    padding: 12px 0 4px;
 }
 
 .modal-moon-hero .moon-disk {
-    width: 84px;
-    height: 84px;
+    width: 220px;
+    height: 220px;
+}
+
+.modal-moon-hero .moon-phase-meta {
+    align-items: center;
+    text-align: center;
 }
 
 .modal-moon-hero .phase-name {
-    font-size: 1.35rem;
+    font-size: 1.45rem;
+    font-weight: var(--fw-value);
     color: var(--text-primary);
 }
 
 .modal-moon-hero .phase-illum {
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.88rem;
 }
 
 /* Sun twilight ladder — vertical list of altitude crossings in
@@ -1893,8 +1900,8 @@ h3 {
         max-height: 65dvh;
         max-width: 420px;
     }
-    .modal-grid  { grid-template-columns: 1fr; gap: 8px; }
-    .modal-moon-hero .moon-disk { width: 68px; height: 68px; }
+    .modal-grid  { gap: 8px 10px; }
+    .modal-moon-hero .moon-disk { width: 160px; height: 160px; }
     .modal-moon-hero .phase-name { font-size: 1.2rem; }
 }
 
@@ -2565,6 +2572,12 @@ h3 {
     }
 }
 
+/* Moon card: at 800px text starts overlapping at 160px disk — scale it down
+   while keeping the side-by-side row layout. */
+@media (max-width: 800px) {
+    .moon-card-content .moon-disk { width: 130px; height: 130px; }
+}
+
 /* The grid drops to 2 columns here so the single metric cards never get squeezed
    into a too-narrow 3-column layout (which previously forced content to overflow
    the card borders between ~600–720px). This is the single mid-tier of card
@@ -2626,6 +2639,34 @@ h3 {
         min-width: unset;
     }
     .metric-selector { gap: 6px; }
+
+    /* Moon card: switch to the same stacked layout as ≤520px — the disk is too
+       large for the side-by-side text at this width. 100px looks right as a
+       centred hero in the stacked column. */
+    .moon-card-content .moon-disk { width: 100px; height: 100px; }
+    .moon-card-content {
+        flex-direction: column-reverse;
+        align-items: center;
+        gap: 6px;
+    }
+    .moon-text-block {
+        align-items: center;
+        text-align: center;
+        gap: 2px;
+    }
+    .moon-card-countdown { display: none; }
+}
+
+/* Restore the correct smaller disk for ≤520px (the 720px block above overrides
+   the earlier 520px block in the file because it appears later in the cascade). */
+@media (max-width: 520px) {
+    .moon-card-content .moon-disk { width: 74px; height: 74px; }
+}
+
+/* ≤480px: full-width stacked card on a narrow phone — the 74px moon from ≤520px
+   is too tall; scale down to keep the card height comparable to the sun card. */
+@media (max-width: 480px) {
+    .moon-card-content .moon-disk { width: 64px; height: 64px; }
 }
 
 @media (max-width: 480px) {

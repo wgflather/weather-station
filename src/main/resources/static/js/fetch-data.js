@@ -1030,9 +1030,6 @@ function buildSunModalHTML() {
 
     const altDeg = snapshot?.currentAltitude;
     const altStr = altDeg != null ? `${altDeg.toFixed(1)}°` : '--';
-    const positionText = altDeg == null
-        ? '--'
-        : (altDeg > 0 ? `Above horizon (${altStr})` : `Below horizon (${altStr})`);
 
     const noonAltStr = daily?.solarNoon?.alt != null
         ? `${daily.solarNoon.alt.toFixed(1)}°`
@@ -1044,7 +1041,7 @@ function buildSunModalHTML() {
             <div class="modal-grid">
                 <div class="modal-row">
                     <span class="label">Current altitude</span>
-                    <span class="value">${positionText}</span>
+                    <span class="value">${altStr}</span>
                 </div>
                 <div class="modal-row">
                     <span class="label">Solar noon altitude</span>
@@ -1098,9 +1095,6 @@ function buildMoonModalHTML() {
 
     const altDeg = snapshot?.currentAltitude;
     const altStr = altDeg != null ? `${altDeg.toFixed(1)}°` : '--';
-    const positionText = altDeg == null
-        ? '--'
-        : (altDeg > 0 ? `Above horizon (${altStr})` : `Below horizon (${altStr})`);
 
     const peakAltStr = daily?.peak?.alt != null ? `${daily.peak.alt.toFixed(1)}°` : '--';
     const distanceKm = snapshot?.distanceKm != null
@@ -1108,15 +1102,13 @@ function buildMoonModalHTML() {
         : '--';
 
     return `
-        <div class="modal-section">
-            <div class="modal-moon-hero">
-                <div class="moon-disk-wrapper">
-                    <canvas class="moon-disk" id="moon-modal-canvas" aria-hidden="true"></canvas>
-                </div>
-                <div class="moon-phase-meta">
-                    <span class="phase-name">${phase?.phaseName ?? '--'}</span>
-                    <span class="phase-illum">${illumPct} illuminated · ${ageDays} old</span>
-                </div>
+        <div class="modal-moon-hero">
+            <div class="moon-disk-wrapper">
+                <canvas class="moon-disk" id="moon-modal-canvas" aria-hidden="true"></canvas>
+            </div>
+            <div class="moon-phase-meta">
+                <span class="phase-name">${phase?.phaseName ?? '--'}</span>
+                <span class="phase-illum">${illumPct} illuminated · ${ageDays} old</span>
             </div>
         </div>
 
@@ -1125,7 +1117,7 @@ function buildMoonModalHTML() {
             <div class="modal-grid">
                 <div class="modal-row">
                     <span class="label">Current altitude</span>
-                    <span class="value">${positionText}</span>
+                    <span class="value">${altStr}</span>
                 </div>
                 <div class="modal-row">
                     <span class="label">Constellation</span>
