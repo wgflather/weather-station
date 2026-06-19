@@ -27,12 +27,42 @@ function _loadTexture(src) {
         const ctx = c.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0, W, H);
         const id  = ctx.getImageData(0, 0, W, H);
-        _texMips = [{ data: id.data, w: W, h: H }];
+        // Pre-sharpen the texture once so bilinear oversampling at lower DPRs
+        // (e.g. DPR=2.5 where ~2 texels average per output pixel) doesn't
+        // produce a visibly soft disc compared to higher-DPR views.
+        _texMips = [{ data: _sharpenTexture(id.data, W, H, 0.38), w: W, h: H }];
     };
     img.onerror = () => {
         if (src.endsWith('.webp')) _loadTexture('/img/moon-texture.png');
     };
     img.src = src;
+}
+
+// One-time unsharp-mask pass on the equirectangular texture.
+// Kernel: center*(1+a) − each of 4 neighbours*(a/4). Sums to 1 — no brightness shift.
+// Wraps horizontally (equirectangular seam), clamps vertically (poles).
+function _sharpenTexture(src, w, h, amount) {
+    const dst = new Uint8ClampedArray(src.length);
+    const cw  = 1 + amount;
+    const nw  = amount * 0.25;
+    for (let y = 0; y < h; y++) {
+        const yn = Math.max(0, y - 1);
+        const yp = Math.min(h - 1, y + 1);
+        for (let x = 0; x < w; x++) {
+            const xn = (x - 1 + w) % w;
+            const xp = (x + 1)     % w;
+            const ic = (y  * w + x)  * 4;
+            const il = (y  * w + xn) * 4;
+            const ir = (y  * w + xp) * 4;
+            const it = (yn * w + x)  * 4;
+            const ib = (yp * w + x)  * 4;
+            dst[ic    ] = Math.min(255, Math.max(0, cw*src[ic  ] - nw*(src[il  ]+src[ir  ]+src[it  ]+src[ib  ])));
+            dst[ic + 1] = Math.min(255, Math.max(0, cw*src[ic+1] - nw*(src[il+1]+src[ir+1]+src[it+1]+src[ib+1])));
+            dst[ic + 2] = Math.min(255, Math.max(0, cw*src[ic+2] - nw*(src[il+2]+src[ir+2]+src[it+2]+src[ib+2])));
+            dst[ic + 3] = src[ic + 3];
+        }
+    }
+    return dst;
 }
 _loadTexture('/img/moon-texture.webp');
 
@@ -307,9 +337,10 @@ function _sphereProject(W, H, phaseDeg, parallacticAngle, brightness = 0, skyTin
     const TERM_INV = 1 / (2 * TERM_W);
 
     // ----- Edge feather -----
-    // Analytic anti-aliasing at the limb: smoothstep over ~2.2 device px at night
-    // (crisp), widening in daylight so the limb melts into the bright sky.
-    const FEATHER     = (2.2 + 10 * b) / r;
+    // Analytic anti-aliasing at the limb: constant ~2.5 device px regardless of
+    // brightness. Daylight blending is handled by tintAmt/darkSideAlpha; a wide
+    // feather here just makes the disc look fuzzy, especially on small screens.
+    const FEATHER     = 2.5 / r;
     const FEATHER_INV = 1 / FEATHER;
 
     for (let py = 0; py < H; py++) {
