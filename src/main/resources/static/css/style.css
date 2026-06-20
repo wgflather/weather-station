@@ -1206,6 +1206,12 @@ h3 {
     padding-bottom: 14px;
 }
 
+.sun_block .card-header,
+.moon_block .card-header {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
 
 .row-astro {
     flex-wrap: nowrap;
@@ -1241,8 +1247,8 @@ h3 {
 }
 
 .moon-card-content .moon-disk {
-    width: 150px;
-    height: 150px;
+    width: 140px;
+    height: 140px;
 }
 
 .moon-glyph-meta {
@@ -1271,6 +1277,14 @@ h3 {
 .moon-time-value {
     color: var(--text-primary);
     font-weight: var(--fw-value);
+}
+
+.moon-future-badge {
+    font-size: 0.6em;
+    font-weight: var(--fw-value);
+    color: var(--text-accent, var(--text-secondary));
+    vertical-align: super;
+    margin-left: 1px;
 }
 
 .moon-time-sep {
@@ -1508,13 +1522,6 @@ h3 {
         padding: 12px;
     }
 
-    /* Reduce the title-line spacing only on astro cards — other cards
-       keep their standard header at this breakpoint. */
-    .sun_block .card-header,
-    .moon_block .card-header {
-        padding-bottom: 8px;
-        margin-bottom: 8px;
-    }
 
     /* Tighter vertical rhythm inside the sun card. */
     .astro-card-content { gap: 8px; padding-top: 2px; }
@@ -1564,8 +1571,6 @@ h3 {
         overflow-wrap: break-word;
     }
 
-    /* Rise/set line: smaller font + tighter separator keeps
-       "Rise 20:14 · Set 08:30" on one line at 163 px. */
     .moon-card-times { font-size: 0.7rem; }
     .moon-time-sep   { margin: 0 3px; }
 

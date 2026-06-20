@@ -15,6 +15,8 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -146,8 +148,8 @@ public class AstronomySearch {
   /** Today's lunar events: rise, set, and the peak (transit) of the moon. */
   @Cacheable(value = "moonDailyEvents", key = "#root.target.dailyKey()")
   public MoonDailyEvents getMoonDailyEvents() {
-    ZonedDateTime moonRise = engine.calculateRiseSet(Body.Moon, Direction.Rise);
-    ZonedDateTime moonSet = engine.calculateRiseSet(Body.Moon, Direction.Set);
+    ZonedDateTime moonRise = engine.findNextRiseSet(Body.Moon, Direction.Rise);
+    ZonedDateTime moonSet = engine.findNextRiseSet(Body.Moon, Direction.Set);
     TransitDto moonPeak = roundTransit(engine.getBodyPeakAltitude(Body.Moon));
     List<AstronomyPoint> moonCurve = engine.generateWholeDayCurve(Body.Moon);
 

@@ -194,7 +194,23 @@ public class AstronomyEngine {
         Astronomy.searchRiseSet(body, observer(), direction, todayMidnight(), SEARCH_LIMIT_DAYS);
     return Optional.ofNullable(foundTime)
         .map(this::toZoned)
-        .orElseThrow(() -> new IllegalStateException("No altitude event found for " + body));
+        .orElse(null);
+  }
+
+  /**
+   * Searches forward day-by-day (up to 30 days) for the next rise or set of the given body.
+   * Returns the first match found, which may be today or on a future date. Returns {@code null}
+   * only if no event occurs within the 30-day window (extreme polar conditions).
+   */
+  public ZonedDateTime findNextRiseSet(Body body, Direction direction) {
+    ZoneId zone = zoneId();
+    for (int offset = 0; offset < 30; offset++) {
+      LocalDate date = LocalDate.now(zone).plusDays(offset);
+      Time start = toTime(date.atStartOfDay(zone));
+      Time found = Astronomy.searchRiseSet(body, observer(), direction, start, SEARCH_LIMIT_DAYS);
+      if (found != null) return toZoned(found);
+    }
+    return null;
   }
 
   // ────────────────────────────────────────────────────────────────────────────

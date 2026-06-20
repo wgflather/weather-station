@@ -291,6 +291,35 @@ function formatTimeOfDay(isoString) {
         : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Full date-aware label for the modal where space is not a constraint.
+function formatMoonEvent(isoString) {
+    if (!isoString) return '—';
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '—';
+    const timeStr  = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const today    = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    if (date.toDateString() === today.toDateString())    return timeStr;
+    if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow ${timeStr}`;
+    return `${date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} ${timeStr}`;
+}
+
+// Sets a moon card time element to HH:MM, with a static +N superscript when the
+// event falls on a future day. No interaction — the full date is in the modal.
+function setMoonTimeEl(el, isoString) {
+    if (!isoString) { el.textContent = '—'; return; }
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) { el.textContent = '—'; return; }
+    const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const today   = new Date();
+    if (date.toDateString() === today.toDateString()) { el.textContent = timeStr; return; }
+    const todayMid  = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dateMid   = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayOffset = Math.round((dateMid - todayMid) / 86400000);
+    el.innerHTML = `${timeStr}<sup class="moon-future-badge">+${dayOffset}</sup>`;
+}
+
 function formatDuration(totalSeconds) {
     if (totalSeconds == null) return '--';
     const seconds = Math.abs(totalSeconds);
@@ -315,8 +344,8 @@ function renderSunCard(sun) {
 
 function renderMoonCard(moon) {
     if (!moon) return;
-    document.getElementById('moon-card-rise').textContent = formatTimeOfDay(moon.rise);
-    document.getElementById('moon-card-set').textContent  = formatTimeOfDay(moon.set);
+    setMoonTimeEl(document.getElementById('moon-card-rise'), moon.rise);
+    setMoonTimeEl(document.getElementById('moon-card-set'),  moon.set);
     // Phase name / illumination come from the live snapshot (phase drifts
     // continuously, see renderAstronomyLive).
 }
@@ -541,6 +570,9 @@ function updateMoonCountdown(riseIso, setIso) {
     const next = pickNextEvent(riseIso, setIso, 'Moon');
     if (next) {
         el.textContent = `${next.label} in ${formatCountdown(next.timeMs)}`;
+    } else if (riseIso == null && setIso == null) {
+        const alt = state.moonSnapshot?.currentAltitude ?? 0;
+        el.textContent = alt > 0 ? 'Above horizon all day' : 'Below horizon all day';
     } else {
         el.textContent = 'Below horizon';
     }
@@ -1139,11 +1171,11 @@ function buildMoonModalHTML() {
             <div class="modal-grid">
                 <div class="modal-row">
                     <span class="label">Moonrise</span>
-                    <span class="value">${formatTimeOfDay(daily?.rise)}</span>
+                    <span class="value">${formatMoonEvent(daily?.rise)}</span>
                 </div>
                 <div class="modal-row">
                     <span class="label">Moonset</span>
-                    <span class="value">${formatTimeOfDay(daily?.set)}</span>
+                    <span class="value">${formatMoonEvent(daily?.set)}</span>
                 </div>
                 <div class="modal-row">
                     <span class="label">Lunar transit</span>

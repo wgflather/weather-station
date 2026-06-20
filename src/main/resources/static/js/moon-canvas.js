@@ -16,6 +16,9 @@
 // in this app (140px card, 84px modal) hit at most 2.5:1 bilinear downsampling at
 // their lowest DPR, which is visually cleaner than a pre-blurred 1:1 mip.
 let _texMips = null;
+// Calls to drawMoon that arrived before the texture finished loading, keyed by
+// canvas element so each canvas only stores its most-recent pending draw.
+const _pendingDraws = new Map();
 
 function _loadTexture(src) {
     const img = new Image();
@@ -31,6 +34,10 @@ function _loadTexture(src) {
         // (e.g. DPR=2.5 where ~2 texels average per output pixel) doesn't
         // produce a visibly soft disc compared to higher-DPR views.
         _texMips = [{ data: _sharpenTexture(id.data, W, H, 0.38), w: W, h: H }];
+        // Re-render any canvas that fell back to the procedural path while the
+        // texture was still loading.
+        for (const [canvas, args] of _pendingDraws) drawMoon(canvas, ...args);
+        _pendingDraws.clear();
     };
     img.onerror = () => {
         if (src.endsWith('.webp')) _loadTexture('/img/moon-texture.png');
@@ -136,6 +143,8 @@ export function drawMoon(canvas, phaseDeg, parallacticAngle = 0, ambient = null)
         // dpr transform to stay crisp.
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         _renderProcedural(ctx, cssW, cssH, phaseDeg, parallacticAngle, brightness, ambient?.skyTint);
+        // Queue a re-render for when the texture finishes loading.
+        _pendingDraws.set(canvas, [phaseDeg, parallacticAngle, ambient]);
     }
 }
 
