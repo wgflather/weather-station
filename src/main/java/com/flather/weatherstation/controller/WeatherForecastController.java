@@ -1,6 +1,5 @@
 package com.flather.weatherstation.controller;
 
-import com.flather.weatherstation.dto.forecast.AstroForecastDto;
 import com.flather.weatherstation.dto.forecast.ForecastDto;
 import com.flather.weatherstation.service.WeatherClientService;
 import lombok.RequiredArgsConstructor;
@@ -19,10 +18,5 @@ public class WeatherForecastController {
   @GetMapping("/clouds")
   public ResponseEntity<ForecastDto> getForecast() {
     return ResponseEntity.ok(service.getForecast());
-  }
-
-  @GetMapping("/astro")
-  public ResponseEntity<AstroForecastDto> getAstroForecast() {
-    return ResponseEntity.ok(service.getAstroForecast());
   }
 }

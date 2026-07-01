@@ -12,7 +12,11 @@ import com.flather.weatherstation.domain.constant.UvLevel;
 import com.flather.weatherstation.domain.constant.WindDirectionLabel;
 import com.flather.weatherstation.dto.analytics.*;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
-import com.flather.weatherstation.dto.forecast.*;
+import com.flather.weatherstation.dto.forecast.CurrentWeather;
+import com.flather.weatherstation.dto.forecast.ForecastDto;
+import com.flather.weatherstation.dto.forecast.WeatherConditionPoint;
+import com.flather.weatherstation.dto.forecast.WeatherConditionsForecast;
+import com.flather.weatherstation.dto.forecast.WeatherResponse;
 import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
 import com.flather.weatherstation.util.MeteoMath;
 import java.time.*;
@@ -36,34 +40,6 @@ public class WeatherClientService {
     WeatherResponse response =
         client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
     return new ForecastDto(response.units(), mapToConditionPoints(response.hourly()));
-  }
-
-  public AstroForecastDto getAstroForecast() {
-    WeatherConditionsForecast f =
-        client
-            .fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude())
-            .hourly();
-    ZoneId zone = configurationCache.getLocationContext().zoneId();
-    List<AstroForecastPoint> points =
-        IntStream.range(0, f.time().size())
-            .mapToObj(
-                i -> {
-                  double windSurface = safe(f.windSpeed10m(), i);
-                  double jetStream = safe(f.windSpeed200hPa(), i);
-                  double seeing = SeeingCalculator.seeing(jetStream, windSurface);
-                  return new AstroForecastPoint(
-                      f.time().get(i).atZone(zone),
-                      safe(f.cloudCoverLow(), i),
-                      safe(f.cloudCoverMid(), i),
-                      safe(f.cloudCoverHigh(), i),
-                      windSurface,
-                      jetStream,
-                      Math.round(seeing * 10.0) / 10.0,
-                      SeeingCalculator.label(seeing),
-                      SeeingCalculator.score(seeing));
-                })
-            .toList();
-    return new AstroForecastDto(points);
   }
 
   public TemperatureDto getTemperature(WeatherResponse response) {

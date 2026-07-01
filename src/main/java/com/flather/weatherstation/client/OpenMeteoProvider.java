@@ -21,10 +21,9 @@ public class OpenMeteoProvider {
   public WeatherResponse fetchWeather(Double lat, Double lon) {
     String currentWeatherQuery =
         configurationCache.getDataProviderConfiguration().generateApiQueryParam();
-    // Base hourly variables always fetched for cloud strip + astro forecast.
     String hourlyBase =
         "weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,"
-            + "precipitation_probability,rain,showers,snowfall,wind_speed_10m,wind_speed_200hPa";
+            + "precipitation_probability,rain,showers,snowfall,wind_speed_10m";
     // Append metric-specific variables only when at least one metric uses the external API.
     String hourlyQuery =
         currentWeatherQuery.isEmpty() ? hourlyBase : hourlyBase + "," + currentWeatherQuery;

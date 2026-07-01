@@ -108,15 +108,6 @@
             <span class="wetness-status-dot"></span>
             <span id="wetness-status-text">Dry</span>
         </div>
-        <button class="astro-fc-strip-btn" id="astro-fc-btn" type="button"
-                aria-label="Astro forecast" aria-haspopup="dialog">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008" />
-                <path d="M17 4a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2" />
-                <path d="M19 11h2m-1 -1v2" />
-            </svg>
-            <span>Astro Forecast</span>
-        </button>
     </div>
 </div>
 
@@ -432,25 +423,10 @@
     </div>
 </div>
 
-<!-- Astro forecast modal -->
-<div class="astro-modal" id="astro-fc-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="astro-fc-title">
-    <div class="astro-modal-backdrop" id="astro-fc-backdrop"></div>
-    <div class="astro-modal-panel astro-fc-panel" role="document">
-        <div class="astro-modal-header">
-            <h2 id="astro-fc-title">Astro Forecast</h2>
-            <button class="astro-modal-close" id="astro-fc-close" type="button" aria-label="Close">&times;</button>
-        </div>
-        <div class="astro-modal-body astro-fc-body" id="astro-fc-body">
-            <div class="af-loading" id="af-loading">Loading forecast&hellip;</div>
-        </div>
-    </div>
-</div>
-
 <script th:src="@{/js/realtime-script.js}"></script>
 <script type="module" th:src="@{/js/fetch-data.js}"></script>
 <script type="module" th:src="@{/js/history-modal.js}"></script>
 <script type="module" th:src="@{/js/cloud-forecast.js}"></script>
-<script type="module" th:src="@{/js/astro-forecast.js}"></script>
 <script type="module" th:src="@{/js/equalize-card-height.js}"></script>
 </body>
 </html>
