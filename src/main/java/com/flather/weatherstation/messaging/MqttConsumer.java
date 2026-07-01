@@ -167,10 +167,13 @@ public class MqttConsumer {
     options.setConnectionTimeout(30);
     options.setKeepAliveInterval(60);
 
-    if ("ssl".equals(properties.getProtocol())) {
-      options.setSocketFactory(SSLSocketFactory.getDefault());
+    if (properties.getUsername() != null && !properties.getUsername().isBlank()) {
       options.setUserName(properties.getUsername());
       options.setPassword(properties.getPassword().toCharArray());
+    }
+
+    if ("ssl".equals(properties.getProtocol())) {
+      options.setSocketFactory(SSLSocketFactory.getDefault());
     }
 
     return options;
