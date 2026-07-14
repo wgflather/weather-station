@@ -161,10 +161,7 @@ public class WeatherClientService {
         };
 
     return new ChartDto(
-        metric.toString(),
-        points,
-        Instant.now().plus(forecastChartTtl),
-        DataProvider.EXTERNAL_API);
+        metric.toString(), points, Instant.now().plus(forecastChartTtl), DataProvider.EXTERNAL_API);
   }
 
   private TrendResult computeHourlyTrend(

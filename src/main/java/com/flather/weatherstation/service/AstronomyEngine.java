@@ -144,6 +144,12 @@ public class AstronomyEngine {
         body, observer(), direction, todayMidnight(), SEARCH_LIMIT_DAYS, altitudeDeg);
   }
 
+  public Time searchTomorrowAstronomicalNightEnd(
+      Body body, Direction direction, double altitudeDeg) {
+    return Astronomy.searchAltitude(
+        body, observer(), direction, todayMidnight().addDays(1), SEARCH_LIMIT_DAYS, altitudeDeg);
+  }
+
   /**
    * Finds the next moment today the given body reaches the target altitude in the given direction.
    * Throws if no such event exists within the search window (e.g. polar conditions).
@@ -192,15 +198,13 @@ public class AstronomyEngine {
   public ZonedDateTime calculateRiseSet(Body body, Direction direction) {
     Time foundTime =
         Astronomy.searchRiseSet(body, observer(), direction, todayMidnight(), SEARCH_LIMIT_DAYS);
-    return Optional.ofNullable(foundTime)
-        .map(this::toZoned)
-        .orElse(null);
+    return Optional.ofNullable(foundTime).map(this::toZoned).orElse(null);
   }
 
   /**
-   * Searches forward day-by-day (up to 30 days) for the next rise or set of the given body.
-   * Returns the first match found, which may be today or on a future date. Returns {@code null}
-   * only if no event occurs within the 30-day window (extreme polar conditions).
+   * Searches forward day-by-day (up to 30 days) for the next rise or set of the given body. Returns
+   * the first match found, which may be today or on a future date. Returns {@code null} only if no
+   * event occurs within the 30-day window (extreme polar conditions).
    */
   public ZonedDateTime findNextRiseSet(Body body, Direction direction) {
     ZoneId zone = zoneId();

@@ -6,7 +6,6 @@ import com.flather.weatherstation.dto.projection.DataPoint;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.commons.math3.util.Precision;
 
@@ -98,5 +97,4 @@ public class MeteoMath {
     double clamped = Math.min(dryBaseline, Math.max(wetBaseline, raw));
     return ((dryBaseline - clamped) / range) * 100.0;
   }
-
 }

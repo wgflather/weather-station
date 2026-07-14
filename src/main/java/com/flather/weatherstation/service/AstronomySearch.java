@@ -15,8 +15,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -140,7 +138,8 @@ public class AstronomySearch {
     double phasePercentage = round2(getMoonPhasePercentage(info.getPhaseFraction()));
     double moonAgeDays = round2(getMoonAgeDays(phaseDegrees));
     String phaseName = getPhaseName(phaseDegrees);
-    MoonPhase moonPhase = new MoonPhase(phasePercentage, moonAgeDays, phaseName, round2(phaseDegrees));
+    MoonPhase moonPhase =
+        new MoonPhase(phasePercentage, moonAgeDays, phaseName, round2(phaseDegrees));
 
     return new MoonSnapshot(currentAlt, moonDistanceKm, moonPhase, constellation, parallacticAngle);
   }
@@ -186,7 +185,7 @@ public class AstronomySearch {
 
     // ── DAWN / RISING TRANSITIONS ──────────────────────────────────────────
     Time astronomicalNightEnd =
-        engine.searchAltitudeRaw(Body.Sun, Direction.Set, ASTRONOMICAL_TWILIGHT_DEG);
+        engine.searchAltitudeRaw(Body.Sun, Direction.Rise, ASTRONOMICAL_TWILIGHT_DEG);
     ZonedDateTime nauticalDawn =
         engine.findWhenAtAltitude(Body.Sun, Direction.Rise, NAUTICAL_TWILIGHT_DEG);
     ZonedDateTime civilDawn =
@@ -249,19 +248,26 @@ public class AstronomySearch {
     ZoneId zone = engine.zoneId();
 
     Time nightStart = engine.searchAltitudeRaw(Body.Sun, Direction.Set, ASTRONOMICAL_TWILIGHT_DEG);
-    Time nightEnd = engine.searchAltitudeRaw(Body.Sun, Direction.Rise, ASTRONOMICAL_TWILIGHT_DEG);
 
-    // Polar day — sun never drops below -18°.
-    if (nightStart == null && nightEnd == null) {
-      return 0;
-    }
-
-    // Sun never goes below -18° before midnight reference shift; measure from start of day
-    // up to the moment the sun finally rises through -18°.
+    // Sun never goes below -18° before midnight reference shift — the night carried over from
+    // before today started. Its end (if any) falls within today, so search from today's
+    // midnight rather than tomorrow's.
     if (nightStart == null) {
-      ZonedDateTime night = toZoned(nightEnd, zone);
+      Time todayNightEnd =
+          engine.searchAltitudeRaw(Body.Sun, Direction.Rise, ASTRONOMICAL_TWILIGHT_DEG);
+
+      // Polar day — sun never drops below -18°.
+      if (todayNightEnd == null) {
+        return 0;
+      }
+
+      ZonedDateTime night = toZoned(todayNightEnd, zone);
       return Duration.between(LocalDate.now(zone).atStartOfDay(zone), night).getSeconds();
     }
+
+    Time nightEnd =
+        engine.searchTomorrowAstronomicalNightEnd(
+            Body.Sun, Direction.Rise, ASTRONOMICAL_TWILIGHT_DEG);
 
     // Sun never climbs back above -18° — night runs for the full 24 hours.
     if (nightEnd == null) {
