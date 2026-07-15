@@ -1520,11 +1520,29 @@ const STATUS_DOT_GLOW = {
     OFFLINE: 'rgba(239, 68, 68, 0.50)',
 };
 
+// Formats a lag duration (minutes) for the System Health popover. Bare
+// minute counts get unreadable once a sensor has been offline for a while
+// (e.g. "38661 min"), so this steps up to hours/days once the count grows —
+// same bucket style as formatTimeSince, but driven by a minute count
+// directly rather than an ISO timestamp diffed against now.
+function formatLagMinutes(minutes) {
+    if (minutes == null) return '--';
+    if (minutes < 60) return `${minutes} min`;
+
+    const hours    = Math.floor(minutes / 60);
+    const remMins  = minutes % 60;
+    if (hours < 24) return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
+
+    const days     = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
+}
+
 function renderSystemHealth(systemHealth) {
     if (!systemHealth) return;
 
     document.getElementById('status').textContent       = systemHealth.status;
-    document.getElementById('lag').textContent          = systemHealth.lagMinutes + ' min';
+    document.getElementById('lag').textContent          = formatLagMinutes(systemHealth.lagMinutes);
     document.getElementById('todayRecords').textContent = systemHealth.recordsToday;
 
     const lastUpdate = document.getElementById('lastUpdate');
