@@ -39,7 +39,9 @@ public class OpenMeteoProvider {
                         .queryParam("latitude", lat)
                         .queryParam("longitude", lon)
                         .queryParam("hourly", hourlyQuery)
-                        .queryParam("forecast_days", 2);
+                        .queryParam("forecast_days", 2)
+                        .queryParam(
+                            "timezone", configurationCache.getLocationContext().zoneId().getId());
                 if (!currentWeatherQuery.isEmpty()) {
                   b = b.queryParam("current", currentWeatherQuery);
                 }
