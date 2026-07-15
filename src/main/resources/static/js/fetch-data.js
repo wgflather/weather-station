@@ -2,6 +2,12 @@ import { renderWeatherChart } from './weather-chart.js';
 import { FetchScheduler } from './FetchScheduler.js';
 import { initStarField, updateStarField, setStarFieldModalDim } from './star-field.js';
 import { drawMoon } from './moon-canvas.js';
+import {
+    renderSunModalChart,
+    updateSunModalChartLive,
+    destroySunModalChart,
+    getCurrentTwilightPhase,
+} from './sun-modal-chart.js';
 import { SKY_ANCHORS, lerpTriplet, skyBottomRgbAt } from './sky-colors.js';
 
 // ==========================================
@@ -384,7 +390,7 @@ function renderAstronomyLive(sunSnapshot, moonSnapshot) {
     if (moon) updateMoonCountdown(moon.rise, moon.set);
 
     // Keep the open modal's live fields in sync on every poll tick.
-    if (state.openModal) renderActiveModal();
+    if (state.openModal) patchActiveModalLive();
 }
 
 // ==========================================
@@ -900,17 +906,13 @@ function initBgPreference() {
 // ASTRONOMY MODAL
 // ==========================================
 
-// Twilight transitions, in chronological order through a normal day.
-// Each entry maps a SunTimesDto field → display label + colour band.
-const TWILIGHT_LADDER = [
-    { field: 'astronomicalNightEnd',   label: 'Astronomical twilight begins', band: 'astronomical' },
-    { field: 'nauticalDawn',           label: 'Nautical twilight begins',      band: 'nautical'     },
-    { field: 'civilDawn',              label: 'Civil twilight begins',         band: 'civil'        },
-    { field: 'sunrise',                label: 'Sunrise',                       band: 'daylight'     },
-    { field: 'sunset',                 label: 'Sunset',                        band: 'daylight'     },
-    { field: 'civilDusk',              label: 'Civil twilight ends',           band: 'civil'        },
-    { field: 'nauticalDusk',           label: 'Nautical twilight ends',        band: 'nautical'     },
-    { field: 'astronomicalNightStart', label: 'Astronomical twilight ends',    band: 'astronomical' },
+// Compact twilight ladder rows: one row per band, dawn and dusk crossings
+// side by side. Brightest band first, mirroring the chart's gradient.
+const TWILIGHT_PAIRS = [
+    { band: 'daylight',     label: 'Daylight',     dawn: 'sunrise',              dusk: 'sunset'                 },
+    { band: 'civil',        label: 'Civil',        dawn: 'civilDawn',            dusk: 'civilDusk'              },
+    { band: 'nautical',     label: 'Nautical',     dawn: 'nauticalDawn',         dusk: 'nauticalDusk'           },
+    { band: 'astronomical', label: 'Astronomical', dawn: 'astronomicalNightEnd', dusk: 'astronomicalNightStart' },
 ];
 
 function openAstroModal(which, trigger) {
@@ -933,6 +935,7 @@ function openAstroModal(which, trigger) {
 
 function closeAstroModal() {
     if (!state.openModal) return;
+    destroySunModalChart();
     const modal = document.getElementById('astro-modal');
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
@@ -974,11 +977,27 @@ function unlockBodyScroll() {
     state.scrollLockY = null;
 }
 
+// Full modal (re)build. Runs on open and on daily rollover / zone change —
+// NOT on the 30-second poll tick (see patchActiveModalLive), so the sun
+// chart's SVG survives ticks and scrubbing is never interrupted.
 function renderActiveModal() {
     const body = document.getElementById('astro-modal-body');
     if (!body) return;
     if (state.openModal === 'sun') {
+        destroySunModalChart();
         body.innerHTML = buildSunModalHTML();
+        updateTwilightNowHighlight();
+        // Chart container is now in the DOM — render on the next frame so
+        // CSS layout has resolved and clientWidth/Height are non-zero.
+        requestAnimationFrame(() => {
+            const el = document.getElementById('sun-modal-chart');
+            if (!el || state.openModal !== 'sun') return;
+            renderSunModalChart(el, {
+                sun: state.astronomyDaily?.sunDailyEvents,
+                currentAltitude: state.sunSnapshot?.currentAltitude,
+                dailyKey: state.dailyKey,
+            });
+        });
     }
     if (state.openModal === 'moon') {
         body.innerHTML = buildMoonModalHTML();
@@ -993,10 +1012,38 @@ function renderActiveModal() {
     }
 }
 
+// Cheap per-poll-tick refresh of the open modal. The moon modal is plain
+// text/canvas, so a full rebuild stays fine; the sun modal only patches its
+// live bits to keep the chart's DOM (and any in-flight scrub) intact.
+function patchActiveModalLive() {
+    if (state.openModal === 'moon') {
+        renderActiveModal();
+        return;
+    }
+    if (state.openModal === 'sun') {
+        updateSunModalChartLive(state.sunSnapshot?.currentAltitude);
+        updateTwilightNowHighlight();
+    }
+}
+
+// Marks the twilight ladder cell (or row, for daylight) matching the phase
+// the clock is in right now.
+function updateTwilightNowHighlight() {
+    const ladder = document.querySelector('#astro-modal-body .twilight-compact');
+    if (!ladder) return;
+    ladder.querySelectorAll('.is-now').forEach((el) => el.classList.remove('is-now'));
+
+    const phase = getCurrentTwilightPhase(state.astronomyDaily?.sunDailyEvents?.times);
+    if (!phase || phase.band === 'night') return;
+    const target = phase.side
+        ? ladder.querySelector(`.tc-time[data-band="${phase.band}"][data-side="${phase.side}"]`)
+        : ladder.querySelector(`.tc-row.${phase.band}`);
+    target?.classList.add('is-now');
+}
+
 function buildSunModalHTML() {
-    const daily    = state.astronomyDaily?.sunDailyEvents;
-    const snapshot = state.sunSnapshot;
-    const times    = daily?.times;
+    const daily = state.astronomyDaily?.sunDailyEvents;
+    const times = daily?.times;
 
     const condition = times?.solarCondition;
     const polarBanner = (condition && condition !== 'NORMAL')
@@ -1007,19 +1054,20 @@ function buildSunModalHTML() {
           }</div>`
         : '';
 
-    const ladderRows = TWILIGHT_LADDER.map(({ field, label, band }) => {
-        const iso = times?.[field];
-        const display = iso ? formatTimeOfDay(iso) : '—';
-        const nullCls = iso ? '' : ' is-null';
+    const ladderRows = TWILIGHT_PAIRS.map(({ band, label, dawn, dusk }) => {
+        const cell = (field, side) => {
+            const iso = times?.[field];
+            return `<span class="tc-time${iso ? '' : ' is-null'}" data-band="${band}" data-side="${side}">${
+                iso ? formatTimeOfDay(iso) : '—'
+            }</span>`;
+        };
         return `
-            <div class="twilight-row ${band}">
-                <span class="twilight-label">${label}</span>
-                <span class="twilight-time${nullCls}">${display}</span>
+            <div class="tc-row ${band}">
+                <span class="tc-label">${label}</span>
+                ${cell(dawn, 'dawn')}
+                ${cell(dusk, 'dusk')}
             </div>`;
     }).join('');
-
-    const altDeg = snapshot?.currentAltitude;
-    const altStr = altDeg != null ? `${altDeg.toFixed(1)}°` : '--';
 
     const noonAltStr = daily?.solarNoon?.alt != null
         ? `${daily.solarNoon.alt.toFixed(1)}°`
@@ -1027,44 +1075,35 @@ function buildSunModalHTML() {
 
     return `
         <div class="modal-section">
-            <div class="modal-section-title">Position</div>
-            <div class="modal-grid">
-                <div class="modal-row">
-                    <span class="label">Current altitude</span>
-                    <span class="value">${altStr}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Solar noon altitude</span>
-                    <span class="value">${noonAltStr}</span>
-                </div>
+            <div class="sun-chart-readout" id="sun-chart-readout" aria-hidden="true"></div>
+            <div class="sun-chart-block" id="sun-modal-chart"></div>
+        </div>
+
+        <div class="sun-stats-row">
+            <div class="modal-row">
+                <span class="label">Day length</span>
+                <span class="value">${formatDuration(daily?.dayLengthSeconds)}</span>
+            </div>
+            <div class="modal-row">
+                <span class="label">Astro night</span>
+                <span class="value">${formatDuration(daily?.nightLengthSeconds)}</span>
+            </div>
+            <div class="modal-row">
+                <span class="label">Noon altitude</span>
+                <span class="value">${noonAltStr}</span>
             </div>
         </div>
 
         <div class="modal-section">
-            <div class="modal-section-title">Today</div>
-            <div class="modal-grid">
-                <div class="modal-row">
-                    <span class="label">Sunrise</span>
-                    <span class="value">${formatTimeOfDay(daily?.rise)}</span>
+            <div class="modal-section-title">Twilight</div>
+            <div class="twilight-compact">
+                <div class="tc-row tc-head">
+                    <span class="tc-label"></span>
+                    <span class="tc-col-label">Dawn</span>
+                    <span class="tc-col-label">Dusk</span>
                 </div>
-                <div class="modal-row">
-                    <span class="label">Sunset</span>
-                    <span class="value">${formatTimeOfDay(daily?.set)}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Day length</span>
-                    <span class="value">${formatDuration(daily?.dayLengthSeconds)}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Night length</span>
-                    <span class="value">${formatDuration(daily?.nightLengthSeconds)}</span>
-                </div>
+                ${ladderRows}
             </div>
-        </div>
-
-        <div class="modal-section">
-            <div class="modal-section-title">Twilight transitions</div>
-            <div class="twilight-ladder">${ladderRows}</div>
         </div>
 
         ${polarBanner}

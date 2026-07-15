@@ -1818,64 +1818,234 @@ h3 {
     font-size: 0.88rem;
 }
 
-/* Sun twilight ladder — vertical list of altitude crossings in
-   chronological order. The marker dot is tinted by twilight band:
-   night = dark, astronomical/nautical/civil get progressively
-   warmer, sunrise/noon/sunset use the warm sun tone. */
-.twilight-ladder {
+/* =========================================================
+   SUN MODAL CHART — whole-day altitude curve, twilight gradient
+========================================================= */
+
+/* Fixed readout slot above the chart: empty when idle, shows
+   "HH:MM · +12.3°" while scrubbing. min-height reserves the line so
+   scrubbing never shifts the layout below. */
+.sun-chart-readout {
+    min-height: 1.1em;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+}
+
+.sun-chart-block {
+    position: relative;
+    width: 100%;
+    height: 190px;
+}
+
+.sun-chart-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* Horizontal drags scrub the chart; vertical drags still scroll the
+       modal body (critical under the 65dvh mobile height cap). */
+    touch-action: pan-y;
+    cursor: crosshair;
+}
+
+.sun-chart-horizon {
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+}
+
+.sun-chart-depth {
+    stroke: rgba(255, 255, 255, 0.16);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+}
+
+/* Single path stroked with the time-axis twilight gradient (see
+   #sun-modal-grad, built in JS) — kept muted relative to the fill so the
+   curve stays legible without competing with it for attention. */
+.sun-chart-line {
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.85;
+}
+
+/* The fill is drawn as many short per-segment filled quads, each with its
+   own sky-altitude color (set inline in JS). Group opacity (rather than
+   per-quad fill-opacity) composites the whole area as one layer first, so
+   adjacent near-identical quads don't double up their alpha at the seams. */
+.sun-chart-area {
+    opacity: 0.6;
+}
+
+/* Dark outline keeps labels legible over the gradient fill. */
+.sun-chart-text {
+    font-size: 11px;
+    fill: var(--text-primary);
+    paint-order: stroke;
+    stroke: rgba(8, 14, 28, 0.75);
+    stroke-width: 2.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.sun-chart-text.dim {
+    font-size: 10px;
+    fill: var(--text-muted);
+}
+
+.sun-chart-event {
+    fill: none;
+    stroke: rgba(252, 211, 77, 0.7);
+    stroke-width: 2;
+}
+
+.sun-chart-peak {
+    fill: #fcd34d;
+}
+
+/* Current-position marker is blue so it never reads as a second peak;
+   the peak and dawn/dusk dots keep the gold/amber sun tone. */
+.sun-chart-now-halo {
+    fill: #38bdf8;
+    opacity: 0.18;
+}
+
+.sun-chart-now-dot {
+    fill: #38bdf8;
+    stroke: var(--card-bg-strong);
+    stroke-width: 2;
+}
+
+/* Label chips: dark pills with a hairline accent border and a dashed
+   leader line down to their dot — legible over any gradient band. */
+.sun-chip {
+    pointer-events: none;
+}
+
+.sun-chip-bg {
+    fill: rgba(10, 16, 34, 0.8);
+    stroke-width: 1;
+}
+
+.sun-chip-peak .sun-chip-bg { stroke: rgba(252, 211, 77, 0.35); }
+.sun-chip-now  .sun-chip-bg { stroke: rgba(56, 189, 248, 0.45); }
+
+.sun-chip-text {
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.sun-chip-peak .sun-chip-text { fill: #fcd34d; }
+.sun-chip-now  .sun-chip-text { fill: #7dd3fc; }
+
+.sun-chip-tag {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    fill: #38bdf8;
+}
+
+.sun-chip-leader {
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    fill: none;
+}
+
+.sun-chip-peak .sun-chip-leader { stroke: rgba(252, 211, 77, 0.4); }
+.sun-chip-now  .sun-chip-leader { stroke: rgba(56, 189, 248, 0.5); }
+
+.sun-chart-cursor line {
+    stroke: rgba(255, 255, 255, 0.45);
+    stroke-width: 1;
+}
+
+.sun-chart-cursor circle {
+    fill: #fff;
+    opacity: 0.9;
+}
+
+/* Compact stats strip under the chart; typography comes from .modal-row. */
+.sun-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 16px;
+}
+
+/* Compact twilight ladder — one row per band, dawn/dusk crossings side by
+   side. The ::before pseudo-element is the band-tinted dot (grid column 1). */
+.twilight-compact {
     display: flex;
     flex-direction: column;
-    border-left: 1px solid var(--divider);
-    padding-left: 14px;
     gap: 8px;
 }
 
-.twilight-row {
+.tc-row {
     display: grid;
-    grid-template-columns: 14px 1fr auto;
+    grid-template-columns: 14px 1fr 56px 56px;
     align-items: center;
-    gap: 10px;
-    position: relative;
+    gap: 8px;
 }
 
-.twilight-row::before {
+.tc-row::before {
     content: "";
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    background: var(--marker-color, var(--text-muted));
+    background: var(--marker-color, transparent);
     box-shadow: 0 0 0 2px rgba(8, 14, 28, 0.8);
-    margin-left: -19px;
 }
 
-.twilight-row.night        { --marker-color: #4c5b7f; }
-.twilight-row.astronomical { --marker-color: #6b7fa8; }
-.twilight-row.nautical     { --marker-color: #8aa3d0; }
-.twilight-row.civil        { --marker-color: #c9d8f5; }
-.twilight-row.daylight     { --marker-color: #fcd34d; }
+.tc-row.tc-head::before {
+    box-shadow: none;
+}
 
-.twilight-row.is-now {
+.tc-row.night        { --marker-color: #4c5b7f; }
+.tc-row.astronomical { --marker-color: #6b7fa8; }
+.tc-row.nautical     { --marker-color: #8aa3d0; }
+.tc-row.civil        { --marker-color: #c9d8f5; }
+.tc-row.daylight     { --marker-color: #fcd34d; }
+
+.tc-row.is-now {
     background: rgba(252, 211, 77, 0.08);
     margin: -4px -8px;
     padding: 4px 8px;
     border-radius: 6px;
 }
 
-.twilight-label {
+.tc-label {
     font-size: 0.85rem;
     color: var(--text-strong);
 }
 
-.twilight-time {
+.tc-col-label {
+    font-size: 0.68rem;
+    font-weight: var(--fw-label);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.tc-time {
     font-size: 0.9rem;
     font-weight: var(--fw-value);
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
+    text-align: right;
 }
 
-.twilight-time.is-null {
+.tc-time.is-null {
     color: var(--text-muted);
     font-weight: var(--fw-regular);
+}
+
+.tc-time.is-now {
+    background: rgba(252, 211, 77, 0.10);
+    border-radius: 5px;
+    padding: 1px 6px;
+    margin: -1px -6px;
 }
 
 .polar-banner {
@@ -1908,6 +2078,7 @@ h3 {
     .modal-grid  { gap: 8px 10px; }
     .modal-moon-hero .moon-disk { width: 160px; height: 160px; }
     .modal-moon-hero .phase-name { font-size: 1.2rem; }
+    .sun-chart-block { height: 150px; }
 }
 
 /* =========================================================

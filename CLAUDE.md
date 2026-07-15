@@ -135,7 +135,7 @@ Every script loaded from `index.html` is a `type="module"` except `realtime-scri
 | `fetch-data.js` | ES module (orchestrator) | All live data polling (30 s), sky background, astro cards, metric cards, status, modals, chart controls |
 | `star-field.js` | ES module | Atmospheric star field canvas + CSS-animated highlights |
 | `cloud-forecast.js` | ES module | Hourly cloud/weather forecast strip; icon selection; tooltip |
-| `astro-forecast.js` | ES module | Astro forecast modal (seeing quality + altitude chart) |
+| `sun-modal-chart.js` | ES module | Sun modal SVG chart: whole-day altitude curve with twilight gradient, label chips, scrubbing |
 | `weather-chart.js` | ES module | Chart.js 24-h metric chart |
 | `FetchScheduler.js` | ES module | Incremental chart data fetcher (fetches only new buckets) |
 | `history-modal.js` | ES module | History chart modal (date picker + period tabs) |
@@ -150,7 +150,7 @@ Modules that need to talk to each other use `window.*` since they load independe
 |---|---|---|---|
 | `window.refreshCloudSunTimes(riseIso, setIso)` | `cloud-forecast.js` | `fetch-data.js` (calls it after astronomy loads) | Re-renders strip with correct day/night icons |
 | `window.getCurrentCloudCover()` | `cloud-forecast.js` | `star-field.js` | Cloud cover multiplier for star opacity |
-| `window.setStarFieldModalDim(bool)` | `fetch-data.js` (re-exports from `star-field.js`) | `history-modal.js`, `astro-forecast.js` | Dims stars while any modal is open |
+| `window.setStarFieldModalDim(bool)` | `fetch-data.js` (re-exports from `star-field.js`) | `history-modal.js` | Dims stars while any modal is open |
 
 ### Sky background system (`fetch-data.js`)
 
