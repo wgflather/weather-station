@@ -116,7 +116,7 @@ public class AstronomyEngine {
   public Topocentric getBodyPosition(Body body, Observer observer, Time time) {
     Equatorial equ =
         Astronomy.equator(body, time, observer, EquatorEpoch.J2000, Aberration.Corrected);
-    return Astronomy.horizon(time, observer, equ.getRa(), equ.getDec(), Refraction.Normal);
+    return Astronomy.horizon(time, observer, equ.getRa(), equ.getDec(), Refraction.None);
   }
 
   /** Current altitude (degrees) of a body above the horizon. Negative when below. */
