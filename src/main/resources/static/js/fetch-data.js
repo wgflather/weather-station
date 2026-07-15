@@ -1142,6 +1142,11 @@ function buildMoonModalHTML() {
         </div>
 
         <div class="modal-section">
+            <div class="modal-section-title">Cycle</div>
+            ${buildMoonCycleTrackHTML(phase?.phaseDegrees)}
+        </div>
+
+        <div class="modal-section">
             <div class="modal-section-title">Position</div>
             <div class="modal-grid">
                 <div class="modal-row">
@@ -1181,6 +1186,45 @@ function buildMoonModalHTML() {
             </div>
         </div>
     `;
+}
+
+// Waypoints around the synodic cycle, evenly spaced by phase angle (not by
+// duration — the real month isn't evenly split by these events, but the
+// track is a schematic position indicator, not a calendar).
+const MOON_CYCLE_WAYPOINTS = [
+    { pct: 0,   label: 'New' },
+    { pct: 25,  label: 'First Q' },
+    { pct: 50,  label: 'Full' },
+    { pct: 75,  label: 'Last Q' },
+    { pct: 100, label: 'New' },
+];
+
+// Horizontal cycle-position track for the moon modal: fixed waypoints at the
+// four named phases plus a glowing "now" marker placed by the current phase
+// angle (0-360°, from AstronomyEngine — 0/360 = new, 180 = full). Styled to
+// match the sun chart's now-dot so the two modals read as one system.
+function buildMoonCycleTrackHTML(phaseDegrees) {
+    const nowPct = phaseDegrees != null ? (phaseDegrees / 360) * 100 : null;
+
+    const ticks = MOON_CYCLE_WAYPOINTS.map(({ pct, label }) => `
+        <div class="mc-tick" style="left:${pct}%">
+            <span class="mc-tick-dot"></span>
+            <span class="mc-tick-label">${label}</span>
+        </div>`).join('');
+
+    const nowMarker = nowPct != null
+        ? `<div class="mc-now" style="left:${nowPct.toFixed(2)}%">
+               <span class="mc-now-halo"></span>
+               <span class="mc-now-dot"></span>
+           </div>`
+        : '';
+
+    return `
+        <div class="moon-cycle-track">
+            <div class="mc-line"></div>
+            ${ticks}
+            ${nowMarker}
+        </div>`;
 }
 
 function initAstroModal() {
