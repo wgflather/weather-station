@@ -1463,7 +1463,7 @@ function renderMetrics(dto, dataStatus) {
     setStatusCircleColor(document.querySelector('#wind-card .status-circle'),        wind?.metricDataDetails?.quality, dataStatus, wind?.metricDataDetails?.dataProvider);
     setStatusCircleColor(document.querySelector('#uv-card .status-circle'),          uv?.dataDetails?.quality,         dataStatus, uv?.dataDetails?.dataProvider);
 
-    updateStalenessHints(dataStatus);
+    updateStalenessHints(dataStatus, dto);
 }
 
 async function loadDaily() {
@@ -1713,7 +1713,9 @@ function formatArrivedAt(value) {
 
 function buildPopupHTML(details, dataStatus) {
     if (details.dataProvider === 'EXTERNAL_API') {
-        return buildApiPopupHTML(details, dataStatus);
+        // API-backed cards are independent of MQTT sensor freshness — see
+        // buildApiPopupHTML.
+        return buildApiPopupHTML(details);
     }
 
     const qColor    = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
@@ -1761,23 +1763,12 @@ function buildPopupHTML(details, dataStatus) {
     `;
 }
 
-function buildApiPopupHTML(details, dataStatus) {
-    const dsColor   = DATA_STATUS_COLORS[dataStatus] ?? '#6b7280';
-    const dsInfo    = DATA_STATUS_INFO[dataStatus];
+// API-backed cards have their own freshness story (the forecast's own
+// timestamp), which has nothing to do with MQTT sensor lag — deliberately
+// does not take a sensor `dataStatus` and never shows the DELAYED/STALE/
+// OFFLINE badge those thresholds were built for.
+function buildApiPopupHTML(details) {
     const timeSince = formatTimeSince(details.arrivedAt);
-
-    const freshnessSection = (dataStatus && dataStatus !== 'LIVE') ? `
-        <div class="popup-divider"></div>
-        <div class="popup-row">
-            <span class="popup-key">Status</span>
-            <span class="popup-val" style="color:${dsColor}; font-weight:700;">${dsInfo?.label ?? dataStatus}</span>
-        </div>
-        ${timeSince ? `
-        <div class="popup-row">
-            <span class="popup-key">Not updated for</span>
-            <span class="popup-val">${timeSince}</span>
-        </div>` : ''}
-    ` : '';
 
     return `
         <div class="popup-heading">${details.metricName ?? '--'}</div>
@@ -1789,7 +1780,11 @@ function buildApiPopupHTML(details, dataStatus) {
             <span class="popup-key">Forecast updated</span>
             <span class="popup-val">${formatArrivedAt(details.arrivedAt)}</span>
         </div>
-        ${freshnessSection}
+        ${timeSince ? `
+        <div class="popup-row">
+            <span class="popup-key">Data age</span>
+            <span class="popup-val">${timeSince}</span>
+        </div>` : ''}
     `;
 }
 
@@ -1832,12 +1827,12 @@ function setStatusCircleColor(circleEl, quality, dataStatus, dataProvider) {
     if (!circleEl) return;
 
     if (dataProvider === 'EXTERNAL_API') {
-        // API-backed cards: blue when data is fresh, staleness color when degraded.
-        // Never pulse — the data is polled, not a live sensor stream.
-        const dSev  = STATUS_SEVERITY[dataStatus] ?? 0;
-        const color = dSev > 0
-            ? (DATA_STATUS_COLORS[dataStatus] ?? DATA_QUALITY_COLORS.MISSING)
-            : '#60a5fa';
+        // API-backed cards are independent of MQTT sensor freshness: the
+        // sensor going STALE/OFFLINE says nothing about whether Open-Meteo
+        // data is current, so `dataStatus` (sensor lag) never reaches here.
+        // Always the flat "fresh API source" blue; never pulses, since the
+        // data is polled on a fixed schedule, not a live sensor stream.
+        const color = '#60a5fa';
         circleEl.style.backgroundColor = color;
         circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
         circleEl.classList.remove('pulsing');
@@ -1855,24 +1850,27 @@ function setStatusCircleColor(circleEl, quality, dataStatus, dataProvider) {
     circleEl.classList.toggle('pulsing', quality === 'OK' && (!dataStatus || dataStatus === 'LIVE'));
 }
 
-function updateStalenessHints(dataStatus) {
+// `dataStatus` is MQTT sensor lag — only ever shown on cards actually backed
+// by the local sensor. API-backed cards get their own provider passed in and
+// are skipped entirely, since sensor lag says nothing about Open-Meteo data.
+function updateStalenessHints(dataStatus, dto) {
     const isStale = dataStatus && dataStatus !== 'LIVE';
     const HINT_TARGETS = [
-        '#temperature-card .main-value',
-        '#pressure-card .main-value',
-        '#humidity-card .main-value',
-        '#wind-card .main-value',
-        '#uv-card .main-value',
+        { selector: '#temperature-card .main-value', provider: dto?.temperature?.dataDetails?.dataProvider },
+        { selector: '#pressure-card .main-value',    provider: dto?.pressure?.dataDetails?.dataProvider },
+        { selector: '#humidity-card .main-value',    provider: dto?.humidity?.dataDetails?.dataProvider },
+        { selector: '#wind-card .main-value',         provider: dto?.wind?.metricDataDetails?.dataProvider },
+        { selector: '#uv-card .main-value',           provider: dto?.uvIndex?.dataDetails?.dataProvider },
     ];
     const HINT_LABELS = { DELAYED: '~ delayed', STALE: '~ stale', OFFLINE: '~ offline', EMPTY: '~ no data' };
     const HINT_COLORS = { DELAYED: '#fcd34d',   STALE: '#f97316',  OFFLINE: '#ef4444',   EMPTY: '#6b7280'   };
 
-    HINT_TARGETS.forEach(selector => {
+    HINT_TARGETS.forEach(({ selector, provider }) => {
         const target = document.querySelector(selector);
         if (!target) return;
         const parent = target.parentElement;
         let hint = parent.querySelector('.data-stale-hint');
-        if (isStale) {
+        if (isStale && provider !== 'EXTERNAL_API') {
             if (!hint) {
                 hint = document.createElement('span');
                 hint.className = 'data-stale-hint';
