@@ -64,7 +64,7 @@ public class AstronomyEngine {
   /** Today's transit (highest point) of the given body: peak altitude in degrees plus time. */
   public TransitDto getBodyPeakAltitude(Body body) {
     ZoneId zone = zoneId();
-    Time start = toTime(LocalDate.now().atStartOfDay(zone));
+    Time start = toTime(LocalDate.now(zone).atStartOfDay(zone));
 
     HourAngleInfo info =
         Astronomy.searchHourAngle(body, observer(), 0.0, start, Direction.Rise.getSign());
