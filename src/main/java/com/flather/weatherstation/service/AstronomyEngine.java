@@ -144,10 +144,15 @@ public class AstronomyEngine {
         body, observer(), direction, todayMidnight(), SEARCH_LIMIT_DAYS, altitudeDeg);
   }
 
-  public Time searchTomorrowAstronomicalNightEnd(
-      Body body, Direction direction, double altitudeDeg) {
+  /**
+   * Raw library search for the next moment after {@code start} the body crosses a given altitude in
+   * the given direction. Unlike {@link #searchAltitudeRaw}, the search window isn't pinned to today
+   * — callers pass the instant to search forward from (e.g. a night start found earlier), so a
+   * same-day crossing isn't skipped over in favor of the following day's.
+   */
+  public Time searchAltitudeAfter(Body body, Direction direction, Time start, double altitudeDeg) {
     return Astronomy.searchAltitude(
-        body, observer(), direction, todayMidnight().addDays(1), SEARCH_LIMIT_DAYS, altitudeDeg);
+        body, observer(), direction, start, SEARCH_LIMIT_DAYS, altitudeDeg);
   }
 
   /**

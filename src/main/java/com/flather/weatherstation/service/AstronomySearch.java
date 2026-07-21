@@ -266,8 +266,7 @@ public class AstronomySearch {
     }
 
     Time nightEnd =
-        engine.searchTomorrowAstronomicalNightEnd(
-            Body.Sun, Direction.Rise, ASTRONOMICAL_TWILIGHT_DEG);
+        engine.searchAltitudeAfter(Body.Sun, Direction.Rise, nightStart, ASTRONOMICAL_TWILIGHT_DEG);
 
     // Sun never climbs back above -18° — night runs for the full 24 hours.
     if (nightEnd == null) {
