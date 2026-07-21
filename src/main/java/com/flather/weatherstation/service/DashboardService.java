@@ -1,6 +1,7 @@
 package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
+import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.domain.constant.DataProvider;
 import com.flather.weatherstation.domain.constant.DataStatus;
 import com.flather.weatherstation.domain.constant.DewPointRisk;
@@ -30,6 +31,7 @@ public class DashboardService {
   private final WeatherClientService weatherClientService;
   private final AstronomySearch astronomySearchService;
   private final ConfigurationCache configurationCache;
+  private final SensorStateCache sensorStateCache;
 
   public MetricsDashboardDto getMetricsDashboard(DataStatus status) {
     var cfg = configurationCache.getDataProviderConfiguration();
@@ -117,6 +119,7 @@ public class DashboardService {
           .lagMinutes(0)
           .recordsToday(0)
           .lastMeasuredAt(null)
+          .mqttStatus(sensorStateCache.isMqttConnected())
           .build();
     }
 
@@ -131,6 +134,7 @@ public class DashboardService {
         .recordsToday(todayRecordsCount)
         .status(dataStatus)
         .lagMinutes(lagMinutes)
+        .mqttStatus(sensorStateCache.isMqttConnected())
         .build();
   }
 
@@ -140,7 +144,6 @@ public class DashboardService {
    * rollover and re-fetch the daily endpoint.
    */
   public DashboardLiveDto getDashboardLive() {
-    var cfg = configurationCache.getDataProviderConfiguration();
     SystemHealthDashboardDto systemHealth = getSystemHealth();
 
     MetricsDashboardDto metrics = getMetricsDashboard(systemHealth.getStatus());

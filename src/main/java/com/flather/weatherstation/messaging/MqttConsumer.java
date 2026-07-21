@@ -1,5 +1,6 @@
 package com.flather.weatherstation.messaging;
 
+import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.MqttProperties;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
@@ -32,10 +33,12 @@ public class MqttConsumer {
   private final WeatherService service;
   private final ObjectMapper mapper;
   private final MqttProperties properties;
+  private final SensorStateCache cache;
   private final Set<String> subscribedTopics = new HashSet<>();
 
   private static final int MAX_RETRIES = 5;
   private static final long BASE_DELAY_MS = 2000L;
+  private static final long NO_CONNECTION_RETRY_MS = 30000L;
 
   @EventListener(ApplicationReadyEvent.class)
   public void initConnection() {
@@ -53,9 +56,18 @@ public class MqttConsumer {
         log.warn("MQTT connection attempt {} failed", attempt, e);
 
         if (attempt == MAX_RETRIES) {
-          throw new RuntimeException("MQTT connection failed after retries", e);
+          boolean isConnected = false;
+          while (!isConnected && !Thread.currentThread().isInterrupted()) {
+            try {
+              connect();
+              isConnected = true;
+            } catch (Exception a) {
+              log.warn("No MQTT connection", a);
+              sleep(NO_CONNECTION_RETRY_MS);
+            }
+          }
+          return;
         }
-
         sleep(backoffDelay(attempt));
       }
     }
@@ -89,6 +101,7 @@ public class MqttConsumer {
       @Override
       public void connectComplete(boolean reconnect, String serverURI) {
         log.info("MQTT connected. reconnect={}, uri={}", reconnect, serverURI);
+        cache.setMqttConnected(true);
 
         if (reconnect) {
           resubscribe();
@@ -98,6 +111,7 @@ public class MqttConsumer {
       @Override
       public void connectionLost(Throwable cause) {
         log.warn("MQTT connection lost", cause);
+        cache.setMqttConnected(false);
       }
 
       @Override

@@ -13,4 +13,5 @@ public class SystemHealthDashboardDto {
   private long lagMinutes;
   private long recordsToday;
   private DataStatus status;
+  private boolean mqttStatus;
 }

@@ -1538,10 +1538,25 @@ function formatLagMinutes(minutes) {
     return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
 }
 
+// Sensor status becomes OFFLINE purely from data lag (see DataStatus.fromLag) —
+// it doesn't know *why* data stopped arriving. Cross-reference the separate MQTT
+// connection flag so the UI can say which one actually failed, instead of a bare
+// "OFFLINE" that reads as ambiguous now that MQTT has its own status row.
+function describeSensorStatus(systemHealth) {
+    if (systemHealth.status !== 'OFFLINE') {
+        return { popoverText: systemHealth.status, labelText: DATA_STATUS_INFO[systemHealth.status]?.label };
+    }
+    return systemHealth.mqttStatus
+        ? { popoverText: 'OFFLINE', labelText: 'Sensors Offline' }
+        : { popoverText: 'OFFLINE', labelText: 'MQTT Offline' };
+}
+
 function renderSystemHealth(systemHealth) {
     if (!systemHealth) return;
 
-    document.getElementById('status').textContent       = systemHealth.status;
+    const statusDetail = describeSensorStatus(systemHealth);
+
+    document.getElementById('status').textContent       = statusDetail.popoverText;
     document.getElementById('lag').textContent          = formatLagMinutes(systemHealth.lagMinutes);
     document.getElementById('todayRecords').textContent = systemHealth.recordsToday;
 
@@ -1549,6 +1564,12 @@ function renderSystemHealth(systemHealth) {
     lastUpdate.textContent = systemHealth.lastMeasuredAt
         ? new Date(systemHealth.lastMeasuredAt).toLocaleTimeString('en-GB')
         : '--:--:--';
+
+    const mqttStatusEl = document.getElementById('mqttStatus');
+    if (mqttStatusEl) {
+        mqttStatusEl.textContent = systemHealth.mqttStatus ? 'Connected' : 'Disconnected';
+        mqttStatusEl.style.color = systemHealth.mqttStatus ? DATA_STATUS_COLORS.LIVE : DATA_STATUS_COLORS.OFFLINE;
+    }
 
     const color = DATA_STATUS_COLORS[systemHealth.status] ?? '#6b7280';
     document.getElementById('status').style.color = color;
@@ -1562,7 +1583,7 @@ function renderSystemHealth(systemHealth) {
     }
     const label = document.getElementById('health-status-label');
     if (label) {
-        label.textContent = DATA_STATUS_INFO[systemHealth.status]?.label ?? '--';
+        label.textContent = statusDetail.labelText ?? '--';
         label.style.color = color;
     }
 }

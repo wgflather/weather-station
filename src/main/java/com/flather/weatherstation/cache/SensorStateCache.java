@@ -43,6 +43,8 @@ public class SensorStateCache {
 
   @Setter @Getter private volatile WeatherRecord lastSavedMeasurement;
 
+  @Setter @Getter private volatile boolean mqttConnected = false;
+
   @PostConstruct
   void init() {
     lastProcessedDate = LocalDate.now(configurationCache.getLocationContext().zoneId());
