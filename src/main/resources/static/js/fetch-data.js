@@ -886,6 +886,7 @@ function initBgPreference() {
     btn.addEventListener('click', e => {
         e.stopPropagation();
         const opening = !popover.classList.contains('open');
+        if (opening) closeAllPopovers('bgpref');
         popover.classList.toggle('open', opening);
         btn.setAttribute('aria-expanded', String(opening));
         popover.setAttribute('aria-hidden', String(!opening));
@@ -1608,6 +1609,7 @@ function initHealthPopover() {
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const opening = !popover.classList.contains('open');
+        if (opening) closeAllPopovers('health');
         popover.classList.toggle('open', opening);
         btn.setAttribute('aria-expanded', String(opening));
         popover.setAttribute('aria-hidden', String(!opening));
@@ -1735,6 +1737,29 @@ function initEventListeners() {
 // ==========================================
 
 const globalPopup = document.getElementById('global-popup');
+
+// Only one popover (metric details, station health, background picker)
+// should ever be open at once. Each trigger stops click propagation before
+// toggling itself, so the "close on outside click" listeners the others set
+// up never fire between them — this is the shared step that actually closes
+// the rest before a new one opens. `except` is 'metric' | 'health' | 'bgpref'.
+function closeAllPopovers(except) {
+    if (except !== 'metric' && globalPopup.classList.contains('open')) {
+        globalPopup.classList.remove('open');
+    }
+    if (except !== 'health') closePopoverEl('health-popover', 'health-dot-btn');
+    if (except !== 'bgpref') closePopoverEl('bg-pref-popover', 'bg-pref-btn');
+}
+
+function closePopoverEl(popoverId, btnId) {
+    const popover = document.getElementById(popoverId);
+    const btn     = document.getElementById(btnId);
+    if (popover?.classList.contains('open')) {
+        popover.classList.remove('open');
+        btn?.setAttribute('aria-expanded', 'false');
+        popover.setAttribute('aria-hidden', 'true');
+    }
+}
 
 function populatePopup(cardId, details, dataStatus) {
     const card = document.getElementById(cardId);
@@ -1956,6 +1981,7 @@ function positionPopup(anchor) {
 }
 
 function openPopup(html, anchor) {
+    closeAllPopovers('metric');
     globalPopup.innerHTML   = html;
     globalPopup._sourceEl   = anchor;
     globalPopup.classList.add('open');
