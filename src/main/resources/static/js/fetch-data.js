@@ -2013,7 +2013,6 @@ function initWetnessBadge() {
     const badgeEl = document.getElementById('wetness-badge');
     if (!badgeEl) return;
 
-    badgeEl.style.cursor = 'pointer';
     badgeEl.addEventListener('click', (e) => {
         e.stopPropagation();
         const wetness = badgeEl._wetnessData;

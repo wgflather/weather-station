@@ -353,11 +353,20 @@ body::before {
     gap: 3px;
     flex: 1 0 44px;
     max-width: 64px;
-    transition: opacity 0.3s var(--ease-standard);
+    cursor: pointer;
+    transition: opacity 0.3s var(--ease-standard), transform 0.15s var(--ease-standard);
 }
 .cloud-slot.past    { opacity: 0.20; }
 .cloud-slot.future  { opacity: 0.65; }
 .cloud-slot.current { opacity: 1.00; }
+
+.cloud-slot:hover {
+    transform: translateY(-2px);
+}
+
+.cloud-slot:active {
+    transform: scale(0.93);
+}
 
 .cloud-slot img {
     width: 34px;
@@ -817,7 +826,17 @@ h3 {
     cursor: pointer;
     transition: background 0.25s var(--ease-standard),
                 border-color 0.25s var(--ease-standard),
-                color 0.25s var(--ease-standard);
+                color 0.25s var(--ease-standard),
+                transform 0.15s var(--ease-standard);
+}
+
+.dew-status-badge:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.dew-status-badge:active {
+    transform: scale(0.97);
 }
 
 /* Status dot — colour follows the parent risk class via currentColor. */
@@ -949,6 +968,16 @@ h3 {
     letter-spacing: 0.4px;
     border: 1px solid currentColor;
     width: fit-content;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-standard), transform 0.15s var(--ease-standard);
+}
+
+.wetness-status-badge:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.wetness-status-badge:active {
+    transform: scale(0.97);
 }
 
 .wetness-status-dot {
@@ -1208,7 +1237,9 @@ h3 {
 
 .sun_block .card-header,
 .moon_block .card-header {
+    position: relative;
     padding-bottom: 8px;
+    padding-right: 16px;
     margin-bottom: 8px;
 }
 
@@ -1511,7 +1542,23 @@ h3 {
 }
 
 .astro-card:active {
-    transform: scale(0.995);
+    transform: scale(0.98);
+}
+
+/* Persistent "this expands" cue — unlike hover/press feedback, this is
+   always visible so touch users can spot it before tapping. Positioned
+   out of flex flow so it never competes with the title/phase-illum text
+   for width on narrow cards (that fight is what clamped the moon header). */
+.astro-card-affordance {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    color: var(--text-secondary);
+    opacity: 0.5;
 }
 
 /* Sun and moon side-by-side down to ~390 px.
@@ -2665,6 +2712,11 @@ h3 {
 .status-circle:hover {
     transform: scale(1.35);
     box-shadow: 0 0 0 3px rgba(255,255,255,0.18);
+}
+
+.status-circle:active {
+    transform: scale(1.5);
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.25);
 }
 
 /* =========================================================
