@@ -20,6 +20,7 @@ import com.flather.weatherstation.util.MeteoMath;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,27 +44,27 @@ public class DashboardService {
 
     TemperatureDto temperature =
         cfg.temperature() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getTemperature(weatherResponse.get())
+            ? mapIfPresent(weatherResponse.get(), weatherClientService::getTemperature)
             : sensorHasData ? analyticsService.getTemperature() : null;
 
     PressureDto pressure =
         cfg.pressure() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getPressure(weatherResponse.get())
+            ? mapIfPresent(weatherResponse.get(), weatherClientService::getPressure)
             : sensorHasData ? analyticsService.getPressure() : null;
 
     HumidityDto humidity =
         cfg.humidity() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getHumidity(weatherResponse.get())
+            ? mapIfPresent(weatherResponse.get(), weatherClientService::getHumidity)
             : sensorHasData ? analyticsService.getHumidity() : null;
 
     WindDto wind =
         cfg.wind() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getWind(weatherResponse.get())
+            ? mapIfPresent(weatherResponse.get(), weatherClientService::getWind)
             : sensorHasData ? analyticsService.getWind() : null;
 
     UvIndexDto uvIndex =
         cfg.uvIndex() == DataProvider.EXTERNAL_API
-            ? weatherClientService.getUvIndex(weatherResponse.get())
+            ? mapIfPresent(weatherResponse.get(), weatherClientService::getUvIndex)
             : sensorHasData ? analyticsService.getUvIndex() : null;
 
     // Cross-source dew point: humidity from API, temperature from local sensor (or vice versa).
@@ -155,6 +156,11 @@ public class DashboardService {
         astronomySearchService.getSunSnapshot(time),
         astronomySearchService.getMoonSnapshot(time),
         astronomySearchService.dailyKey());
+  }
+
+  /** Null-safe map: skips the mapper (and yields {@code null}) when the API fetch failed. */
+  private static <T> T mapIfPresent(WeatherResponse response, Function<WeatherResponse, T> fn) {
+    return response != null ? fn.apply(response) : null;
   }
 
   /** Wraps a supplier so the delegate is invoked at most once, on first {@code get()}. */

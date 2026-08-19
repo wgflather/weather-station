@@ -50,7 +50,8 @@ public class OpenMeteoProvider {
           .retrieve()
           .body(WeatherResponse.class);
     } catch (RestClientException e) {
-      throw new RestClientException("Couldn't fetch data from Open meteo", e);
+      log.warn("Couldn't fetch data from Open-Meteo", e);
+      return null;
     }
   }
 }

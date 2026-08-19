@@ -37,8 +37,7 @@ public class WeatherClientService {
   private final Duration forecastChartTtl = Duration.ofMinutes(10);
 
   public ForecastDto getForecast() {
-    WeatherResponse response =
-        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+    WeatherResponse response = fetchWeatherOrThrow();
     return new ForecastDto(response.units(), mapToConditionPoints(response.hourly()));
   }
 
@@ -143,8 +142,7 @@ public class WeatherClientService {
   }
 
   public ChartDto getChart(Metric metric) {
-    WeatherResponse response =
-        client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+    WeatherResponse response = fetchWeatherOrThrow();
     WeatherConditionsForecast forecast = response.hourly();
 
     List<LocalDateTime> time = forecast.time();
@@ -210,6 +208,14 @@ public class WeatherClientService {
 
   public WeatherResponse getWeatherResponse() {
     return client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
+  }
+
+  private WeatherResponse fetchWeatherOrThrow() {
+    WeatherResponse response = getWeatherResponse();
+    if (response == null) {
+      throw new IllegalStateException("Open-Meteo forecast is currently unavailable");
+    }
+    return response;
   }
 
   private List<WeatherConditionPoint> mapToConditionPoints(WeatherConditionsForecast forecast) {
