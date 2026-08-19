@@ -611,6 +611,10 @@ const CARD_BORDER_STRONG_ALPHA = 0.18;
 // Sky-ambient outer glow: desaturated sky bottom at very low alpha as a
 // barely-perceptible outer box-shadow on cards — environmental hue, not glow.
 const SKY_AMBIENT_ALPHA        = 0.10;
+// How far popup/modal panels shift from the static card color toward the
+// live (desaturated) sky color. Kept modest so golden-hour warmth tints
+// the panel rather than washing out text contrast.
+const POPUP_TINT_RATIO         = 0.25;
 
 function rgbString([r, g, b])          { return `rgb(${r}, ${g}, ${b})`; }
 function rgbaString([r, g, b], alpha)  { return `rgba(${r}, ${g}, ${b}, ${alpha})`; }
@@ -644,6 +648,11 @@ function buildSkyState(lo, hi, t) {
     const ambientRgb = desaturateColor(bottomRgb, 0.55);
     const accentRgb  = desaturateColor(skyRgbArr, 0.40);
 
+    // Popup/modal panel color: the static card base nudged toward the
+    // desaturated sky-bottom hue, so overlays visibly track time of day
+    // while dashboard cards themselves stay put (see --popup-bg-strong).
+    const popupBgRgb = lerpTriplet(cardBgRgb, ambientRgb, POPUP_TINT_RATIO);
+
     return {
         top:              rgbString(topRgb),
         bottom:           rgbString(bottomRgb),
@@ -652,6 +661,7 @@ function buildSkyState(lo, hi, t) {
         divider:          rgbaString(accRgb,    DIVIDER_ALPHA),
         cardBgStrong:     rgbaString(cardBgRgb, CARD_BG_STRONG_ALPHA),
         cardBorderStrong: rgbaString(accRgb,    CARD_BORDER_STRONG_ALPHA),
+        popupBgStrong:    rgbaString(popupBgRgb, CARD_BG_STRONG_ALPHA),
         // Desaturated bottom-sky at low alpha as outer box-shadow on cards.
         // Retains warm/cool temperature direction without the brightness
         // spike that raw orange/yellow would create at golden hour.
@@ -747,6 +757,7 @@ function applySkyColors(colors, snap = false) {
     root.style.setProperty('--card-border-strong', colors.cardBorderStrong);
     root.style.setProperty('--sky-ambient',        colors.skyAmbient);
     root.style.setProperty('--sky-rgb',            colors.skyRgb);
+    root.style.setProperty('--popup-bg-strong',    colors.popupBgStrong);
 
     if (snap) { void root.offsetWidth; root.style.transition = ''; }
     skyBackgroundPrimed = true;
@@ -759,6 +770,7 @@ function applySkyColors(colors, snap = false) {
             divider: colors.divider, cardBgStrong: colors.cardBgStrong,
             cardBorderStrong: colors.cardBorderStrong, skyAmbient: colors.skyAmbient,
             skyRgb: colors.skyRgb, topHex: colors.topHex, bottomHex: colors.bottomHex,
+            popupBgStrong: colors.popupBgStrong,
         }));
     } catch (e) { /* private mode / quota */ }
 }

@@ -51,6 +51,13 @@
     --card-bg-strong:     rgba(14, 18, 42, 0.85);
     --card-border-strong: rgba(255, 255, 255, 0.18);
 
+    /* Popup/modal panel surface — unlike --card-bg-strong (which stays a
+       constant navy on the dashboard cards for consistent legibility),
+       this one is tinted toward the live sky color each tick so floating
+       overlays (tooltips, popovers, the big sun/moon/history modals)
+       visibly track time of day. Driven by JS each tick. */
+    --popup-bg-strong: rgba(14, 18, 42, 0.85);
+
     /* Sky-ambient glow — the current bottom-sky color as an outer
        box-shadow on every card: warm at sunset, cool-blue at midday,
        barely-visible at night. Lower alpha than the former inner glow
@@ -75,7 +82,8 @@
         --divider            12s ease,
         --card-bg-strong     12s ease,
         --card-border-strong 12s ease,
-        --sky-ambient        12s ease;
+        --sky-ambient        12s ease,
+        --popup-bg-strong    12s ease;
 }
 
 /* `@property` makes the custom properties typed colors so CSS can
@@ -129,6 +137,12 @@
     syntax: '<color>';
     inherits: true;
     initial-value: rgba(100, 180, 255, 0.15);
+}
+
+@property --popup-bg-strong {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: rgba(14, 18, 42, 0.85);
 }
 
 /* Respect user motion preference: skip the long gradient transition
@@ -390,7 +404,7 @@ body::before {
     z-index: 200;
     pointer-events: none;
     padding: 7px 11px;
-    background: var(--card-bg-strong);
+    background: var(--popup-bg-strong);
     border: 1px solid var(--card-border-strong);
     border-radius: 10px;
     backdrop-filter: blur(18px) saturate(1.15);
@@ -1703,14 +1717,15 @@ h3 {
     display: flex;
     flex-direction: column;
     /* Tinted glass instead of a flat opaque panel. The semi-transparent
-       card-bg-strong (kept at 0.92 alpha for text contrast) gets layered
-       over its own backdrop-filter — so the panel reads as the same
-       atmospheric material as the dashboard cards, just denser. The
-       vertical color-mix fade keeps the slight top-brighter / bottom-
+       popup-bg-strong (sky-tinted, unlike the dashboard cards' static
+       card-bg-strong) gets layered over its own backdrop-filter — so the
+       panel reads as the same atmospheric material as the dashboard
+       cards, just denser and alive to time of day. The vertical
+       color-mix fade keeps the slight top-brighter / bottom-
        darker depth from the previous solid version. */
     background: linear-gradient(180deg,
-        var(--card-bg-strong),
-        color-mix(in srgb, var(--card-bg-strong) 85%, #000 15%));
+        var(--popup-bg-strong),
+        color-mix(in srgb, var(--popup-bg-strong) 85%, #000 15%));
     backdrop-filter: blur(12px) saturate(1.3);
     -webkit-backdrop-filter: blur(12px) saturate(1.3);
     border: 1px solid var(--card-border-strong);
@@ -2317,8 +2332,8 @@ h3 {
 
 .bg-pref-inner {
     background: linear-gradient(180deg,
-        var(--card-bg-strong),
-        color-mix(in srgb, var(--card-bg-strong) 85%, #000 15%));
+        var(--popup-bg-strong),
+        color-mix(in srgb, var(--popup-bg-strong) 85%, #000 15%));
     backdrop-filter: blur(18px) saturate(1.3);
     -webkit-backdrop-filter: blur(18px) saturate(1.3);
     border: 1px solid var(--card-border-strong);
@@ -2444,8 +2459,8 @@ h3 {
 
 .health-popover-inner {
     background: linear-gradient(180deg,
-        var(--card-bg-strong),
-        color-mix(in srgb, var(--card-bg-strong) 85%, #000 15%));
+        var(--popup-bg-strong),
+        color-mix(in srgb, var(--popup-bg-strong) 85%, #000 15%));
     backdrop-filter: blur(18px) saturate(1.3);
     -webkit-backdrop-filter: blur(18px) saturate(1.3);
     border: 1px solid var(--card-border-strong);
@@ -2727,10 +2742,12 @@ h3 {
     display: none;          /* hidden until .open is added */
     position: fixed;        /* escapes all overflow:hidden parents */
     min-width: 210px;
-    background: rgba(10, 18, 46, 0.92);
+    background: linear-gradient(180deg,
+        var(--popup-bg-strong),
+        color-mix(in srgb, var(--popup-bg-strong) 85%, #000 15%));
     backdrop-filter: blur(16px) saturate(1.2);
     -webkit-backdrop-filter: blur(16px) saturate(1.2);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid var(--card-border-strong);
     border-top: 1px solid rgba(255, 255, 255, 0.22);
     border-radius: 10px;
     padding: 12px 14px;
@@ -3225,8 +3242,8 @@ h3 {
     display: flex;
     flex-direction: column;
     background: linear-gradient(180deg,
-        var(--card-bg-strong),
-        color-mix(in srgb, var(--card-bg-strong) 85%, #000 15%));
+        var(--popup-bg-strong),
+        color-mix(in srgb, var(--popup-bg-strong) 85%, #000 15%));
     backdrop-filter: blur(12px) saturate(1.3);
     -webkit-backdrop-filter: blur(12px) saturate(1.3);
     border: 1px solid var(--card-border-strong);
