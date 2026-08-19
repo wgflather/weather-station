@@ -13,7 +13,7 @@
 // this was the root cause of softness at DPR<3 (which selected the 1024 mip) vs
 // sharpness at DPR≥3 (which selected the unmodified 2048 mip).
 // Always sampling the raw 2048 source avoids pre-blurring. The disc diameters used
-// in this app (140px card, 84px modal) hit at most 2.5:1 bilinear downsampling at
+// in this app (120px card, 84px modal) hit at most 2.5:1 bilinear downsampling at
 // their lowest DPR, which is visually cleaner than a pre-blurred 1:1 mip.
 let _texMips = null;
 // Calls to drawMoon that arrived before the texture finished loading, keyed by

@@ -1246,7 +1246,7 @@ h3 {
 .moon_block {
     flex: 1 1 0;
     min-width: 0;
-    padding-bottom: 14px;
+    padding-bottom: 10px;
 }
 
 .sun_block .card-header,
@@ -1265,7 +1265,7 @@ h3 {
 .astro-card-content {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
     padding-top: 4px;
 }
 
@@ -1292,8 +1292,8 @@ h3 {
 }
 
 .moon-card-content .moon-disk {
-    width: 140px;
-    height: 140px;
+    width: 120px;
+    height: 120px;
 }
 
 .moon-glyph-meta {
@@ -2904,7 +2904,7 @@ h3 {
 /* Moon card: at 800px text starts overlapping at 160px disk — scale it down
    while keeping the side-by-side row layout. */
 @media (max-width: 800px) {
-    .moon-card-content .moon-disk { width: 130px; height: 130px; }
+    .moon-card-content .moon-disk { width: 110px; height: 110px; }
 }
 
 /* The grid drops to 2 columns here so the single metric cards never get squeezed
