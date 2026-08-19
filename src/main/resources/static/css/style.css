@@ -2771,7 +2771,7 @@ h3 {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #5b8fd4;
+    color: var(--text-secondary);
     margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(140, 190, 255, 0.15);
@@ -2789,7 +2789,7 @@ h3 {
 
 .popup-key {
     font-size: 11px;
-    color: #5b8fd4;
+    color: var(--text-muted);
     white-space: nowrap;
 }
 
@@ -2801,7 +2801,7 @@ h3 {
 
 .popup-val {
     font-size: 11px;
-    color: #c8daf5;
+    color: var(--text-strong);
     font-weight: 600;
     text-align: right;
 }
