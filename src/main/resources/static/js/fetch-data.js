@@ -12,6 +12,7 @@ import {
     SKY_ANCHORS,
     lerpTriplet,
     skyBottomRgbAt,
+    altitudeCurveY,
     desaturateColor,
     skyBrightnessForAltitude,
     sunAppearanceAt,
@@ -427,11 +428,13 @@ const CURVE_BELOW_PADDING = 0.25;
 let sunCurveScale = null;
 
 function altitudeToY(altDeg, maxAlt, minAlt) {
-    if (altDeg >= 0) {
-        return CURVE_HORIZON_Y - (altDeg / maxAlt) * CURVE_HORIZON_Y * CURVE_ABOVE_PADDING;
-    }
-    const belowSpace = CURVE_H_VB - CURVE_HORIZON_Y;
-    return CURVE_HORIZON_Y + (Math.abs(altDeg) / Math.abs(minAlt)) * belowSpace * CURVE_BELOW_PADDING;
+    return altitudeCurveY(altDeg, {
+        maxAlt,
+        minAlt,
+        horizonY:     CURVE_HORIZON_Y,
+        aboveExtent:  CURVE_HORIZON_Y * CURVE_ABOVE_PADDING,
+        belowExtent: (CURVE_H_VB - CURVE_HORIZON_Y) * CURVE_BELOW_PADDING,
+    });
 }
 
 function timeToXPercent(isoTime, startMs, endMs) {

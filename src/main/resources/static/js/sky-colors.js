@@ -1,6 +1,8 @@
-// Shared sun-altitude → color model. Single source of truth for the live
-// page background (fetch-data.js) and anything else that wants to render
-// "the color of the sky right now" — e.g. the sun modal chart's curve.
+// Shared sun-altitude model. Single source of truth for the live page
+// background (fetch-data.js) and anything else that wants to render "the
+// color of the sky right now" — e.g. the sun modal chart's curve. Also
+// holds the altitude → y geometry both daily arcs plot with, so the card
+// and the modal chart draw the same shape.
 //
 // Anchor table: each row defines, for a given sun altitude (degrees), the
 // top/bottom sky gradient colors plus the card surface and accent (border +
@@ -58,6 +60,41 @@ export function skyBrightnessForAltitude(altitudeDeg) {
     if (altitudeDeg >= 12) return 1;            // sun well up: full daylight
     if (altitudeDeg <= 0) return 0.5 * smoothstep01((altitudeDeg + 6) / 6);  // -6°→0° : 0 → 0.5
     return 0.5 + 0.5 * smoothstep01(altitudeDeg / 12);                       // 0°→12° : 0.5 → 1
+}
+
+// ==========================================
+// DAILY ARC GEOMETRY
+// ==========================================
+
+// Smooth stand-in for Math.abs: equals |x| away from zero, but rounds through
+// zero instead of forming a point. `knee` sets how wide that rounding is.
+function softAbs(x, knee) {
+    return Math.sqrt(x * x + knee * knee) - knee;
+}
+
+// Degrees of altitude the horizon crossing is rounded over.
+const CURVE_KNEE_DEG = 7;
+
+/**
+ * Maps a sun altitude to a y coordinate on the daily arc — shared by the sun
+ * card and the modal chart so both plot the same shape.
+ *
+ * The day arc deliberately gets much more vertical room than the night
+ * trough (the arc is the point; the trough is context). Drawn as two
+ * straight lines meeting at the horizon, that difference is a ~5x slope jump
+ * at exactly 0°, which renders as a visible corner where the curve crosses
+ * the horizon — obvious when zoomed in or on a small screen. Blending the
+ * two slopes through softAbs keeps both far-field gradients intact but
+ * rounds the join, so the curve reads as one smooth arc.
+ */
+export function altitudeCurveY(altDeg, { maxAlt, minAlt, horizonY, aboveExtent, belowExtent }) {
+    // Steepness of the trough relative to the arc. Away from the horizon the
+    // blend below resolves to exactly these two linear slopes.
+    const ratio = (belowExtent / Math.abs(minAlt)) / (aboveExtent / maxAlt);
+    const shape = (a) => 0.5 * (1 + ratio) * a + 0.5 * (1 - ratio) * softAbs(a, CURVE_KNEE_DEG);
+    // Normalised so the peak still lands exactly on aboveExtent despite the
+    // rounding shaving a little off the shape function.
+    return horizonY - (aboveExtent / shape(maxAlt)) * shape(altDeg);
 }
 
 // ==========================================

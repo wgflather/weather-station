@@ -23,7 +23,7 @@
 //   destroySunModalChart()
 //       — idempotent teardown; must run before rebuilds and on modal close.
 
-import { skyBottomRgbAt, sunAppearanceAt, sunEventMarkerColor } from './sky-colors.js';
+import { skyBottomRgbAt, sunAppearanceAt, sunEventMarkerColor, altitudeCurveY } from './sky-colors.js';
 
 const rgbCss = ([r, g, b]) => `rgb(${r}, ${g}, ${b})`;
 
@@ -419,9 +419,13 @@ function buildSvg() {
     const horizonY = plotT + (plotB - plotT) * HORIZON_FRACTION;
 
     const xOf = (ms) => plotL + clamp01((ms - startMs) / (endMs - startMs)) * plotW;
-    const yOf = (alt) => alt >= 0
-        ? horizonY - (alt / maxAlt) * (horizonY - plotT) * ABOVE_PADDING
-        : horizonY + (Math.abs(alt) / Math.abs(minAlt)) * (plotB - horizonY) * BELOW_PADDING;
+    const yOf = (alt) => altitudeCurveY(alt, {
+        maxAlt,
+        minAlt,
+        horizonY,
+        aboveExtent: (horizonY - plotT) * ABOVE_PADDING,
+        belowExtent: (plotB - horizonY) * BELOW_PADDING,
+    });
     // Keep marker labels clear of the plot edges (half an HH:MM at 11px).
     const clampLabelX = (x) => Math.max(plotL + 26, Math.min(plotR - 26, x));
 
