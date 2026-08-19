@@ -1406,11 +1406,11 @@ h3 {
     opacity: 0.85;
 }
 
-/* Marker dots overlaid on the curve via absolute positioning. Rise/set
-   are small hollow circles on the horizon; solar noon sits at the
-   curve's peak. The "now" marker is filled and a touch larger so the
-   eye finds it first. JS sets left/top in pixels relative to the
-   wrapper for each marker. */
+/* Marker dots overlaid on the curve via absolute positioning. Rise/set/noon
+   are plain data points on the curve — small dark filled dots, the way a
+   chart marks a plotted value; the gold is reserved for the "now" marker so
+   it stays the one thing the eye goes to. JS sets left/top in pixels
+   relative to the wrapper for each marker. */
 .astro-marker {
     position: absolute;
     border-radius: 50%;
@@ -1419,15 +1419,20 @@ h3 {
     box-sizing: border-box;
 }
 
+/* One flat colour across the dot, set inline per marker by placeSunMarker
+   from sunEventMarkerColor — the sun's own colour at that event's altitude,
+   desaturated and darkened. The value here is the pre-first-render
+   fallback. */
 .astro-marker-event {
-    width: 9px;
-    height: 9px;
-    background: transparent;
-    border: 2px solid rgba(252, 211, 77, 0.7);
+    width: 5px;
+    height: 5px;
+    background: rgb(120, 96, 84);
 }
 
+/* Solar noon is the apex reading, so it sits a touch larger. */
 .astro-marker-peak {
-    border-color: #fcd34d;
+    width: 6px;
+    height: 6px;
 }
 
 /* A miniature sun rather than a flat UI dot, built from three concentric
@@ -2091,27 +2096,22 @@ h3 {
     fill: var(--text-muted);
 }
 
-.sun-chart-event {
-    fill: none;
-    stroke: rgba(252, 211, 77, 0.7);
-    stroke-width: 2;
-}
-
+/* Rise/set/noon: small quiet dots, one flat colour set inline per marker
+   from sunEventMarkerColor (the sun's own colour at that moment, desaturated
+   and darkened) — same treatment as the card's .astro-marker-event, so both
+   charts read the same. Only the geometry lives here. */
+.sun-chart-event,
 .sun-chart-peak {
-    fill: #fcd34d;
+    stroke: none;
 }
 
-/* Current-position marker is blue so it never reads as a second peak;
-   the peak and dawn/dusk dots keep the gold/amber sun tone. */
+/* The "now" marker is the layered miniature sun, built to match the card's
+   .astro-marker-now: a gradient-filled disc plus blurred halo and bloom.
+   All of its colours come from sunAppearanceAt via positionNowMarker, so
+   nothing is hard-coded here. */
+.sun-chart-now-bloom,
 .sun-chart-now-halo {
-    fill: #38bdf8;
-    opacity: 0.18;
-}
-
-.sun-chart-now-dot {
-    fill: #38bdf8;
-    stroke: var(--card-bg-strong);
-    stroke-width: 2;
+    pointer-events: none;
 }
 
 /* Label chips: dark pills with a hairline accent border and a dashed

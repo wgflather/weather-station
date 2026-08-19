@@ -23,7 +23,9 @@
 //   destroySunModalChart()
 //       — idempotent teardown; must run before rebuilds and on modal close.
 
-import { skyBottomRgbAt } from './sky-colors.js';
+import { skyBottomRgbAt, sunAppearanceAt, sunEventMarkerColor } from './sky-colors.js';
+
+const rgbCss = ([r, g, b]) => `rgb(${r}, ${g}, ${b})`;
 
 // ==========================================
 // TWILIGHT MODEL
@@ -476,14 +478,19 @@ function buildSvg() {
         })
         .join('');
 
-    // Rise / set: hollow circles on the horizon (hidden in polar conditions
-    // via null times — same convention as the card markers).
+    // Rise / set / noon: small filled dots tinted by the sun's own apparent
+    // colour at that moment, desaturated and darkened so they read as quiet
+    // reference points. Identical treatment to the card markers (both go
+    // through sunEventMarkerColor) so the two charts share one language;
+    // hidden in polar conditions via null times.
+    const riseSetTint = sunEventMarkerColor(0);
     const horizonEvent = (iso) => {
         if (!iso) return '';
         const ms = Date.parse(iso);
         if (isNaN(ms)) return '';
         const x = xOf(ms);
-        return `<circle class="sun-chart-event" cx="${x.toFixed(1)}" cy="${horizonY.toFixed(1)}" r="4"/>
+        return `<circle class="sun-chart-event" cx="${x.toFixed(1)}" cy="${horizonY.toFixed(1)}" r="2.5"
+                        fill="${riseSetTint}"/>
                 <text class="sun-chart-text" x="${clampLabelX(x).toFixed(1)}" y="${(horizonY + 16).toFixed(1)}" text-anchor="middle">${fmtTime(iso)}</text>`;
     };
 
@@ -493,7 +500,8 @@ function buildSvg() {
         const x = xOf(Date.parse(sun.solarNoon.time));
         const y = yOf(sun.solarNoon.alt);
         chart.peakAnchor = { x, y };
-        noonSvg = `<circle class="sun-chart-peak" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5"/>`;
+        noonSvg = `<circle class="sun-chart-peak" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3"
+                           fill="${sunEventMarkerColor(sun.solarNoon.alt)}"/>`;
     }
 
     const ariaParts = ['Sun altitude chart.'];
@@ -511,6 +519,22 @@ function buildSvg() {
             <defs>
                 <linearGradient id="sun-modal-grad" gradientUnits="userSpaceOnUse"
                                 x1="${plotL}" y1="0" x2="${plotR}" y2="0">${stopsSvg}</linearGradient>
+                <!-- Layered "now" sun, matching the card marker: a disc whose
+                     stops run pale centre → core → halo colour, plus a blurred
+                     bloom. Stop colours are patched per tick by
+                     positionNowMarker from sunAppearanceAt. -->
+                <radialGradient id="sun-modal-disc">
+                    <stop class="sun-disc-centre" offset="0%"/>
+                    <stop class="sun-disc-centre" offset="20%"/>
+                    <stop class="sun-disc-core"   offset="44%"/>
+                    <stop class="sun-disc-halo"   offset="100%"/>
+                </radialGradient>
+                <filter id="sun-modal-bloom" x="-150%" y="-150%" width="400%" height="400%">
+                    <feGaussianBlur stdDeviation="3.2"/>
+                </filter>
+                <filter id="sun-modal-halo" x="-150%" y="-150%" width="400%" height="400%">
+                    <feGaussianBlur stdDeviation="1.6"/>
+                </filter>
             </defs>
             <g class="sun-chart-area">${fillSegmentsSvg}</g>
             <line class="sun-chart-horizon" x1="${plotL}" x2="${plotR}" y1="${horizonY.toFixed(1)}" y2="${horizonY.toFixed(1)}"/>
@@ -525,8 +549,9 @@ function buildSvg() {
                 <circle r="3.5" cx="0" cy="0"/>
             </g>
             <g class="sun-chart-now" visibility="hidden">
-                <circle class="sun-chart-now-halo" r="9"/>
-                <circle class="sun-chart-now-dot" r="4.5"/>
+                <circle class="sun-chart-now-bloom" r="11" filter="url(#sun-modal-bloom)"/>
+                <circle class="sun-chart-now-halo"  r="6.5" filter="url(#sun-modal-halo)"/>
+                <circle class="sun-chart-now-dot"   r="4.5" fill="url(#sun-modal-disc)"/>
             </g>
         </svg>`;
 
@@ -537,8 +562,12 @@ function buildSvg() {
         cursorLine: svg.querySelector('.sun-chart-cursor line'),
         cursorDot:  svg.querySelector('.sun-chart-cursor circle'),
         now:        svg.querySelector('.sun-chart-now'),
+        nowBloom:   svg.querySelector('.sun-chart-now-bloom'),
         nowHalo:    svg.querySelector('.sun-chart-now-halo'),
         nowDot:     svg.querySelector('.sun-chart-now-dot'),
+        discCentre: svg.querySelectorAll('#sun-modal-disc .sun-disc-centre'),
+        discCore:   svg.querySelector('#sun-modal-disc .sun-disc-core'),
+        discHalo:   svg.querySelector('#sun-modal-disc .sun-disc-halo'),
         peakChip:   null,
         nowChip:    null,
     };
@@ -559,7 +588,7 @@ function buildSvg() {
 
 function positionNowMarker() {
     if (!chart?.els) return;
-    const { now, nowHalo, nowDot, nowChip, svg } = chart.els;
+    const { now, nowBloom, nowHalo, nowDot, nowChip, svg } = chart.els;
     const alt = chart.currentAltitude;
     if (alt == null) {
         now.setAttribute('visibility', 'hidden');
@@ -572,10 +601,22 @@ function positionNowMarker() {
     const x = xOf(nowMs);
     const y = yOf(alt);
 
-    for (const dot of [nowHalo, nowDot]) {
+    for (const dot of [nowBloom, nowHalo, nowDot]) {
         dot.setAttribute('cx', x.toFixed(1));
         dot.setAttribute('cy', y.toFixed(1));
     }
+
+    // Same layered appearance as the card marker — one shared source of
+    // truth, so the sun looks identical in both places at a given altitude.
+    const a = sunAppearanceAt(alt);
+    chart.els.discCentre.forEach((s) => s.setAttribute('stop-color', rgbCss(a.centre)));
+    chart.els.discCore.setAttribute('stop-color', rgbCss(a.core));
+    chart.els.discHalo.setAttribute('stop-color', rgbCss(a.halo));
+    nowHalo.setAttribute('fill', rgbCss(a.halo));
+    nowHalo.setAttribute('opacity', a.glowInnerAlpha.toFixed(3));
+    nowBloom.setAttribute('fill', rgbCss(a.bloom));
+    nowBloom.setAttribute('opacity', (a.glowMidAlpha * 0.9).toFixed(3));
+
     now.setAttribute('visibility', 'visible');
 
     // Altitude only in the chip — the timestamp is redundant with the page
