@@ -1430,12 +1430,62 @@ h3 {
     border-color: #fcd34d;
 }
 
+/* A miniature sun rather than a flat UI dot, built from three concentric
+   layers that each carry a different amount of atmospheric colour — least
+   at the centre, most in the outer bloom. That spatial separation (not a
+   single tint over the whole marker) is what sells "luminous body seen
+   through air" instead of "orange circle".
+
+     disc      10px — pale centre → core → halo colour at a softening rim
+     inner halo ~18px — box-shadow tier 1, the visible scattering
+     outer bloom ~30px — box-shadow tiers 2-3, faint, no hard boundary
+
+   Every colour comes from --now-* custom properties that
+   applySunMarkerAppearance (fetch-data.js) recomputes each tick from the
+   live altitude; the literals here are only the pre-first-tick fallback.
+   Glow radii are fixed so only colour/opacity animate with altitude and the
+   layered structure stays constant. No border: a hard ring reads as a flat
+   UI dot rather than a glowing disc. */
 .astro-marker-now {
-    width: 9px;
-    height: 9px;
-    background: #fcd34d;
-    border: 2px solid var(--card-bg-strong);
-    box-shadow: 0 0 6px rgba(252, 211, 77, 0.5);
+    width: 10px;
+    height: 10px;
+    background-image:
+        radial-gradient(circle at 38% 34%, var(--now-highlight, rgba(255, 255, 255, 0.4)) 0%, rgba(255, 255, 255, 0) 46%),
+        radial-gradient(circle at 50% 50%,
+            var(--now-centre, #fffdf6) 0%,
+            var(--now-centre, #fffdf6) 20%,
+            var(--now-core, #fff6e2) 44%,
+            var(--now-halo, #fcd34d) var(--now-edge-stop, 78%),
+            var(--now-edge, rgba(252, 211, 77, 0.8)) 100%);
+    box-shadow:
+        0 0  5px 0px var(--now-glow-inner-color, rgba(252, 211, 77, 0.5)),
+        0 0 12px 1px var(--now-glow-mid-color,   rgba(252, 211, 77, 0.28)),
+        0 0 22px 3px var(--now-glow-outer-color, rgba(252, 211, 77, 0.12));
+}
+
+/* Four short diffraction spikes (vertical + horizontal). Elongated radial
+   gradients, so each arm is brightest at the shared centre and feathers to
+   nothing — no hard geometric edges. Reach is ~2x the core radius: barely
+   perceptible at true 10px size, just enough that the sun reads as
+   optically luminous. Colour is inherited from the inner halo, so the
+   spikes warm along with the atmosphere.
+
+   `screen` makes the layer purely additive. This pseudo-element paints on
+   top of the disc, and the halo colour it uses is darker than the pale
+   core — with normal compositing the arms *subtracted* light and showed
+   through as a cross-shaped silhouette inside the disc, which grew more
+   obvious the dimmer the sun got (the halo darkens with luminosity while
+   the core stays comparatively pale). Screen can only ever lighten, which
+   is also how real diffraction behaves. */
+.astro-marker-now::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    background-image:
+        radial-gradient(ellipse 1.1px 9px  at 50% 50%, var(--now-spike, #fcd34d) 0%, transparent 68%),
+        radial-gradient(ellipse 9px 1.0px  at 50% 50%, var(--now-spike, #fcd34d) 0%, transparent 68%);
+    opacity: var(--now-spike-opacity, 0.25);
+    mix-blend-mode: screen;
 }
 
 .astro-curve-labels {
