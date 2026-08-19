@@ -19,15 +19,22 @@ import org.springframework.stereotype.Service;
 public class WeatherRetentionService {
 
   private static final LocalTime MIDNIGHT_WINDOW_START = LocalTime.of(0, 5);
-  private static final LocalTime MIDNIGHT_WINDOW_END = LocalTime.of(0, 10);
+  private static final LocalTime MIDNIGHT_WINDOW_END = LocalTime.of(0, 15);
+  private static final LocalTime MAINTENANCE_WINDOW_START = LocalTime.of(2, 0);
+  private static final LocalTime MAINTENANCE_WINDOW_END = LocalTime.of(2, 10);
 
   private final WeatherRetentionRepository retentionRepository;
   private final DailyWeatherRecordRepository dailyRecordRepository;
   private final ConfigurationCache configurationCache;
 
-  @Scheduled(cron = "0 0 2 * * ?")
+  @Scheduled(fixedRate = 5, timeUnit = TimeUnit.MINUTES)
   public void rollUpAndCleanData() {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
+    LocalTime now = LocalTime.now(zoneId);
+
+    if (now.isBefore(MAINTENANCE_WINDOW_START) || now.isAfter(MAINTENANCE_WINDOW_END)) {
+      return;
+    }
 
     Instant cutoff = LocalDate.now(zoneId).minusDays(30).atStartOfDay(zoneId).toInstant();
 
