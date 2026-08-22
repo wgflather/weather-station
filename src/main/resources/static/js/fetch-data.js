@@ -2,12 +2,8 @@ import { renderWeatherChart } from './weather-chart.js';
 import { FetchScheduler } from './FetchScheduler.js';
 import { initStarField, updateStarField, setStarFieldModalDim } from './star-field.js';
 import { drawMoon } from './moon-canvas.js';
-import {
-    renderSunModalChart,
-    updateSunModalChartLive,
-    destroySunModalChart,
-    getCurrentTwilightPhase,
-} from './sun-modal-chart.js';
+import { initAstroModal, refreshAstroModal, patchAstroModalLive } from './astro-modal.js';
+import { formatTimeOfDay, formatDuration } from './time-format.js';
 import { qualityStripSlot, hydrateQualityStrip } from './quality-strip.js';
 import {
     SKY_ANCHORS,
@@ -31,9 +27,6 @@ const state = {
     sunSnapshot:       null,   // continuously-changing solar state
     moonSnapshot:      null,   // continuously-changing lunar state
     dailyKey:          null,   // key the cached daily payload was computed under
-    openModal:         null,   // 'sun' | 'moon' | null — which detail modal is open
-    modalReturnFocus:  null,   // element to restore focus to when modal closes
-    scrollLockY:       null,   // scroll position frozen while modal is open
     currentMetric:     'temperature',
     currentResolution: Number(localStorage.getItem('chartResolution')) || 10,
 
@@ -300,28 +293,6 @@ function renderPressure(pressure) {
 // ==========================================
 
 
-function formatTimeOfDay(isoString) {
-    if (!isoString) return '--:--';
-    const date = new Date(isoString);
-    return isNaN(date.getTime())
-        ? '--:--'
-        : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-
-// Full date-aware label for the modal where space is not a constraint.
-function formatMoonEvent(isoString) {
-    if (!isoString) return '—';
-    const date = new Date(isoString);
-    if (isNaN(date.getTime())) return '—';
-    const timeStr  = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    const today    = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    if (date.toDateString() === today.toDateString())    return timeStr;
-    if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow ${timeStr}`;
-    return `${date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} ${timeStr}`;
-}
-
 // Sets a moon card time element to HH:MM, with a static +N superscript when the
 // event falls on a future day. No interaction — the full date is in the modal.
 function setMoonTimeEl(el, isoString) {
@@ -337,21 +308,13 @@ function setMoonTimeEl(el, isoString) {
     el.innerHTML = `${timeStr}<sup class="moon-future-badge">+${dayOffset}</sup>`;
 }
 
-function formatDuration(totalSeconds) {
-    if (totalSeconds == null) return '--';
-    const seconds = Math.abs(totalSeconds);
-    const hours   = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-}
-
 function renderAstronomyDaily(daily) {
     if (!daily) return;
     renderSunCard(daily.sunDailyEvents);
     renderMoonCard(daily.moonDailyEvents);
     // If a modal is open while daily refreshes (midnight rollover or
     // zone change), keep its contents in sync.
-    if (state.openModal) renderActiveModal();
+    refreshAstroModal();
 }
 
 function renderSunCard(sun) {
@@ -400,7 +363,7 @@ function renderAstronomyLive(sunSnapshot, moonSnapshot) {
     if (moon) updateMoonCountdown(moon.rise, moon.set);
 
     // Keep the open modal's live fields in sync on every poll tick.
-    if (state.openModal) patchActiveModalLive();
+    patchAstroModalLive();
 }
 
 // ==========================================
@@ -937,363 +900,6 @@ function initBgPreference() {
             popover.setAttribute('aria-hidden', 'true');
             btn.focus();
         }
-    });
-}
-
-// ASTRONOMY MODAL
-// ==========================================
-
-// Compact twilight ladder rows: one row per band, dawn and dusk crossings
-// side by side. Brightest band first, mirroring the chart's gradient.
-const TWILIGHT_PAIRS = [
-    { band: 'daylight',     label: 'Daylight',     dawn: 'sunrise',              dusk: 'sunset'                 },
-    { band: 'civil',        label: 'Civil',        dawn: 'civilDawn',            dusk: 'civilDusk'              },
-    { band: 'nautical',     label: 'Nautical',     dawn: 'nauticalDawn',         dusk: 'nauticalDusk'           },
-    { band: 'astronomical', label: 'Astronomical', dawn: 'astronomicalNightEnd', dusk: 'astronomicalNightStart' },
-];
-
-function openAstroModal(which, trigger) {
-    state.openModal        = which;
-    state.modalReturnFocus = trigger ?? null;
-
-    const modal = document.getElementById('astro-modal');
-    document.getElementById('astro-modal-title').textContent =
-        which === 'sun' ? 'Sun details' : 'Moon details';
-
-    renderActiveModal();
-    modal.classList.add('open');
-    modal.setAttribute('aria-hidden', 'false');
-    lockBodyScroll();
-    setStarFieldModalDim(true);
-
-    // Focus the close button so keyboard users land somewhere sensible.
-    modal.querySelector('.astro-modal-close')?.focus();
-}
-
-function closeAstroModal() {
-    if (!state.openModal) return;
-    destroySunModalChart();
-    const modal = document.getElementById('astro-modal');
-    modal.classList.remove('open');
-    modal.setAttribute('aria-hidden', 'true');
-    unlockBodyScroll();
-    setStarFieldModalDim(false);
-    state.openModal = null;
-    state.modalReturnFocus?.focus?.();
-    state.modalReturnFocus = null;
-}
-
-// iOS Safari + Android Chrome ignore `overflow: hidden` on <body> for touch
-// scrolling, so the page underneath would still scroll while the modal is
-// open — that's what produces the flicker (the URL bar collapses, the
-// viewport reflows, the fixed backdrop appears to jump). The reliable fix
-// is to pin <body> to a fixed position offset by the current scroll, then
-// restore the offset on close so the user lands back where they were.
-function lockBodyScroll() {
-    if (state.scrollLockY != null) return;
-    const scrollY = window.scrollY;
-    state.scrollLockY = scrollY;
-    const body = document.body;
-    body.style.position = 'fixed';
-    body.style.top      = `-${scrollY}px`;
-    body.style.left     = '0';
-    body.style.right    = '0';
-    body.style.width    = '100%';
-}
-
-function unlockBodyScroll() {
-    if (state.scrollLockY == null) return;
-    const y = state.scrollLockY;
-    const body = document.body;
-    body.style.position = '';
-    body.style.top      = '';
-    body.style.left     = '';
-    body.style.right    = '';
-    body.style.width    = '';
-    window.scrollTo(0, y);
-    state.scrollLockY = null;
-}
-
-// Full modal (re)build. Runs on open and on daily rollover / zone change —
-// NOT on the 30-second poll tick (see patchActiveModalLive), so the sun
-// chart's SVG survives ticks and scrubbing is never interrupted.
-function renderActiveModal() {
-    const body = document.getElementById('astro-modal-body');
-    if (!body) return;
-    if (state.openModal === 'sun') {
-        destroySunModalChart();
-        body.innerHTML = buildSunModalHTML();
-        updateTwilightNowHighlight();
-        // Chart container is now in the DOM — render on the next frame so
-        // CSS layout has resolved and clientWidth/Height are non-zero.
-        requestAnimationFrame(() => {
-            const el = document.getElementById('sun-modal-chart');
-            if (!el || state.openModal !== 'sun') return;
-            renderSunModalChart(el, {
-                sun: state.astronomyDaily?.sunDailyEvents,
-                currentAltitude: state.sunSnapshot?.currentAltitude,
-                dailyKey: state.dailyKey,
-            });
-        });
-    }
-    if (state.openModal === 'moon') {
-        body.innerHTML = buildMoonModalHTML();
-        // Canvas is now in the DOM — draw into it on the next frame so CSS
-        // layout has resolved and offsetWidth/Height are non-zero.
-        requestAnimationFrame(() => {
-            const canvas = document.getElementById('moon-modal-canvas');
-            if (!canvas) return;
-            const snap = state.moonSnapshot;
-            drawMoon(canvas, snap?.phase?.phaseDegrees ?? 0, snap?.parallacticAngle ?? 0);
-        });
-    }
-}
-
-// Cheap per-poll-tick refresh of the open modal. The moon modal is plain
-// text/canvas, so a full rebuild stays fine; the sun modal only patches its
-// live bits to keep the chart's DOM (and any in-flight scrub) intact.
-function patchActiveModalLive() {
-    if (state.openModal === 'moon') {
-        renderActiveModal();
-        return;
-    }
-    if (state.openModal === 'sun') {
-        updateSunModalChartLive(state.sunSnapshot?.currentAltitude);
-        updateTwilightNowHighlight();
-    }
-}
-
-// Marks the twilight ladder cell (or row, for daylight) matching the phase
-// the clock is in right now.
-function updateTwilightNowHighlight() {
-    const ladder = document.querySelector('#astro-modal-body .twilight-compact');
-    if (!ladder) return;
-    ladder.querySelectorAll('.is-now').forEach((el) => el.classList.remove('is-now'));
-
-    const phase = getCurrentTwilightPhase(state.astronomyDaily?.sunDailyEvents?.times);
-    if (!phase || phase.band === 'night') return;
-    const target = phase.side
-        ? ladder.querySelector(`.tc-time[data-band="${phase.band}"][data-side="${phase.side}"]`)
-        : ladder.querySelector(`.tc-row.${phase.band}`);
-    target?.classList.add('is-now');
-}
-
-function buildSunModalHTML() {
-    const daily = state.astronomyDaily?.sunDailyEvents;
-    const times = daily?.times;
-
-    const condition = times?.solarCondition;
-    const polarBanner = (condition && condition !== 'NORMAL')
-        ? `<div class="polar-banner">${
-              condition === 'POLAR_DAY'
-                  ? 'Polar day — the sun stays above the horizon all day.'
-                  : 'Polar night — the sun stays below the horizon all day.'
-          }</div>`
-        : '';
-
-    const ladderRows = TWILIGHT_PAIRS.map(({ band, label, dawn, dusk }) => {
-        const cell = (field, side) => {
-            const iso = times?.[field];
-            return `<span class="tc-time${iso ? '' : ' is-null'}" data-band="${band}" data-side="${side}">${
-                iso ? formatTimeOfDay(iso) : '—'
-            }</span>`;
-        };
-        return `
-            <div class="tc-row ${band}">
-                <span class="tc-label">${label}</span>
-                ${cell(dawn, 'dawn')}
-                ${cell(dusk, 'dusk')}
-            </div>`;
-    }).join('');
-
-    const noonAltStr = daily?.solarNoon?.alt != null
-        ? `${daily.solarNoon.alt.toFixed(1)}°`
-        : '--';
-
-    return `
-        <div class="modal-section">
-            <div class="sun-chart-readout" id="sun-chart-readout" aria-hidden="true"></div>
-            <div class="sun-chart-block" id="sun-modal-chart"></div>
-        </div>
-
-        <div class="sun-stats-row">
-            <div class="modal-row">
-                <span class="label">Day length</span>
-                <span class="value">${formatDuration(daily?.dayLengthSeconds)}</span>
-            </div>
-            <div class="modal-row">
-                <span class="label">Astro night</span>
-                <span class="value">${formatDuration(daily?.nightLengthSeconds)}</span>
-            </div>
-            <div class="modal-row">
-                <span class="label">Noon altitude</span>
-                <span class="value">${noonAltStr}</span>
-            </div>
-        </div>
-
-        <div class="modal-section">
-            <div class="modal-section-title">Twilight</div>
-            <div class="twilight-compact">
-                <div class="tc-row tc-head">
-                    <span class="tc-label"></span>
-                    <span class="tc-col-label">Dawn</span>
-                    <span class="tc-col-label">Dusk</span>
-                </div>
-                ${ladderRows}
-            </div>
-        </div>
-
-        ${polarBanner}
-    `;
-}
-
-function buildMoonModalHTML() {
-    const daily    = state.astronomyDaily?.moonDailyEvents;
-    const snapshot = state.moonSnapshot;
-    const phase    = snapshot?.phase;
-
-    const illumPct = phase?.illuminationPercent != null
-        ? `${phase.illuminationPercent.toFixed(1)}%`
-        : '--';
-    const ageDays = phase?.ageDays != null
-        ? `${phase.ageDays.toFixed(1)} days`
-        : '--';
-
-    const altDeg = snapshot?.currentAltitude;
-    const altStr = altDeg != null ? `${altDeg.toFixed(1)}°` : '--';
-
-    const peakAltStr = daily?.peak?.alt != null ? `${daily.peak.alt.toFixed(1)}°` : '--';
-    const distanceKm = snapshot?.distanceKm != null
-        ? `${Math.round(snapshot.distanceKm).toLocaleString('en-US')} km`
-        : '--';
-
-    return `
-        <div class="modal-moon-hero">
-            <div class="moon-disk-wrapper">
-                <canvas class="moon-disk" id="moon-modal-canvas" aria-hidden="true"></canvas>
-            </div>
-            <div class="moon-phase-meta">
-                <span class="phase-name">${phase?.phaseName ?? '--'}</span>
-                <span class="phase-illum">${illumPct} illuminated · ${ageDays} old</span>
-            </div>
-        </div>
-
-        <div class="modal-section">
-            <div class="modal-section-title">Cycle</div>
-            ${buildMoonCycleTrackHTML(phase?.phaseDegrees)}
-        </div>
-
-        <div class="modal-section">
-            <div class="modal-section-title">Position</div>
-            <div class="modal-grid">
-                <div class="modal-row">
-                    <span class="label">Current altitude</span>
-                    <span class="value">${altStr}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Constellation</span>
-                    <span class="value">${snapshot?.constellation ?? '--'}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Distance</span>
-                    <span class="value">${distanceKm}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Peak altitude</span>
-                    <span class="value">${peakAltStr}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal-section">
-            <div class="modal-section-title">Today</div>
-            <div class="modal-grid">
-                <div class="modal-row">
-                    <span class="label">Moonrise</span>
-                    <span class="value">${formatMoonEvent(daily?.rise)}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Moonset</span>
-                    <span class="value">${formatMoonEvent(daily?.set)}</span>
-                </div>
-                <div class="modal-row">
-                    <span class="label">Lunar transit</span>
-                    <span class="value">${formatTimeOfDay(daily?.peak?.time)}</span>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Waypoints around the synodic cycle, evenly spaced by phase angle (not by
-// duration — the real month isn't evenly split by these events, but the
-// track is a schematic position indicator, not a calendar).
-const MOON_CYCLE_WAYPOINTS = [
-    { pct: 0,   label: 'New' },
-    { pct: 25,  label: 'First Q' },
-    { pct: 50,  label: 'Full' },
-    { pct: 75,  label: 'Last Q' },
-    { pct: 100, label: 'New' },
-];
-
-// Horizontal cycle-position track for the moon modal: fixed waypoints at the
-// four named phases plus a glowing "now" marker placed by the current phase
-// angle (0-360°, from AstronomyEngine — 0/360 = new, 180 = full). Styled to
-// match the sun chart's now-dot so the two modals read as one system.
-function buildMoonCycleTrackHTML(phaseDegrees) {
-    const nowPct = phaseDegrees != null ? (phaseDegrees / 360) * 100 : null;
-
-    const ticks = MOON_CYCLE_WAYPOINTS.map(({ pct, label }) => `
-        <div class="mc-tick" style="left:${pct}%">
-            <span class="mc-tick-dot"></span>
-            <span class="mc-tick-label">${label}</span>
-        </div>`).join('');
-
-    const nowMarker = nowPct != null
-        ? `<div class="mc-now" style="left:${nowPct.toFixed(2)}%">
-               <span class="mc-now-halo"></span>
-               <span class="mc-now-dot"></span>
-           </div>`
-        : '';
-
-    return `
-        <div class="moon-cycle-track">
-            <div class="mc-line"></div>
-            ${ticks}
-            ${nowMarker}
-        </div>`;
-}
-
-function initAstroModal() {
-    const modal   = document.getElementById('astro-modal');
-    const sunEl   = document.getElementById('sun-card');
-    const moonEl  = document.getElementById('moon-card');
-    if (!modal || !sunEl || !moonEl) return;
-
-    const openHandler = (which) => (e) => {
-        e.preventDefault();
-        openAstroModal(which, e.currentTarget);
-    };
-    sunEl.addEventListener('click', openHandler('sun'));
-    moonEl.addEventListener('click', openHandler('moon'));
-
-    // Keyboard activation — Enter/Space on the card.
-    [sunEl, moonEl].forEach((card) => {
-        card.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                openAstroModal(card === sunEl ? 'sun' : 'moon', card);
-            }
-        });
-    });
-
-    // Backdrop and close button both carry data-modal-dismiss.
-    modal.addEventListener('click', (e) => {
-        if (e.target?.dataset?.modalDismiss === 'true') closeAstroModal();
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && state.openModal) closeAstroModal();
     });
 }
 
@@ -2188,7 +1794,9 @@ initEventListeners();
 initStatusCircles();
 initDewRiskBadge();
 initWetnessBadge();
-initAstroModal();
+// The modal re-reads `state` on every render, so it always reflects the
+// latest poll without the dashboard pushing updates into it.
+initAstroModal(() => state);
 initHealthPopover();
 initBgPreference();
 initStarField();
