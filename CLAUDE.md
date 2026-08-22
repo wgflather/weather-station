@@ -29,7 +29,7 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 
 | Controller | Base path | Purpose |
 |---|---|---|
-| `WeatherController` | `/api/weather` | Ingest (`POST`), live dashboard, 24-h chart |
+| `WeatherController` | `/api/weather` | Ingest (`POST`), live dashboard, 24-h chart, data-quality strip (`/quality`) |
 | `WeatherDashboardController` | `/` | Serves the Thymeleaf dashboard (`index.html`) |
 | `WeatherForecastController` | `/api/forecast` | Cloud strip (`/clouds`) and astro forecast (`/astro`) |
 | `AstronomyController` | `/api/astronomy` | Daily sun/moon events (`/daily`), altitude curve (`/curve`) |
@@ -43,7 +43,7 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 
 - **`WeatherService`** — persists `WeatherRecord`, triggers validation via `DataQualityValidator`.
 - **`DataQualityValidator`** — detects spikes and anomalies using median-based statistical methods; reads recent readings from `SensorStateCache`.
-- **`AnalyticsService`** — time-series aggregation for 24-h charts (buckets of configurable resolution).
+- **`AnalyticsService`** — time-series aggregation for 24-h charts (buckets of configurable resolution); also assembles the 24-h data-quality strip (`findLast24HoursQualityStrip`) — see below.
 - **`DashboardService`** — assembles the live dashboard DTO (metrics, system health, snapshots).
 - **`AstronomyEngine`** — wraps the cosinekitty astronomy lib; computes sun/moon altitude curves, rise/set/twilight times, moon phase.
 - **`AstronomySearch`** — binary-search horizon crossing finder used by `AstronomyEngine`.
@@ -92,6 +92,12 @@ PostgreSQL with Flyway migrations (`src/main/resources/db/migration/`). JPA is s
 | V3 | Alter surface wetness column to `DOUBLE` |
 | V4 | Add `wifi_rssi` column |
 | V5 | `hourly_weather_record` and `daily_weather_record` tables |
+| V6 | Data-provider configuration columns on `station_configuration` |
+| V7 | `wind` / `uv_index` columns (+ quality columns, validation thresholds) |
+| V8 | `wind_direction` column (+ quality column) |
+| V9 | Index on `weather_records (measured_at DESC)` |
+
+Note on indexes: V1 created three `(quality, measured_at DESC)` composites for temperature, pressure and humidity only — nothing equivalent exists for surface wetness, wind, wind direction or UV index. Those composites only help queries filtering on a *rare* quality (`SPIKE`/`ANOMALY`); `= 'OK'` matches almost every row, so the planner ignores them. V9's plain `measured_at` index is what serves the time-range queries (quality strip, retention, raw admin view, charts).
 
 Local DB: `localhost:5432/weather_station` (`application-local.yml`). Active profile: `local`.
 
@@ -136,6 +142,7 @@ Every script loaded from `index.html` is a `type="module"` except `realtime-scri
 | `star-field.js` | ES module | Atmospheric star field canvas + CSS-animated highlights |
 | `cloud-forecast.js` | ES module | Hourly cloud/weather forecast strip; icon selection; tooltip |
 | `sun-modal-chart.js` | ES module | Sun modal SVG chart: whole-day altitude curve with twilight gradient, label chips, scrubbing |
+| `quality-strip.js` | ES module | 24-h data-quality strip inside metric status-circle popovers; owns the shared `/api/weather/quality` fetch cache |
 | `weather-chart.js` | ES module | Chart.js 24-h metric chart |
 | `FetchScheduler.js` | ES module | Incremental chart data fetcher (fetches only new buckets) |
 | `history-modal.js` | ES module | History chart modal (date picker + period tabs) |
@@ -191,6 +198,31 @@ The page background gradient is driven by the current sun altitude, updated on e
 - Triggered by `#astro-fc-btn` (below forecast strip, `id` must stay the same for JS binding).
 - Fetches `/api/forecast/astro`; renders an SVG scroll chart showing seeing quality, cloud layers (high/mid/low), sun/moon altitude curves, and a "now" indicator.
 - Seeing quality computed server-side by `SeeingCalculator` (Hufnagel-Valley model, jet stream + surface wind).
+
+### Data-quality strip (`quality-strip.js`)
+
+A 6 px bar inside a metric card's status-circle popover, answering "has this sensor *been* healthy?" alongside the popover's existing "is this reading trustworthy right now?".
+
+**Endpoint.** `GET /api/weather/quality` returns one `QualityStrip` covering **every** sensor-backed metric — 48 half-hour buckets, per-metric summaries, and the list of gaps. One ~4 KB payload serves all five popovers, so `fetchQualityStrip()` caches the **promise** (not the value) for 60 s; caching the promise also dedupes two popovers opened in quick succession. Metrics configured as `EXTERNAL_API` are omitted server-side — Open-Meteo values never pass through `DataQualityValidator`.
+
+**Window anchoring.** `AnalyticsService.findLast24HoursQualityStrip()` floors `now` to the current 30-minute slot and makes that the *last* bucket, so the strip always ends at "now". Consequence: the final bucket is partial by construction, and the client prorates its expected reading count by elapsed fraction — otherwise the right edge would read as degraded permanently.
+
+**Bucket states**, first match wins. `expected` is the median non-empty bucket total, derived from the data because the reporting interval isn't configured anywhere:
+
+| Order | State | Condition |
+|---|---|---|
+| 1 | `EMPTY` | `totalCount === 0` — no row at all |
+| 2 | `ANOMALY` | any reading out of range |
+| 3 | `SPIKE` | any reading flagged as a spike |
+| 4 | `MISSING` | ≥ 50 % of rows had no value for this metric |
+| 5 | `PARTIAL` | fewer than 50 % of expected readings |
+| 6 | `OK` | — |
+
+Events win outright over coverage states: at 48 buckets a single spike tints ~2 % of the bar, which is proportionate. Colours live in `STRIP_COLORS`, deliberately **not** `DATA_QUALITY_COLORS` — the latter's `MISSING` (`#111827`) reads as a hole punched through the bar. `EMPTY` is darker than the track (a notch — the station was silent), `MISSING` is muted slate (rows arrived, this field was null).
+
+**Gaps.** Outages are *absent rows*, not `MISSING` rows, so they can't be seen in the quality columns at all. `WeatherReportRepository.findGaps` unions the window edges in as sentinel timestamps so `LAG` also catches leading and trailing gaps — the trailing one (died and never came back) being the case a plain row-to-row scan misses. `minGapMinutes` scales with observed cadence (`max(15, cadence × 3)`), without which every consecutive pair of readings is technically a gap. Gaps render as an overlay at their **true** timestamps, not snapped to buckets: a 20-minute outage inside a 30-minute bucket is invisible in the bucket layer.
+
+**Scrubbing.** Pointer over the strip rewrites the caption line in place (`11:00–11:30 · 30 readings · 2 spikes`) rather than opening a tooltip — a tooltip would be clipped by the 210 px popover and is awkward nested on touch. Listeners bind to the padded `.qstrip-track` (20 px tall) but measure `.qstrip-bar`, so the hit area is usable without skewing the x-to-bucket mapping. Only `pointerType === 'mouse'` reverts on leave; a touch pointer stops existing on lift, so reverting there would blank the readout before it could be read. `click` is `stopPropagation()`-ed because `fetch-data.js` closes the popover on *any* document click with no containment check.
 
 ### Styling (`static/css/`)
 
