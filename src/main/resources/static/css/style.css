@@ -2862,6 +2862,62 @@ h3 {
     margin: 8px 0 0;
 }
 
+/* ---------- 24-hour data-quality strip (in metric popovers) ---------- */
+
+/* Wrapper rather than radius on the <svg> itself: rounding a replaced element
+   and clipping its children is less consistently handled across engines. */
+/* The track exists purely to enlarge the pointer target: a 6px bar is far too
+   thin to hit reliably, especially on touch. Scrub handlers bind here but
+   measure .qstrip-bar, so the padding never skews the x-to-bucket mapping. */
+.qstrip-track {
+    padding: 7px 0;
+    margin-top: 1px;
+    /* Scrubbable, not clickable — crosshair says "inspect" without promising
+       an action, which is the distinction the other popover controls blur. */
+    cursor: crosshair;
+    /* Keeps pointermove firing through a touch drag instead of the gesture
+       being claimed as a page scroll. */
+    touch-action: none;
+}
+
+.qstrip-bar {
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: rgba(148, 190, 255, 0.10);
+}
+
+/* preserveAspectRatio="none" in the markup lets the viewBox (1 unit per bucket)
+   stretch to whatever width the popover settles at, so bucket boundaries stay
+   proportional instead of depending on a hardcoded pixel width. */
+.qstrip-bar svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.qstrip-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    opacity: 0.75;
+}
+
+.qstrip-issues {
+    margin-top: 5px;
+    font-size: 10px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    /* Two lines are reserved so a long scrub readout wrapping to a second line
+       cannot change the popover's height mid-hover — which would otherwise
+       shift it under the cursor, or push it past the viewport edge. */
+    min-height: 2.9em;
+}
+
 .data-stale-hint {
     display: block;
     font-size: 10px;

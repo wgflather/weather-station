@@ -8,6 +8,7 @@ import {
     destroySunModalChart,
     getCurrentTwilightPhase,
 } from './sun-modal-chart.js';
+import { qualityStripSlot, hydrateQualityStrip } from './quality-strip.js';
 import {
     SKY_ANCHORS,
     lerpTriplet,
@@ -1810,10 +1811,14 @@ function formatArrivedAt(value) {
     return value ?? '--';
 }
 
-function buildPopupHTML(details, dataStatus) {
+// `cardId` is only used to locate this metric's slice of the shared quality
+// payload; it is optional so the other popup builders can keep calling this
+// without one.
+function buildPopupHTML(details, dataStatus, cardId) {
     if (details.dataProvider === 'EXTERNAL_API') {
         // API-backed cards are independent of MQTT sensor freshness — see
-        // buildApiPopupHTML.
+        // buildApiPopupHTML. Open-Meteo values never pass through
+        // DataQualityValidator either, so there is no quality history to show.
         return buildApiPopupHTML(details);
     }
 
@@ -1859,6 +1864,7 @@ function buildPopupHTML(details, dataStatus) {
             <span class="popup-val">${formatArrivedAt(details.arrivedAt)}</span>
         </div>
         ${freshnessSection}
+        ${qualityStripSlot(cardId)}
     `;
 }
 
@@ -2022,7 +2028,13 @@ function initStatusCircles() {
                             && globalPopup._sourceEl === circle;
 
             globalPopup.classList.remove('open');
-            if (!isOpen && details) openPopup(buildPopupHTML(details, dataStatus), circle);
+            if (!isOpen && details) {
+                openPopup(buildPopupHTML(details, dataStatus, card?.id), circle);
+                // Fills asynchronously — usually straight from cache. It makes
+                // the popup taller, so reposition once it lands or a popover
+                // that flipped above its anchor will overflow the viewport.
+                hydrateQualityStrip(globalPopup, () => positionPopup(circle));
+            }
         });
     });
 }
