@@ -128,8 +128,10 @@ Google Java Format enforced by Spotless. Always run `./mvnw spotless:apply` befo
 | Template / file | URL | Purpose |
 |---|---|---|
 | `templates/index.html` | `/` | Main dashboard (Thymeleaf) |
-| `static/history.html` | `/history.html` | History page (static, unused directly — history opened via modal) |
 | `static/admin/config.html` | `/admin/config.html` | Station configuration admin panel |
+| `templates/login.html` | `/login` | Login page |
+
+History has no standalone page — it opens as a modal from the dashboard (`history-modal.js`).
 
 ### JavaScript modules (all under `static/js/`)
 
@@ -146,8 +148,11 @@ Every script loaded from `index.html` is a `type="module"` except `realtime-scri
 | `weather-chart.js` | ES module | Chart.js 24-h metric chart |
 | `FetchScheduler.js` | ES module | Incremental chart data fetcher (fetches only new buckets) |
 | `history-modal.js` | ES module | History chart modal (date picker + period tabs) |
-| `history-summary.js` | ES module | History summary stats rendering |
-| `daily-chart.js` | ES module | Daily chart rendering (used in history) |
+| `daily-chart.js` | ES module | Daily chart rendering (used by the history modal) |
+| `moon-canvas.js` | ES module | Moon phase canvas renderer |
+| `sky-colors.js` | ES module | Sky/sun colour ramps shared by `fetch-data.js` and `sun-modal-chart.js` |
+| `equalize-card-height.js` | ES module | Keeps dashboard card heights in step |
+| `database-view.js` / `config.js` | ES module | Admin pages only, not loaded by the dashboard |
 
 ### Cross-module communication (window globals)
 
@@ -193,11 +198,9 @@ The page background gradient is driven by the current sun altitude, updated on e
   - `thunderstorms-{n}-overcast` does not exist in the CDN — falls back to rain variant.
 - Touch tooltip: `stopPropagation()` always fires on strip clicks so gap taps never close the tooltip unexpectedly.
 
-### Astro forecast modal (`astro-forecast.js`)
+### Astro forecast — backend only, no frontend
 
-- Triggered by `#astro-fc-btn` (below forecast strip, `id` must stay the same for JS binding).
-- Fetches `/api/forecast/astro`; renders an SVG scroll chart showing seeing quality, cloud layers (high/mid/low), sun/moon altitude curves, and a "now" indicator.
-- Seeing quality computed server-side by `SeeingCalculator` (Hufnagel-Valley model, jet stream + surface wind).
+`WeatherForecastController` serves `/api/forecast/astro`, and `SeeingCalculator` computes seeing quality server-side (Hufnagel-Valley, jet stream + surface wind). **Nothing consumes it.** There is no `astro-forecast.js` and no `#astro-fc-btn` anywhere in the templates, JS or CSS — this doc previously described that module as if it existed. Either build the frontend or retire the endpoint; don't trust the old description.
 
 ### Data-quality strip (`quality-strip.js`)
 
