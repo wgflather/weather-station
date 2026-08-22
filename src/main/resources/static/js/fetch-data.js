@@ -3,7 +3,6 @@ import { FetchScheduler } from './FetchScheduler.js';
 import { initStarField, updateStarField, setStarFieldModalDim } from './star-field.js';
 import { drawMoon } from './moon-canvas.js';
 import { initAstroModal, refreshAstroModal, patchAstroModalLive } from './astro-modal.js';
-import { formatTimeOfDay, formatDuration } from './time-format.js';
 import {
     initMetricPopovers,
     closeAllPopovers,
@@ -19,16 +18,19 @@ import {
     SURFACE_WETNESS_CONFIG,
     UV_CSS,
 } from './dashboard-constants.js';
+import { SKY_ANCHORS } from './sky-colors.js';
 import {
-    SKY_ANCHORS,
-    lerpTriplet,
-    skyBottomRgbAt,
-    altitudeCurveY,
-    desaturateColor,
-    skyBrightnessForAltitude,
-    sunAppearanceAt,
-    sunEventMarkerColor,
-} from './sky-colors.js';
+    renderSunCurve,
+    updateSunNowMarker,
+    updateSunHero,
+    updateMoonCountdown,
+} from './sun-curve.js';
+import {
+    renderSkyBackground,
+    moonAmbientFor,
+    loadBgPreference,
+    initBgPreference,
+} from './sky-background.js';
 
 // ==========================================
 // STATE
@@ -276,547 +278,10 @@ function renderAstronomyLive(sunSnapshot, moonSnapshot) {
         updateSunNowMarker(sunSnapshot?.currentAltitude);
     }
     const moon = state.astronomyDaily?.moonDailyEvents;
-    if (moon) updateMoonCountdown(moon.rise, moon.set);
+    if (moon) updateMoonCountdown(moon.rise, moon.set, moonSnapshot?.currentAltitude);
 
     // Keep the open modal's live fields in sync on every poll tick.
     patchAstroModalLive();
-}
-
-// ==========================================
-// SUN CURVE + HERO
-// ==========================================
-
-// SVG viewBox dimensions for the daily-arc curve. preserveAspectRatio is
-// 'none' on the element so width stretches with the card while height
-// stays at 70px. Marker / label positioning uses these same logical
-// units (HORIZON_Y_VB is in viewBox y, but since the SVG is 70px tall
-// with a 70-unit-tall viewBox, the y values double as pixel offsets
-// inside the wrapper).
-const CURVE_W_VB = 300;
-const CURVE_H_VB = 70;
-// Horizon sits 60% down so the daytime arc gets ~1.5× the vertical room
-// of the night dip — matches what people expect (day is the part that
-// matters; the trough below is context).
-const CURVE_HORIZON_Y = 42;
-const CURVE_ABOVE_PADDING = 0.88;
-// Below-horizon depth is intentionally shallow (0.25) so the trough reads
-// as a gentle suggestion of nighttime rather than a sharp V-shape.
-const CURVE_BELOW_PADDING = 0.25;
-
-// Scale memoised from the daily render so the per-tick "now" marker
-// reposition doesn't rescan the points list.
-let sunCurveScale = null;
-
-function altitudeToY(altDeg, maxAlt, minAlt) {
-    return altitudeCurveY(altDeg, {
-        maxAlt,
-        minAlt,
-        horizonY:     CURVE_HORIZON_Y,
-        aboveExtent:  CURVE_HORIZON_Y * CURVE_ABOVE_PADDING,
-        belowExtent: (CURVE_H_VB - CURVE_HORIZON_Y) * CURVE_BELOW_PADDING,
-    });
-}
-
-function timeToXPercent(isoTime, startMs, endMs) {
-    const ms = new Date(isoTime).getTime();
-    return Math.max(0, Math.min(100, ((ms - startMs) / (endMs - startMs)) * 100));
-}
-
-function renderSunCurve(sun) {
-    const svg = document.getElementById('sun-curve');
-    const points = sun.sunCurve;
-    if (!svg || !points || !points.length) return;
-
-    let maxAlt = 0, minAlt = 0;
-    for (const p of points) {
-        if (p.altitude > maxAlt) maxAlt = p.altitude;
-        if (p.altitude < minAlt) minAlt = p.altitude;
-    }
-    // Guard against degenerate (polar-day / polar-night) curves where the
-    // body stays one side of the horizon — keep a minimum range so the
-    // scale doesn't collapse to a div-by-zero.
-    maxAlt = Math.max(maxAlt, 1);
-    minAlt = Math.min(minAlt, -1);
-
-    const startMs = new Date(points[0].time).getTime();
-    const endMs   = new Date(points[points.length - 1].time).getTime();
-
-    sunCurveScale = { maxAlt, minAlt, startMs, endMs };
-
-    // Path is sampled every ~10 minutes (embedded curve is 1-min
-    // resolution; ~144 segments draw a smooth arc at card size without
-    // shipping ~1.4k path commands).
-    const N = points.length;
-    const step = Math.max(1, Math.floor(N / 144));
-    let pathD = '';
-    for (let i = 0; i < N; i += step) {
-        const x = (i / (N - 1)) * CURVE_W_VB;
-        const y = altitudeToY(points[i].altitude, maxAlt, minAlt);
-        pathD += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
-    }
-    pathD += 'L' + CURVE_W_VB + ',' + altitudeToY(points[N - 1].altitude, maxAlt, minAlt).toFixed(1);
-    svg.querySelector('.astro-curve-path').setAttribute('d', pathD);
-
-    // Rise / noon / set markers + their time labels. The viewBox y range
-    // [0, 70] equals the SVG's rendered pixel height, so altitudeToY's
-    // output doubles as a top offset in pixels relative to the wrapper.
-    placeSunMarker('sun-marker-rise', 'sun-label-rise', sun.rise, 0);
-    placeSunMarker('sun-marker-set',  'sun-label-set',  sun.set,  0);
-    placeSunMarker(
-        'sun-marker-noon',
-        'sun-label-noon',
-        sun.solarNoon?.time,
-        sun.solarNoon?.alt ?? maxAlt,
-    );
-}
-
-// Gap between the bottom edge of a marker dot and the top of its label.
-const LABEL_OFFSET_PX = 12;
-
-function placeSunMarker(markerId, labelId, isoTime, altitudeDeg) {
-    const marker = document.getElementById(markerId);
-    const label  = document.getElementById(labelId);
-    if (!marker || !label || !sunCurveScale) return;
-
-    if (!isoTime) {
-        marker.style.display = 'none';
-        label.style.display  = 'none';
-        return;
-    }
-
-    const { maxAlt, minAlt, startMs, endMs } = sunCurveScale;
-    const xPercent = timeToXPercent(isoTime, startMs, endMs);
-    const yPx = altitudeToY(altitudeDeg, maxAlt, minAlt);
-
-    marker.style.display = '';
-    marker.style.left = `${xPercent}%`;
-    marker.style.top  = `${yPx}px`;
-
-    // One flat colour across the dot: the sun's own apparent colour at this
-    // event's altitude, desaturated and darkened so it stays a quiet
-    // reference point — the full-saturation sun belongs to the "now" marker.
-    marker.style.background = sunEventMarkerColor(altitudeDeg);
-
-    // Label sits LABEL_OFFSET_PX below the marker's centre. The tick
-    // ::before pseudo-element bridges the gap visually.
-    label.style.display = '';
-    label.textContent   = formatTimeOfDay(isoTime);
-    label.style.left    = `${xPercent}%`;
-    label.style.top     = `${yPx + LABEL_OFFSET_PX}px`;
-}
-
-function updateSunNowMarker(currentAltitude) {
-    const el = document.getElementById('sun-marker-now');
-    if (!el) return;
-    if (!sunCurveScale || currentAltitude == null) {
-        el.style.display = 'none';
-        return;
-    }
-    const { maxAlt, minAlt, startMs, endMs } = sunCurveScale;
-    const t = Math.max(0, Math.min(1, (Date.now() - startMs) / (endMs - startMs)));
-    el.style.display = '';
-    el.style.left = `${(t * 100).toFixed(2)}%`;
-    el.style.top  = `${altitudeToY(currentAltitude, maxAlt, minAlt)}px`;
-
-    applySunMarkerAppearance(el, currentAltitude);
-}
-
-/**
- * Paints the card's "now" marker as a miniature sun. The layered colour
- * model lives in sky-colors.js (sunAppearanceAt) so the sun modal chart
- * renders the identical object from the same numbers; this just maps those
- * values onto the CSS custom properties the marker's styles read.
- */
-function applySunMarkerAppearance(el, altitude) {
-    const a = sunAppearanceAt(altitude);
-
-    // Disc: bright pale centre → core → halo colour at the rim. The rim
-    // softens as the sun drops so it melts into the glow rather than ending
-    // on a hard circle.
-    el.style.setProperty('--now-centre',    rgbString(a.centre));
-    el.style.setProperty('--now-core',      rgbString(a.core));
-    el.style.setProperty('--now-halo',      rgbString(a.halo));
-    el.style.setProperty('--now-edge',      rgbaString(a.halo, a.edgeAlpha));
-    el.style.setProperty('--now-edge-stop', `${a.edgeStopPct.toFixed(0)}%`);
-    el.style.setProperty('--now-highlight', rgbaString([255, 255, 255], a.highlightAlpha));
-
-    // Halo/bloom: radii fixed so the layered structure stays constant; only
-    // colour and opacity move with altitude. Inner halo ≈ 18px, bloom ≈ 30px
-    // around the 10px disc, fading to nothing with no visible boundary.
-    el.style.setProperty('--now-glow-inner-color', rgbaString(a.halo,  a.glowInnerAlpha));
-    el.style.setProperty('--now-glow-mid-color',   rgbaString(a.bloom, a.glowMidAlpha));
-    el.style.setProperty('--now-glow-outer-color', rgbaString(a.bloom, a.glowOuterAlpha));
-
-    // Spikes inherit the inner-halo colour, so they warm with the atmosphere.
-    el.style.setProperty('--now-spike',         rgbString(a.halo));
-    el.style.setProperty('--now-spike-opacity', a.spikeAlpha.toFixed(2));
-}
-
-// ==========================================
-// COUNTDOWN HELPERS (shared by sun + moon)
-// ==========================================
-
-// Picks the next horizon-crossing event today and returns { label,
-// timeMs } or null when no future event remains in today's data (the
-// tail end of the day — tomorrow's rise isn't on this payload).
-function pickNextEvent(riseIso, setIso, bodyLabel) {
-    const now = Date.now();
-    const candidates = [
-        { label: `${bodyLabel}rise`, timeMs: riseIso ? new Date(riseIso).getTime() : null },
-        { label: `${bodyLabel}set`,  timeMs: setIso  ? new Date(setIso).getTime()  : null },
-    ].filter(e => e.timeMs != null && e.timeMs > now);
-    candidates.sort((a, b) => a.timeMs - b.timeMs);
-    return candidates[0] ?? null;
-}
-
-function formatCountdown(targetMs) {
-    const diffSec = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
-    const hours = Math.floor(diffSec / 3600);
-    const minutes = Math.floor((diffSec % 3600) / 60);
-    if (hours === 0) return `${minutes}m`;
-    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-}
-
-function clockText(ms) {
-    return new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-
-function updateSunHero(riseIso, setIso, dayLengthSeconds) {
-    const eventEl = document.getElementById('sun-hero-event');
-    const timeEl  = document.getElementById('sun-sub-time');
-    const dayEl   = document.getElementById('sun-sub-day');
-    if (!eventEl || !timeEl || !dayEl) return;
-
-    const dayText = `Day ${formatDuration(dayLengthSeconds)}`;
-    const next = pickNextEvent(riseIso, setIso, 'Sun');
-    if (next) {
-        eventEl.textContent = `${next.label} in ${formatCountdown(next.timeMs)}`;
-        timeEl.textContent  = `${clockText(next.timeMs)} · `;
-        dayEl.textContent   = dayText;
-    } else {
-        eventEl.textContent = 'Below horizon';
-        timeEl.textContent  = '';
-        dayEl.textContent   = dayText;
-    }
-}
-
-function updateMoonCountdown(riseIso, setIso) {
-    const el = document.getElementById('moon-hero-event');
-    if (!el) return;
-    const next = pickNextEvent(riseIso, setIso, 'Moon');
-    if (next) {
-        el.textContent = `${next.label} in ${formatCountdown(next.timeMs)}`;
-    } else if (riseIso == null && setIso == null) {
-        const alt = state.moonSnapshot?.currentAltitude ?? 0;
-        el.textContent = alt > 0 ? 'Above horizon all day' : 'Below horizon all day';
-    } else {
-        el.textContent = 'Below horizon';
-    }
-}
-
-// ==========================================
-// DYNAMIC SKY BACKGROUND & CARD COLORS
-// ==========================================
-//
-// SKY_ANCHORS (imported from sky-colors.js, shared with the sun modal
-// chart's curve): for a given sun altitude, the top/bottom sky gradient
-// colors plus the card surface and accent (border + divider) colors. The
-// current altitude is linearly interpolated between bracketing anchors and
-// the results are written into CSS custom properties; @property + a 12s
-// transition do the smooth animation between values.
-//
-// Card colors stay cool/blue across all phases so light text remains
-// readable; they shift just enough in brightness and saturation to
-// harmonise with the sky rather than fight it. The +30° anchor matches
-// the original static palette so the daytime "baseline" is unchanged.
-
-// Alpha channels for card surface and accent.
-const CARD_BG_ALPHA           = 0.46;
-const CARD_BORDER_ALPHA       = 0.12;
-const DIVIDER_ALPHA           = 0.10;
-// Stronger variants for elements that sit above the page (modal panel, hover).
-const CARD_BG_STRONG_ALPHA     = 0.85;
-const CARD_BORDER_STRONG_ALPHA = 0.18;
-// Sky-ambient outer glow: desaturated sky bottom at very low alpha as a
-// barely-perceptible outer box-shadow on cards — environmental hue, not glow.
-const SKY_AMBIENT_ALPHA        = 0.10;
-// How far popup/modal panels shift from the static card color toward the
-// live (desaturated) sky color. Kept modest so golden-hour warmth tints
-// the panel rather than washing out text contrast.
-const POPUP_TINT_RATIO         = 0.25;
-
-function rgbString([r, g, b])          { return `rgb(${r}, ${g}, ${b})`; }
-function rgbaString([r, g, b], alpha)  { return `rgba(${r}, ${g}, ${b}, ${alpha})`; }
-function rgbHex([r, g, b])             { return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join(''); }
-
-function buildSkyState(lo, hi, t) {
-    const topRgb    = lerpTriplet(lo.top,     hi.top,     t);
-    const bottomRgb = lerpTriplet(lo.bottom,  hi.bottom,  t);
-    const cardBgRgb = lerpTriplet(lo.cardBg,  hi.cardBg,  t);
-    const accRgb    = lerpTriplet(lo.cardAcc, hi.cardAcc, t);
-    const skyRgbArr = lerpTriplet(lo.skyRgb,  hi.skyRgb,  t);
-
-    // Desaturate ambient colors before use: warm sunset oranges and yellows
-    // are perceptually much brighter than cool blues at the same luminance.
-    // Shifting each color 55% toward its own luma (neutral grey) normalizes
-    // perceived brightness across all sky states while preserving temperature
-    // direction (warm vs cool remains distinguishable).
-    const ambientRgb = desaturateColor(bottomRgb, 0.55);
-    const accentRgb  = desaturateColor(skyRgbArr, 0.40);
-
-    // Popup/modal panel color: the static card base nudged toward the
-    // desaturated sky-bottom hue, so overlays visibly track time of day
-    // while dashboard cards themselves stay put (see --popup-bg-strong).
-    const popupBgRgb = lerpTriplet(cardBgRgb, ambientRgb, POPUP_TINT_RATIO);
-
-    return {
-        top:              rgbString(topRgb),
-        bottom:           rgbString(bottomRgb),
-        cardBg:           rgbaString(cardBgRgb, CARD_BG_ALPHA),
-        cardBorder:       rgbaString(accRgb,    CARD_BORDER_ALPHA),
-        divider:          rgbaString(accRgb,    DIVIDER_ALPHA),
-        cardBgStrong:     rgbaString(cardBgRgb, CARD_BG_STRONG_ALPHA),
-        cardBorderStrong: rgbaString(accRgb,    CARD_BORDER_STRONG_ALPHA),
-        popupBgStrong:    rgbaString(popupBgRgb, CARD_BG_STRONG_ALPHA),
-        // Desaturated bottom-sky at low alpha as outer box-shadow on cards.
-        // Retains warm/cool temperature direction without the brightness
-        // spike that raw orange/yellow would create at golden hour.
-        skyAmbient:       rgbaString(ambientRgb, SKY_AMBIENT_ALPHA),
-        // Desaturated sky-RGB triplet for CSS rgba() accent usage.
-        skyRgb:           accentRgb.join(', '),
-        topHex:           rgbHex(topRgb),
-        bottomHex:        rgbHex(bottomRgb),
-    };
-}
-
-// iOS Safari caches the <meta name="theme-color"> value from initial page
-// load and ignores subsequent `setAttribute('content', ...)` updates — the
-// URL bar (and the bottom liquid-glass toolbar it feeds) keeps the old tint
-// until a navigation forces a re-read. The workaround is to replace the
-// element entirely each tick, which Safari treats as a fresh signal.
-//
-// On Chrome / Edge / Android Chrome, in-place mutation does work — but
-// replacing the element works too, and the cost is one DOM op every 30s.
-function setBrowserChromeColor(hex) {
-    const old = document.head.querySelector('meta[name="theme-color"]');
-    if (old && old.getAttribute('content') === hex) return;
-    const fresh = document.createElement('meta');
-    fresh.setAttribute('name', 'theme-color');
-    fresh.setAttribute('content', hex);
-    if (old) {
-        old.replaceWith(fresh);
-    } else {
-        document.head.appendChild(fresh);
-    }
-}
-
-function computeSkyColors(altitudeDeg) {
-    if (altitudeDeg == null) return null;
-
-    const first = SKY_ANCHORS[0];
-    const last  = SKY_ANCHORS[SKY_ANCHORS.length - 1];
-
-    if (altitudeDeg <= first.alt) return buildSkyState(first, first, 0);
-    if (altitudeDeg >= last.alt)  return buildSkyState(last,  last,  0);
-
-    for (let i = 0; i < SKY_ANCHORS.length - 1; i++) {
-        const lo = SKY_ANCHORS[i];
-        const hi = SKY_ANCHORS[i + 1];
-        if (altitudeDeg >= lo.alt && altitudeDeg <= hi.alt) {
-            const t = (altitudeDeg - lo.alt) / (hi.alt - lo.alt);
-            return buildSkyState(lo, hi, t);
-        }
-    }
-    return null;
-}
-
-// Sky adaptation passed to drawMoon. Uses the *effective* altitude (the same one
-// that drives star visibility) so a pinned static background preset washes the
-// moon to match the displayed sky rather than the real sun position.
-function moonAmbientFor(sunAltDeg) {
-    const effAlt = getStarAltitude(sunAltDeg);
-    return {
-        brightness: skyBrightnessForAltitude(effAlt),
-        skyTint:    skyBottomRgbAt(effAlt),
-    };
-}
-
-let skyBackgroundPrimed = false;
-
-// Shared DOM-writer used by both the dynamic renderer and the static
-// background preference. `snap` bypasses the 12s CSS transition so the
-// switch is instantaneous rather than a 12-second crawl to the new colour.
-function applySkyColors(colors, snap = false) {
-    if (!colors) return;
-    const root = document.documentElement;
-    if (snap) root.style.transition = 'none';
-
-    root.style.setProperty('--bg-grad-top',        colors.top);
-    root.style.setProperty('--bg-grad-bottom',     colors.bottom);
-    root.style.setProperty('--card-bg',            colors.cardBg);
-    root.style.setProperty('--card-border',        colors.cardBorder);
-    root.style.setProperty('--divider',            colors.divider);
-    root.style.setProperty('--card-bg-strong',     colors.cardBgStrong);
-    root.style.setProperty('--card-border-strong', colors.cardBorderStrong);
-    root.style.setProperty('--sky-ambient',        colors.skyAmbient);
-    root.style.setProperty('--sky-rgb',            colors.skyRgb);
-    root.style.setProperty('--popup-bg-strong',    colors.popupBgStrong);
-
-    if (snap) { void root.offsetWidth; root.style.transition = ''; }
-    skyBackgroundPrimed = true;
-
-    setBrowserChromeColor(colors.topHex);
-    try {
-        localStorage.setItem('skyColors', JSON.stringify({
-            version: '2', top: colors.top, bottom: colors.bottom,
-            cardBg: colors.cardBg, cardBorder: colors.cardBorder,
-            divider: colors.divider, cardBgStrong: colors.cardBgStrong,
-            cardBorderStrong: colors.cardBorderStrong, skyAmbient: colors.skyAmbient,
-            skyRgb: colors.skyRgb, topHex: colors.topHex, bottomHex: colors.bottomHex,
-            popupBgStrong: colors.popupBgStrong,
-        }));
-    } catch (e) { /* private mode / quota */ }
-}
-
-function renderSkyBackground(sunAltitudeDeg) {
-    if (loadBgPreference().mode === 'static') return;
-    const colors = computeSkyColors(sunAltitudeDeg);
-    if (!colors) return;
-    applySkyColors(colors, !skyBackgroundPrimed);
-}
-
-// ==========================================
-// ==========================================
-// BACKGROUND PREFERENCE
-// ==========================================
-
-const PRESET_ANCHORS = [
-    { label: 'Night',    idx: 0 },
-    { label: 'Twilight', idx: 2 },
-    { label: 'Sunset',   idx: 3 },
-    { label: 'Golden',   idx: 4 },
-    { label: 'Morning',  idx: 5 },
-    { label: 'Midday',   idx: 6 },
-];
-
-function loadBgPreference() {
-    try { return JSON.parse(localStorage.getItem('bgPreference') || 'null') ?? { mode: 'dynamic' }; }
-    catch { return { mode: 'dynamic' }; }
-}
-
-function saveBgPreference(pref) {
-    try { localStorage.setItem('bgPreference', JSON.stringify(pref)); } catch {}
-}
-
-function applyBgPreference(pref) {
-    saveBgPreference(pref);
-    if (pref.mode === 'static') {
-        const a = SKY_ANCHORS[pref.anchorIndex];
-        applySkyColors(buildSkyState(a, a, 0), true);
-    } else {
-        // Snap back to the current sun altitude so the transition is instant.
-        skyBackgroundPrimed = false;
-        const alt = state.sunSnapshot?.currentAltitude;
-        if (alt != null) renderSkyBackground(alt);
-    }
-    // Star visibility must also reflect the new preference immediately.
-    // getStarAltitude reads the just-saved pref via loadBgPreference().
-    updateStarField(getStarAltitude(state.sunSnapshot?.currentAltitude));
-    // Moon appearance (brightness, sky tint, glow) depends on the ambient sky,
-    // so re-render immediately rather than waiting for the next 30s poll.
-    if (state.moonSnapshot?.phase) {
-        renderMoonPhase(
-            state.moonSnapshot.phase,
-            state.moonSnapshot.parallacticAngle ?? 0,
-            moonAmbientFor(state.sunSnapshot?.currentAltitude),
-        );
-    }
-}
-
-function updateSwatchActive(pref) {
-    document.querySelectorAll('.bg-swatch').forEach(el => {
-        const active = pref.mode === el.dataset.mode &&
-            (pref.mode === 'dynamic' || String(pref.anchorIndex) === el.dataset.anchor);
-        el.classList.toggle('active', active);
-    });
-}
-
-function initBgPreference() {
-    // Apply saved static preference before the first astronomy poll arrives.
-    const pref = loadBgPreference();
-    if (pref.mode === 'static' && pref.anchorIndex != null) {
-        const a = SKY_ANCHORS[pref.anchorIndex];
-        applySkyColors(buildSkyState(a, a, 0), true);
-    }
-
-    const swatchesEl = document.getElementById('bg-pref-swatches');
-    if (!swatchesEl) return;
-
-    // Dynamic option (full-width horizontal row)
-    let html = `<div class="bg-swatch" data-mode="dynamic" title="Changes with sun position">
-        <div class="bg-swatch-circle bg-swatch-dynamic-circle"></div>
-        <span class="bg-swatch-label">Dynamic — follows sun</span>
-    </div><div class="bg-preset-grid">`;
-
-    for (const preset of PRESET_ANCHORS) {
-        const a   = SKY_ANCHORS[preset.idx];
-        const top = `rgb(${a.top[0]},${a.top[1]},${a.top[2]})`;
-        const bot = `rgb(${a.bottom[0]},${a.bottom[1]},${a.bottom[2]})`;
-        html += `<div class="bg-swatch" data-mode="static" data-anchor="${preset.idx}" title="${preset.label}">
-            <div class="bg-swatch-circle" style="background:linear-gradient(to bottom,${top},${bot})"></div>
-            <span class="bg-swatch-label">${preset.label}</span>
-        </div>`;
-    }
-    html += '</div>';
-
-    swatchesEl.innerHTML = html;
-    updateSwatchActive(pref);
-
-    swatchesEl.addEventListener('click', e => {
-        const swatch = e.target.closest('.bg-swatch');
-        if (!swatch) return;
-        const newPref = swatch.dataset.mode === 'static'
-            ? { mode: 'static', anchorIndex: Number(swatch.dataset.anchor) }
-            : { mode: 'dynamic' };
-        applyBgPreference(newPref);
-        updateSwatchActive(newPref);
-    });
-
-    const btn     = document.getElementById('bg-pref-btn');
-    const popover = document.getElementById('bg-pref-popover');
-    if (!btn || !popover) return;
-
-    btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const opening = !popover.classList.contains('open');
-        if (opening) closeAllPopovers('bgpref');
-        popover.classList.toggle('open', opening);
-        btn.setAttribute('aria-expanded', String(opening));
-        popover.setAttribute('aria-hidden', String(!opening));
-        if (opening) {
-            const rect = btn.getBoundingClientRect();
-            popover.style.top   = `${rect.bottom + 6}px`;
-            popover.style.right = `${window.innerWidth - rect.right}px`;
-            popover.style.left  = 'auto';
-        }
-    });
-
-    document.addEventListener('click', () => {
-        if (popover.classList.contains('open')) {
-            popover.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
-            popover.setAttribute('aria-hidden', 'true');
-        }
-    });
-
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && popover.classList.contains('open')) {
-            popover.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
-            popover.setAttribute('aria-hidden', 'true');
-            btn.focus();
-        }
-    });
 }
 
 function renderMoonPhase(phase, parallacticAngle = 0, ambient = null) {
@@ -1323,59 +788,6 @@ function startPolling(fn, interval) {
 // BOOT
 // ==========================================
 
-// Safari tints its liquid-glass chrome by sampling the fixed .safari-*-anchor
-// strips (theme-color only drives the iPhone status bar). After the app is
-// backgrounded and resumed, the TOP strip's composited layer can come back
-// stale or dropped, so Safari re-samples the wrong colour and the top chrome
-// ends up matching the BOTTOM strip. Switching tabs fixes it by forcing a full
-// re-composite — we reproduce that by hiding and re-showing the strips, which
-// drops and rebuilds their layers and makes Safari take a fresh sample. The
-// strips are 6px and sit behind the chrome, so the toggle is invisible.
-function forceChromeRepaint() {
-    const els = [
-        document.querySelector('.safari-top-anchor'),
-        document.querySelector('.safari-bottom-anchor'),
-    ].filter(Boolean);
-    if (!els.length) return;
-
-    const cycle = () => {
-        els.forEach(el => { el.style.display = 'none'; });
-        void document.documentElement.offsetHeight; // commit the hide before re-show
-        requestAnimationFrame(() => {
-            els.forEach(el => { el.style.display = ''; });
-        });
-    };
-
-    requestAnimationFrame(cycle);
-    // Safari can take its chrome sample a beat after the tab becomes visible,
-    // so run a second cycle shortly after to catch that later timing too.
-    setTimeout(cycle, 250);
-}
-
-// When iOS Safari restores a tab from the Back-Forward Cache (bfcache), JS
-// doesn't re-run and the 30s poll timer is frozen — so theme-color stays at
-// whatever it was when the tab was frozen, even if the sky has since changed.
-// pageshow (e.persisted) fires on every bfcache restore; visibilitychange
-// catches switching back to the tab without a full bfcache restore. Both
-// re-stamp theme-color from the localStorage cache immediately, before the
-// next poll tick, so the status bar matches the current sky on first glance,
-// and force the anchor strips to re-sample so the top chrome can't get stuck
-// on the bottom colour.
-function refreshChromeColorFromCache() {
-    try {
-        const c = JSON.parse(localStorage.getItem('skyColors') || 'null');
-        if (c?.version === '2' && c.topHex) setBrowserChromeColor(c.topHex);
-    } catch (_) {}
-    forceChromeRepaint();
-}
-window.addEventListener('pageshow', (e) => { if (e.persisted) refreshChromeColorFromCache(); });
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') refreshChromeColorFromCache();
-});
-// macOS Safari can regain focus on an app-switch without firing
-// visibilitychange (the window was never marked hidden), yet the chrome sample
-// can still be stale — so re-sample on window focus as well.
-window.addEventListener('focus', refreshChromeColorFromCache);
 
 initEventListeners();
 initMetricPopovers();
@@ -1383,7 +795,22 @@ initMetricPopovers();
 // latest poll without the dashboard pushing updates into it.
 initAstroModal(() => state);
 initHealthPopover();
-initBgPreference();
+initBgPreference({
+    getSunAltitude: () => state.sunSnapshot?.currentAltitude,
+    // Stars and the moon disk both key off the sky, so they have to be
+    // re-rendered the moment the preference changes rather than waiting for
+    // the next 30 s poll.
+    onApplied: () => {
+        updateStarField(getStarAltitude(state.sunSnapshot?.currentAltitude));
+        if (state.moonSnapshot?.phase) {
+            renderMoonPhase(
+                state.moonSnapshot.phase,
+                state.moonSnapshot.parallacticAngle ?? 0,
+                moonAmbientFor(state.sunSnapshot?.currentAltitude),
+            );
+        }
+    },
+});
 initStarField();
 window.setStarFieldModalDim = setStarFieldModalDim;
 loadDaily();

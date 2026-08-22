@@ -237,3 +237,13 @@ export function skyBottomRgbAt(altitudeDeg) {
     }
     return last.bottom.slice();
 }
+
+// ---- RGB triplet formatting ----------------------------------------------
+//
+// The anchor table stores colours as [r, g, b] triplets, so anything writing
+// them into CSS needs these. They live here rather than in a caller because
+// both the sky background and the sun-curve marker consume the same triplets.
+
+export function rgbString([r, g, b])         { return `rgb(${r}, ${g}, ${b})`; }
+export function rgbaString([r, g, b], alpha) { return `rgba(${r}, ${g}, ${b}, ${alpha})`; }
+export function rgbHex([r, g, b])            { return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join(''); }
