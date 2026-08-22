@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flather.weatherstation.domain.constant.DataProvider;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.analytics.ChartPointDto;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
@@ -61,7 +62,8 @@ class WeatherHistoryControllerTest {
         new ChartDto(
             "temperature",
             List.of(new ChartPointDto(ZonedDateTime.parse("2026-06-15T10:00Z"), 20.0)),
-            Instant.parse("2026-06-16T01:00:00Z"));
+            Instant.parse("2026-06-16T01:00:00Z"),
+            DataProvider.LOCAL_SENSOR);
 
     given(historyService.getChart(eq(Metric.TEMPERATURE), eq(from), eq(to))).willReturn(chart);
 
@@ -82,7 +84,12 @@ class WeatherHistoryControllerTest {
   @Test
   void shouldReturnDayChart_byDateAndMetric() throws Exception {
     LocalDate date = LocalDate.of(2026, 6, 15);
-    ChartDto chart = new ChartDto("pressure", List.of(), Instant.parse("2026-06-16T00:00:00Z"));
+    ChartDto chart =
+        new ChartDto(
+            "pressure",
+            List.of(),
+            Instant.parse("2026-06-16T00:00:00Z"),
+            DataProvider.LOCAL_SENSOR);
 
     given(historyService.getDayChart(date, Metric.PRESSURE)).willReturn(chart);
 
@@ -107,7 +114,8 @@ class WeatherHistoryControllerTest {
         new ChartDto(
             "humidity",
             List.of(new ChartPointDto(ZonedDateTime.parse("2026-06-01T12:00Z"), 65.0)),
-            Instant.parse("2026-06-16T00:00:00Z"));
+            Instant.parse("2026-06-16T00:00:00Z"),
+            DataProvider.LOCAL_SENSOR);
 
     given(historyService.getDailyChartPoints(from, to, Metric.HUMIDITY)).willReturn(chart);
 

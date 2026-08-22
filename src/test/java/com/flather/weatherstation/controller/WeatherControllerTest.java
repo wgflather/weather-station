@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.flather.weatherstation.domain.constant.DataProvider;
 import com.flather.weatherstation.domain.constant.DataStatus;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.dto.analytics.ChartPointDto;
@@ -115,9 +116,14 @@ class WeatherControllerTest {
         new ChartDto(
             "temperature",
             List.of(new ChartPointDto(ZonedDateTime.parse("2026-06-16T10:00Z"), 21.0)),
-            Instant.parse("2026-06-16T11:00:00Z"));
+            Instant.parse("2026-06-16T11:00:00Z"),
+            DataProvider.LOCAL_SENSOR);
 
-    given(analyticsService.returnChart(eq(Metric.TEMPERATURE), isNull(), eq(10))).willReturn(chart);
+    // The controller goes through DashboardService, which routes to either
+    // WeatherClientService or AnalyticsService depending on the metric's
+    // configured provider. Stubbing AnalyticsService directly skips that router,
+    // so the controller sees an unstubbed mock and returns an empty body.
+    given(dashboardService.getChart(eq(Metric.TEMPERATURE), isNull(), eq(10))).willReturn(chart);
 
     mockMvc
         .perform(get(WeatherController.BASE_PATH + "/chart").accept(MediaType.APPLICATION_JSON))
@@ -126,14 +132,19 @@ class WeatherControllerTest {
         .andExpect(jsonPath("$.chartPoints", hasSize(1)))
         .andExpect(jsonPath("$.chartPoints[0].hourlyValue").value(21.0));
 
-    verify(analyticsService).returnChart(eq(Metric.TEMPERATURE), isNull(), eq(10));
+    verify(dashboardService).getChart(eq(Metric.TEMPERATURE), isNull(), eq(10));
   }
 
   @Test
   void shouldReturnChart_withExplicitMetricAndResolution() throws Exception {
-    ChartDto chart = new ChartDto("pressure", List.of(), Instant.parse("2026-06-16T11:00:00Z"));
+    ChartDto chart =
+        new ChartDto(
+            "pressure",
+            List.of(),
+            Instant.parse("2026-06-16T11:00:00Z"),
+            DataProvider.LOCAL_SENSOR);
 
-    given(analyticsService.returnChart(eq(Metric.PRESSURE), isNull(), eq(5))).willReturn(chart);
+    given(dashboardService.getChart(eq(Metric.PRESSURE), isNull(), eq(5))).willReturn(chart);
 
     mockMvc
         .perform(
@@ -145,16 +156,20 @@ class WeatherControllerTest {
         .andExpect(jsonPath("$.metric").value("pressure"))
         .andExpect(jsonPath("$.chartPoints").isArray());
 
-    verify(analyticsService).returnChart(eq(Metric.PRESSURE), isNull(), eq(5));
+    verify(dashboardService).getChart(eq(Metric.PRESSURE), isNull(), eq(5));
   }
 
   @Test
   void shouldReturnChart_withSinceParameter() throws Exception {
     String since = "2026-06-15T00:00:00Z";
-    ChartDto chart = new ChartDto("temperature", List.of(), Instant.parse("2026-06-16T11:00:00Z"));
+    ChartDto chart =
+        new ChartDto(
+            "temperature",
+            List.of(),
+            Instant.parse("2026-06-16T11:00:00Z"),
+            DataProvider.LOCAL_SENSOR);
 
-    given(analyticsService.returnChart(eq(Metric.TEMPERATURE), eq(since), eq(10)))
-        .willReturn(chart);
+    given(dashboardService.getChart(eq(Metric.TEMPERATURE), eq(since), eq(10))).willReturn(chart);
 
     mockMvc
         .perform(
@@ -165,7 +180,7 @@ class WeatherControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.metric").value("temperature"));
 
-    verify(analyticsService).returnChart(eq(Metric.TEMPERATURE), eq(since), eq(10));
+    verify(dashboardService).getChart(eq(Metric.TEMPERATURE), eq(since), eq(10));
   }
 
   @Test
