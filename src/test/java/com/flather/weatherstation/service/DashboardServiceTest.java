@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
+import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.DataProviderConfiguration;
 import com.flather.weatherstation.config.LocationContext;
 import com.flather.weatherstation.domain.constant.DataProvider;
@@ -34,6 +35,10 @@ class DashboardServiceTest {
   @Mock WeatherClientService weatherClientService;
   @Mock AstronomySearch astronomySearchService;
   @Mock ConfigurationCache configurationCache;
+  // getSystemHealth reads sensorStateCache.isMqttConnected() on both its return
+  // paths; without this mock @InjectMocks leaves the field null and every test
+  // that reaches system health fails with an NPE rather than an assertion.
+  @Mock SensorStateCache sensorStateCache;
   @InjectMocks DashboardService service;
 
   private static final DataProviderConfiguration ALL_LOCAL =

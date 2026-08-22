@@ -3,6 +3,7 @@ package com.flather.weatherstation.messaging;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.*;
 
+import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.config.MqttProperties;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.service.WeatherService;
@@ -27,9 +28,11 @@ class MqttConsumerTest {
 
   @Mock private MqttProperties properties;
 
+  @Mock private SensorStateCache sensorStateCache;
+
   @BeforeEach
   void setup() {
-    consumer = new MqttConsumer(service, objectMapper, properties);
+    consumer = new MqttConsumer(service, objectMapper, properties, sensorStateCache);
   }
 
   @Test
