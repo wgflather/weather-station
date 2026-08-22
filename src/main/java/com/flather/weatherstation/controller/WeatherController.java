@@ -1,10 +1,12 @@
 package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.domain.constant.Metric;
+import com.flather.weatherstation.dto.analytics.QualityStrip;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
 import com.flather.weatherstation.dto.dashboard.DashboardLiveDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordCreatedDto;
 import com.flather.weatherstation.dto.weather.WeatherRecordResponseDto;
+import com.flather.weatherstation.service.AnalyticsService;
 import com.flather.weatherstation.service.DashboardService;
 import com.flather.weatherstation.service.WeatherService;
 import java.net.URI;
@@ -24,6 +26,7 @@ public class WeatherController {
 
   private final WeatherService service;
   private final DashboardService dashboardService;
+  private final AnalyticsService analyticsService;
 
   @PostMapping(BASE_PATH)
   public ResponseEntity<WeatherRecordResponseDto> createNewWeatherRecord(
@@ -35,6 +38,11 @@ public class WeatherController {
   @GetMapping(DASHBOARD_LIVE_PATH)
   public ResponseEntity<DashboardLiveDto> getDashboardLive() {
     return ResponseEntity.ok(dashboardService.getDashboardLive());
+  }
+
+  @GetMapping(BASE_PATH + "/quality")
+  public ResponseEntity<QualityStrip> getQualityStrip() {
+    return ResponseEntity.ok(analyticsService.findLast24HoursQualityStrip());
   }
 
   @GetMapping(BASE_PATH + "/chart")
