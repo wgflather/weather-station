@@ -1,0 +1,22 @@
+-- weather_records had no index on measured_at on its own. The three indexes created in V1 all lead
+-- on a quality column (temperature_data_quality, pressure_data_quality, humidity_data_quality), and
+-- a btree cannot seek without a predicate on its leading column — so every query filtering purely on
+-- a time range fell back to a sequential scan of the whole table.
+--
+-- Affected queries:
+--   WeatherReportRepository.findQualityBuckets / findLongestGap  (data-quality strip, per request)
+--   WeatherReportRepository.countRecordsBetween / findByMeasuredAtAfterOrderByMeasuredAtAsc
+--   WeatherRetentionRepository.deleteByMeasuredAtBefore          (nightly, scanned the full table)
+--   RawDatabaseViewRepository.getRecordsBetween / countByMeasuredAtAfter
+--
+-- This also covers the findChart* queries. Their extra `X_data_quality = 'OK'` predicate matches the
+-- overwhelming majority of rows on a healthy station, so it is not selective enough to be worth
+-- indexing on its own; the time range is the selective part, and the quality filter is cheap to
+-- apply to the rows this index returns.
+--
+-- Deliberately not adding (quality, measured_at) composites for the metrics V7/V8 introduced. Those
+-- only pay off for the *rare* qualities (SPIKE / ANOMALY) used by the raw admin view, and a partial
+-- index on the flagged rows would be the better tool when that view gets built out.
+--
+-- DESC is stylistic, matching V1; a single-column btree scans equally well in either direction.
+CREATE INDEX idx_weather_measured_at ON weather_records (measured_at DESC);
