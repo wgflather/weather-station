@@ -50,6 +50,106 @@ public class AnalyticsService {
     return repository.countRecordsBetween(range.startTime(), range.endTime());
   }
 
+  private static final int QUALITY_BUCKET_MINUTES = 30;
+  private static final Duration QUALITY_WINDOW = Duration.ofHours(24);
+
+  /**
+   * Shortest silence worth calling an outage, whatever the station's cadence. Below this it is
+   * indistinguishable from a couple of dropped MQTT messages.
+   */
+  private static final int MIN_GAP_MINUTES = 15;
+
+  /** A gap must span at least this many missed readings before it counts. */
+  private static final int MIN_MISSED_READINGS = 3;
+
+  /**
+   * Data-quality counts for the last 24 h, in {@value #QUALITY_BUCKET_MINUTES}-minute buckets.
+   *
+   * <p>The window is anchored so the <em>final</em> bucket contains "now" rather than ending at the
+   * last completed bucket — otherwise the strip would stop up to 30 minutes in the past and could
+   * not show a sensor that has just dropped out. That makes the final bucket partial by
+   * construction: it is only {@code (now - bucketStart)} old, so callers must prorate its expected
+   * reading count before judging it degraded.
+   */
+  public QualityStrip findLast24HoursQualityStrip() {
+    long bucketSec = Duration.ofMinutes(QUALITY_BUCKET_MINUTES).toSeconds();
+    Instant now = Instant.now();
+    long slotSec = Math.floorDiv(now.getEpochSecond(), bucketSec) * bucketSec;
+
+    Instant to = Instant.ofEpochSecond(slotSec + bucketSec);
+    Instant from = to.minus(QUALITY_WINDOW);
+
+    List<QualityBucket> bucketList =
+        repository.findQualityBuckets(from, to, QUALITY_BUCKET_MINUTES + " minutes");
+
+    // The gap search is bounded by now rather than to: to is the end of the still-running final
+    // bucket and lies in the future, which would show up as a trailing gap on every station.
+    List<DataGap> gaps = repository.findGaps(from, now, minGapMinutes(bucketList));
+
+    return new QualityStrip(
+        from, to, QUALITY_BUCKET_MINUTES, bucketList, getMetricSummaries(bucketList), gaps);
+  }
+
+  /**
+   * How long a silence has to run before it is an outage rather than a hiccup.
+   *
+   * <p>Every consecutive pair of readings is technically a gap, so this floor is what stops a
+   * healthy station returning one entry per reading. It scales with the station's own cadence —
+   * inferred from the buckets already fetched, since the reporting interval isn't configured
+   * anywhere — so a 30-minute station doesn't have every normal interval flagged, while the
+   * absolute floor keeps a 1-minute station from reporting three missed messages as an outage.
+   */
+  private int minGapMinutes(List<QualityBucket> bucketList) {
+    int median = medianBucketTotal(bucketList);
+    if (median <= 0) return MIN_GAP_MINUTES;
+
+    double cadenceMinutes = (double) QUALITY_BUCKET_MINUTES / median;
+    return (int) Math.max(MIN_GAP_MINUTES, Math.round(cadenceMinutes * MIN_MISSED_READINGS));
+  }
+
+  /**
+   * The station's usual readings per bucket. Median rather than mean or max so that outage buckets
+   * (zero) and bursts can't drag it around.
+   */
+  private int medianBucketTotal(List<QualityBucket> bucketList) {
+    int[] totals =
+        bucketList.stream()
+            .mapToInt(QualityBucket::totalCount)
+            .filter(t -> t > 0)
+            .sorted()
+            .toArray();
+    return totals.length == 0 ? 0 : totals[totals.length / 2];
+  }
+
+  private MetricQualitySummary summarize(List<QualityBucket> bucketList, Metric metric) {
+    int okCount = 0;
+    int spikeCount = 0;
+    int anomalyCount = 0;
+    int missingCount = 0;
+
+    for (QualityBucket bucket : bucketList) {
+      MetricQualityCounts counts = bucket.qualityFor(metric);
+
+      okCount += counts.okCount();
+      spikeCount += counts.spikeCount();
+      anomalyCount += counts.anomalyCount();
+      missingCount += counts.missingCount();
+    }
+
+    return new MetricQualitySummary(
+        metric.getRequestKey(), okCount, spikeCount, anomalyCount, missingCount);
+  }
+
+  public List<MetricQualitySummary> getMetricSummaries(List<QualityBucket> bucketList) {
+    ArrayList<MetricQualitySummary> summaries = new ArrayList<>();
+    for (Metric metric : Metric.values()) {
+      if (configurationCache.getDataProviderConfiguration().getProviderByMetric(metric)
+          != DataProvider.EXTERNAL_API) summaries.add(summarize(bucketList, metric));
+    }
+
+    return summaries;
+  }
+
   public Optional<ZonedDateTime> findLastRecordTime() {
 
     WeatherRecord last = sensorStateCache.getLastSavedMeasurement();
