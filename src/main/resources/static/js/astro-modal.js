@@ -19,6 +19,7 @@ import {
 } from './sun-modal-chart.js';
 import { setStarFieldModalDim } from './star-field.js';
 import { formatTimeOfDay, formatMoonEvent, formatDuration } from './time-format.js';
+import { enterModal, exitModal } from './modal-shell.js';
 
 // Compact twilight ladder rows: one row per band, dawn and dusk crossings
 // side by side. Brightest band first, mirroring the chart's gradient.
@@ -44,41 +45,10 @@ const MOON_CYCLE_WAYPOINTS = [
 
 let openModal = null;         // 'sun' | 'moon' | null
 let modalReturnFocus = null;  // element to restore focus to on close
-let scrollLockY = null;       // scroll position frozen while open
 let getData = () => ({});     // supplied by initAstroModal
 
-// ---- scroll locking -------------------------------------------------------
-
-// iOS Safari + Android Chrome ignore `overflow: hidden` on <body> for touch
-// scrolling, so the page underneath would still scroll while the modal is
-// open — that's what produces the flicker (the URL bar collapses, the
-// viewport reflows, the fixed backdrop appears to jump). The reliable fix
-// is to pin <body> to a fixed position offset by the current scroll, then
-// restore the offset on close so the user lands back where they were.
-function lockBodyScroll() {
-    if (scrollLockY != null) return;
-    const scrollY = window.scrollY;
-    scrollLockY = scrollY;
-    const body = document.body;
-    body.style.position = 'fixed';
-    body.style.top      = `-${scrollY}px`;
-    body.style.left     = '0';
-    body.style.right    = '0';
-    body.style.width    = '100%';
-}
-
-function unlockBodyScroll() {
-    if (scrollLockY == null) return;
-    const y = scrollLockY;
-    const body = document.body;
-    body.style.position = '';
-    body.style.top      = '';
-    body.style.left     = '';
-    body.style.right    = '';
-    body.style.width    = '';
-    window.scrollTo(0, y);
-    scrollLockY = null;
-}
+// Scroll locking and focus containment live in modal-shell.js, shared with the
+// history modal — see the note there on why they can't be per-modal.
 
 // ---- rendering ------------------------------------------------------------
 
@@ -324,7 +294,7 @@ export function openAstroModal(which, trigger) {
     renderActiveModal();
     modal.classList.add('open');
     modal.setAttribute('aria-hidden', 'false');
-    lockBodyScroll();
+    enterModal(modal);
     setStarFieldModalDim(true);
 
     // Focus the close button so keyboard users land somewhere sensible.
@@ -337,7 +307,7 @@ export function closeAstroModal() {
     const modal = document.getElementById('astro-modal');
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
-    unlockBodyScroll();
+    exitModal(modal);
     setStarFieldModalDim(false);
     openModal = null;
     modalReturnFocus?.focus?.();

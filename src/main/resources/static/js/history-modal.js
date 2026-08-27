@@ -1,6 +1,7 @@
 import { renderWeatherChart } from './weather-chart.js';
 import { renderDailyChart }   from './daily-chart.js';
 import { createAvailableDates, isoDateKey } from './available-dates.js';
+import { enterModal, exitModal } from './modal-shell.js';
 
 /* =========================================================
    HISTORY MODAL
@@ -233,30 +234,21 @@ async function initModal() {
 }
 
 // ── Modal open / close ────────────────────────────────────────────────────────
+// Scroll locking and focus containment come from modal-shell.js, shared with
+// the astro modal — see the note there on why they can't be per-modal.
 const modal = document.getElementById('hist-modal');
-let savedScrollY = 0;
 
 function openHistModal() {
-    // iOS Safari ignores overflow:hidden on <body> alone and still allows
-    // scroll/viewport shifts. position:fixed + top = -scrollY prevents that.
-    savedScrollY = window.scrollY;
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.top      = `-${savedScrollY}px`;
-    document.body.style.width    = '100%';
     modal.classList.add('open');
     modal.removeAttribute('aria-hidden');
+    enterModal(modal);
     document.getElementById('hist-modal-close').focus();
     window.setStarFieldModalDim?.(true);
     initModal();
 }
 
 function closeHistModal() {
-    document.body.style.overflow = '';
-    document.body.style.position = '';
-    document.body.style.top      = '';
-    document.body.style.width    = '';
-    window.scrollTo(0, savedScrollY);
+    exitModal(modal);
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
     window.setStarFieldModalDim?.(false);
