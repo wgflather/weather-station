@@ -135,24 +135,57 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 
 ### JavaScript modules (all under `static/js/`)
 
-Every script loaded from `index.html` is a `type="module"` except `realtime-script.js` (plain script, runs synchronously before modules).
+`index.html` loads only five scripts: `realtime-script.js` (a plain script, runs synchronously before the rest) plus four `type="module"` entry points — `fetch-data.js`, `history-modal.js`, `cloud-forecast.js`, `equalize-card-height.js`. Everything else is reached through `import`. `/admin/config.html` loads `config.js` and `database-view.js`; neither is used by the dashboard.
 
-| File | Type | Role |
-|---|---|---|
-| `realtime-script.js` | plain script | Clock, date/time DOM updates (runs every second) |
-| `fetch-data.js` | ES module (orchestrator) | All live data polling (30 s), sky background, astro cards, metric cards, status, modals, chart controls |
-| `star-field.js` | ES module | Atmospheric star field canvas + CSS-animated highlights |
-| `cloud-forecast.js` | ES module | Hourly cloud/weather forecast strip; icon selection; tooltip |
-| `sun-modal-chart.js` | ES module | Sun modal SVG chart: whole-day altitude curve with twilight gradient, label chips, scrubbing |
-| `quality-strip.js` | ES module | 24-h data-quality strip inside metric status-circle popovers; owns the shared `/api/weather/quality` fetch cache |
-| `weather-chart.js` | ES module | Chart.js 24-h metric chart |
-| `FetchScheduler.js` | ES module | Incremental chart data fetcher (fetches only new buckets) |
-| `history-modal.js` | ES module | History chart modal (date picker + period tabs) |
-| `daily-chart.js` | ES module | Daily chart rendering (used by the history modal) |
-| `moon-canvas.js` | ES module | Moon phase canvas renderer |
-| `sky-colors.js` | ES module | Sky/sun colour ramps shared by `fetch-data.js` and `sun-modal-chart.js` |
-| `equalize-card-height.js` | ES module | Keeps dashboard card heights in step |
-| `database-view.js` / `config.js` | ES module | Admin pages only, not loaded by the dashboard |
+**Dashboard shell**
+
+| File | Role |
+|---|---|
+| `realtime-script.js` | Clock, date/time DOM updates (runs every second) |
+| `fetch-data.js` | Orchestrator: live polling (30 s), astronomy glue, chart scheduler + resolution controls, boot wiring. Owns the dashboard `state` object |
+| `metric-cards.js` | The metric cards — temperature, pressure, humidity/dew, surface wetness, wind, UV — plus the staleness hints. Entry point `renderMetrics(dto, dataStatus)` |
+| `system-health.js` | Header status dot, its label, and the lag / MQTT / records popover |
+| `metric-popovers.js` | Status-circle and badge popovers; owns the shared `#global-popup` and `closeAllPopovers()` |
+| `dashboard-constants.js` | Enum → colour / label lookup tables shared across cards, health and popovers |
+| `equalize-card-height.js` | Keeps dashboard card heights in step |
+
+**Sky, stars and astronomy**
+
+| File | Role |
+|---|---|
+| `sky-background.js` | Altitude-driven page gradient, browser-chrome tint, and the dynamic/static background preference. Owns `getStarAltitude()` |
+| `sky-colors.js` | Sky/sun colour ramps shared by `sky-background.js`, `sun-curve.js` and `sun-modal-chart.js` |
+| `star-field.js` | Atmospheric star field canvas + CSS-animated highlights |
+| `sun-curve.js` | Sun card's daily-arc SVG, its markers, and the sun/moon countdown heroes |
+| `moon-canvas.js` | Moon phase canvas renderer |
+| `astro-modal.js` | Sun and moon detail modals |
+| `sun-modal-chart.js` | Sun modal SVG chart: whole-day altitude curve with twilight gradient, label chips, scrubbing |
+| `cloud-forecast.js` | Hourly cloud/weather forecast strip; icon selection; tooltip |
+| `time-format.js` | Shared time-of-day and duration formatters |
+
+**Charts**
+
+| File | Role |
+|---|---|
+| `weather-chart.js` | Orchestrates the 24-h chart: chart state, datasets, Chart.js lifecycle. Entry point `renderWeatherChart()` |
+| `chart-metrics.js` | Per-metric config (`METRIC_CONFIG`), value → colour ramps (`COLOR_SCALES`), and the line/area gradients derived from them |
+| `chart-series.js` | Pure point-array transforms: gap detection, dynamic y bounds, extremes |
+| `chart-labels.js` | H / L / Now label geometry, the collision engine, and the `minMaxLabels` Chart.js plugin |
+| `chart-interaction.js` | The 24-h chart's external tooltip handler, its placement, and touch suppression |
+| `chart-tooltip.js` | The single floating tooltip element, shared with `daily-chart.js` |
+| `daily-chart.js` | Multi-day chart used by the history modal |
+| `FetchScheduler.js` | Incremental chart data fetcher (fetches only new buckets) |
+| `quality-strip.js` | 24-h data-quality strip inside metric status-circle popovers; owns the shared `/api/weather/quality` fetch cache |
+
+**History and admin**
+
+| File | Role |
+|---|---|
+| `history-modal.js` | History chart modal (date picker + period tabs) |
+| `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js` |
+| `database-view.js` / `config.js` | Admin pages only, not loaded by the dashboard |
+
+`available-dates.js` is a factory rather than a singleton because its two callers hit different endpoints (`/api/weather/history/available-dates` and `/api/admin/available-dates`), so each instance owns its month cache. `isDateEnabled()` answers from cache only — a month that has not loaded reads as "nothing enabled", and `ensureMonthsLoaded()` redraws once the fetch resolves, which is why a picker briefly shows every cell disabled when it first opens.
 
 ### Cross-module communication (window globals)
 
@@ -164,7 +197,7 @@ Modules that need to talk to each other use `window.*` since they load independe
 | `window.getCurrentCloudCover()` | `cloud-forecast.js` | `star-field.js` | Cloud cover multiplier for star opacity |
 | `window.setStarFieldModalDim(bool)` | `fetch-data.js` (re-exports from `star-field.js`) | `history-modal.js` | Dims stars while any modal is open |
 
-### Sky background system (`fetch-data.js`)
+### Sky background system (`sky-background.js`)
 
 The page background gradient is driven by the current sun altitude, updated on every 30-second poll:
 
@@ -172,7 +205,7 @@ The page background gradient is driven by the current sun altitude, updated on e
 - **`computeSkyColors(altDeg)`** — linearly interpolates between bracketing anchors.
 - **`applySkyColors(colors, snap)`** — writes to CSS custom properties on `:root`. The `snap` flag bypasses the 12 s CSS transition for instant switches.
 - **`@property`** typed custom properties (`--bg-grad-top`, `--bg-grad-bottom`, `--card-bg`, etc.) enable CSS color interpolation between values.
-- **Background preference** (dynamic / static preset) is persisted in `localStorage` as `bgPreference`. Static mode uses a fixed anchor; dynamic mode follows live sun altitude. `getStarAltitude()` reads the preference to supply the correct effective altitude to the star field.
+- **Background preference** (dynamic / static preset) is persisted in `localStorage` as `bgPreference`. Static mode uses a fixed anchor; dynamic mode follows live sun altitude. `getStarAltitude()` reads the preference to supply the correct effective altitude to the star field, and `moonAmbientFor()` uses it so a pinned preset also tints the moon disk.
 
 ### Star field (`star-field.js`)
 
@@ -202,6 +235,18 @@ The page background gradient is driven by the current sun altitude, updated on e
 
 `WeatherForecastController` serves `/api/forecast/astro`, and `SeeingCalculator` computes seeing quality server-side (Hufnagel-Valley, jet stream + surface wind). **Nothing consumes it.** There is no `astro-forecast.js` and no `#astro-fc-btn` anywhere in the templates, JS or CSS — this doc previously described that module as if it existed. Either build the frontend or retire the endpoint; don't trust the old description.
 
+### 24-hour chart modules (`weather-chart.js` + `chart-*.js`)
+
+Chart.js and its date-fns adapter come from the CDN as globals — none of these modules import them.
+
+`weather-chart.js` keeps the orchestration (chart state, datasets, Chart.js lifecycle) and delegates the rest. Three contracts survive the split and are easy to break:
+
+- **`chart-labels.js` is imported partly for its side effect.** It defines `minMaxLabelsPlugin` and calls `Chart.register()` at module load. The chart config only names the plugin by its id, `'minMaxLabels'`, so nothing else keeps the import alive — dropping it silently removes the H / L / Now labels.
+- **The plugin reads `chart.$state`.** `computeChartState()` builds the state; `createChart()` and `updateChart()` stash it on the chart instance each pass so dataset callbacks and plugins read current analytics without the chart being destroyed and rebuilt. `resolveCollisionScenario()` fills in the `scenario` field the plugin dispatches on.
+- **`COLLISION_STATE` is per-metric hysteresis that persists across renders.** The module stays loaded across the 20 s polling cycle deliberately: entry and exit thresholds differ so layouts don't flicker as new data crosses a boundary. Resetting it per render would reintroduce the flicker.
+
+**Tooltip ownership.** `chart-tooltip.js` owns the single floating element and is the only writer of its structure, via `setTooltipContent(el, titles, bodies)`. Both the 24-h chart (`chart-interaction.js`) and the history modal's daily chart (`daily-chart.js`) render through it. They previously each created the element with different internals — one replacing `innerHTML` wholesale, the other seeding `.title`/`.body` children and querying them — so whichever drew first won and the other read into markup it had not built. Placement stays per-chart: the 24-h chart flips against the plot area and pins to the card on touch, the daily chart clamps to the viewport.
+
 ### Data-quality strip (`quality-strip.js`)
 
 A 6 px bar inside a metric card's status-circle popover, answering "has this sensor *been* healthy?" alongside the popover's existing "is this reading trustworthy right now?".
@@ -225,7 +270,7 @@ Events win outright over coverage states: at 48 buckets a single spike tints ~2 
 
 **Gaps.** Outages are *absent rows*, not `MISSING` rows, so they can't be seen in the quality columns at all. `WeatherReportRepository.findGaps` unions the window edges in as sentinel timestamps so `LAG` also catches leading and trailing gaps — the trailing one (died and never came back) being the case a plain row-to-row scan misses. `minGapMinutes` scales with observed cadence (`max(15, cadence × 3)`), without which every consecutive pair of readings is technically a gap. Gaps render as an overlay at their **true** timestamps, not snapped to buckets: a 20-minute outage inside a 30-minute bucket is invisible in the bucket layer.
 
-**Scrubbing.** Pointer over the strip rewrites the caption line in place (`11:00–11:30 · 30 readings · 2 spikes`) rather than opening a tooltip — a tooltip would be clipped by the 210 px popover and is awkward nested on touch. Listeners bind to the padded `.qstrip-track` (20 px tall) but measure `.qstrip-bar`, so the hit area is usable without skewing the x-to-bucket mapping. Only `pointerType === 'mouse'` reverts on leave; a touch pointer stops existing on lift, so reverting there would blank the readout before it could be read. `click` is `stopPropagation()`-ed because `fetch-data.js` closes the popover on *any* document click with no containment check.
+**Scrubbing.** Pointer over the strip rewrites the caption line in place (`11:00–11:30 · 30 readings · 2 spikes`) rather than opening a tooltip — a tooltip would be clipped by the 210 px popover and is awkward nested on touch. Listeners bind to the padded `.qstrip-track` (20 px tall) but measure `.qstrip-bar`, so the hit area is usable without skewing the x-to-bucket mapping. Only `pointerType === 'mouse'` reverts on leave; a touch pointer stops existing on lift, so reverting there would blank the readout before it could be read. `click` is `stopPropagation()`-ed because `metric-popovers.js` closes the popover on *any* document click with no containment check.
 
 ### Styling (`static/css/`)
 
