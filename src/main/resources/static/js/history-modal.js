@@ -178,7 +178,11 @@ async function loadMultiDay(fromStr, toStr, days, metric) {
 }
 
 // ── Metric tabs ───────────────────────────────────────────────────────────────
-document.getElementById('hist-metric-tabs').addEventListener('click', (e) => {
+// The wiring from here down is optional-chained: this module owns the
+// dashboard's history modal, and every entry point into it is a listener on
+// that markup. On a page without it the module simply binds nothing, instead
+// of throwing at import time and taking the rest of that page's scripts down.
+document.getElementById('hist-metric-tabs')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.history-metric-tab');
     if (!btn || btn.classList.contains('active')) return;
     document.querySelectorAll('#hist-metric-tabs .history-metric-tab').forEach(b => b.classList.remove('active'));
@@ -188,7 +192,7 @@ document.getElementById('hist-metric-tabs').addEventListener('click', (e) => {
 });
 
 // ── Period tabs ───────────────────────────────────────────────────────────────
-document.getElementById('hist-period-tabs').addEventListener('click', (e) => {
+document.getElementById('hist-period-tabs')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.history-period-btn');
     if (!btn || btn.classList.contains('active')) return;
     document.querySelectorAll('#hist-period-tabs .history-period-btn').forEach(b => b.classList.remove('active'));
@@ -254,10 +258,10 @@ function closeHistModal() {
     window.setStarFieldModalDim?.(false);
 }
 
-document.getElementById('chart-history-btn').addEventListener('click', openHistModal);
-document.getElementById('hist-modal-close').addEventListener('click', closeHistModal);
-modal.querySelector('.hist-modal-backdrop').addEventListener('click', closeHistModal);
+document.getElementById('chart-history-btn')?.addEventListener('click', openHistModal);
+document.getElementById('hist-modal-close')?.addEventListener('click', closeHistModal);
+modal?.querySelector('.hist-modal-backdrop')?.addEventListener('click', closeHistModal);
 
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.classList.contains('open')) closeHistModal();
+    if (e.key === 'Escape' && modal?.classList.contains('open')) closeHistModal();
 });

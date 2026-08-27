@@ -20,6 +20,11 @@ import {
     STATUS_SEVERITY,
 } from './dashboard-constants.js';
 
+// Every popover in this module renders into this one shared element, so
+// without it the module has nothing to do. It is only present on the
+// dashboard; the guards on initMetricPopovers() and on the document-level
+// listeners below keep the module inert anywhere else, rather than throwing on
+// the first click of a page that merely happens to import it.
 const globalPopup = document.getElementById('global-popup');
 
 // Only one popover (metric details, station health, background picker)
@@ -28,7 +33,7 @@ const globalPopup = document.getElementById('global-popup');
 // up never fire between them — this is the shared step that actually closes
 // the rest before a new one opens. `except` is 'metric' | 'health' | 'bgpref'.
 export function closeAllPopovers(except) {
-    if (except !== 'metric' && globalPopup.classList.contains('open')) {
+    if (except !== 'metric' && globalPopup?.classList.contains('open')) {
         globalPopup.classList.remove('open');
     }
     if (except !== 'health') closePopoverEl('health-popover', 'health-dot-btn');
@@ -324,27 +329,26 @@ function initWetnessBadge() {
 
 // ---- global popover behaviour --------------------------------------------
 
-// Any click anywhere dismisses the metric popover. Triggers survive by calling
-// stopPropagation() before toggling; anything interactive *inside* the popover
-// must do the same (see the quality strip's scrub handler).
-document.addEventListener('click', () => globalPopup.classList.remove('open'));
+if (globalPopup) {
+    // Any click anywhere dismisses the metric popover. Triggers survive by
+    // calling stopPropagation() before toggling; anything interactive *inside*
+    // the popover must do the same (see the quality strip's scrub handler).
+    document.addEventListener('click', () => globalPopup.classList.remove('open'));
 
-// The popover is position:fixed against a live anchor rect, so it has to be
-// re-solved whenever the anchor moves under it.
-window.addEventListener('scroll', () => {
-    if (globalPopup.classList.contains('open') && globalPopup._sourceEl) {
-        positionPopup(globalPopup._sourceEl);
-    }
-}, { passive: true });
-
-window.addEventListener('resize', () => {
-    if (globalPopup.classList.contains('open') && globalPopup._sourceEl) {
-        positionPopup(globalPopup._sourceEl);
-    }
-});
+    // The popover is position:fixed against a live anchor rect, so it has to be
+    // re-solved whenever the anchor moves under it.
+    const reposition = () => {
+        if (globalPopup.classList.contains('open') && globalPopup._sourceEl) {
+            positionPopup(globalPopup._sourceEl);
+        }
+    };
+    window.addEventListener('scroll', reposition, { passive: true });
+    window.addEventListener('resize', reposition);
+}
 
 /** Binds the status circles and the dew / wetness badges. */
 export function initMetricPopovers() {
+    if (!globalPopup) return;
     initStatusCircles();
     initDewRiskBadge();
     initWetnessBadge();
