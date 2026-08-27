@@ -18,7 +18,6 @@ import {
     SURFACE_WETNESS_CONFIG,
     UV_CSS,
 } from './dashboard-constants.js';
-import { SKY_ANCHORS } from './sky-colors.js';
 import {
     renderSunCurve,
     updateSunNowMarker,
@@ -28,7 +27,7 @@ import {
 import {
     renderSkyBackground,
     moonAmbientFor,
-    loadBgPreference,
+    getStarAltitude,
     initBgPreference,
 } from './sky-background.js';
 
@@ -246,16 +245,6 @@ function renderMoonCard(moon) {
     setMoonTimeEl(document.getElementById('moon-card-set'),  moon.set);
     // Phase name / illumination come from the live snapshot (phase drifts
     // continuously, see renderAstronomyLive).
-}
-
-// Returns the altitude to use for star visibility. When the user has pinned
-// a static background preset, the actual sun altitude is irrelevant — a midday
-// preset at night must not show stars, and a night preset at noon should show
-// them. Dynamic mode always uses the real sun altitude.
-function getStarAltitude(sunAltDeg) {
-    const pref = loadBgPreference();
-    if (pref.mode === 'static') return SKY_ANCHORS[pref.anchorIndex]?.alt ?? null;
-    return sunAltDeg;
 }
 
 function renderAstronomyLive(sunSnapshot, moonSnapshot) {

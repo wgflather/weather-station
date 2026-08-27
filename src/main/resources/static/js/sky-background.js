@@ -132,6 +132,16 @@ function computeSkyColors(altitudeDeg) {
     return null;
 }
 
+// Returns the altitude the *displayed* sky corresponds to. When the user has
+// pinned a static background preset, the actual sun altitude is irrelevant — a
+// midday preset at night must not show stars, and a night preset at noon should
+// show them. Dynamic mode always uses the real sun altitude.
+export function getStarAltitude(sunAltDeg) {
+    const pref = loadBgPreference();
+    if (pref.mode === 'static') return SKY_ANCHORS[pref.anchorIndex]?.alt ?? null;
+    return sunAltDeg;
+}
+
 // Sky adaptation passed to drawMoon. Uses the *effective* altitude (the same one
 // that drives star visibility) so a pinned static background preset washes the
 // moon to match the displayed sky rather than the real sun position.
