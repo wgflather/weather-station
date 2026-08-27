@@ -1,5 +1,6 @@
 import { renderWeatherChart } from './weather-chart.js';
 import { renderDailyChart }   from './daily-chart.js';
+import { createAvailableDates, isoDateKey } from './available-dates.js';
 
 /* =========================================================
    HISTORY MODAL
@@ -14,22 +15,18 @@ let currentMetric = 'temperature';
 let currentPeriod = 1;
 let initialized   = false;
 
-const monthCache    = new Map();
-const monthInFlight = new Map();
+const availableDates = createAvailableDates('/api/weather/history/available-dates');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function pad2(n) { return String(n).padStart(2, '0'); }
-
 function yesterday() {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    return isoDateKey(d);
 }
 
 function subtractDays(dateStr, days) {
     const [y, m, d] = dateStr.split('-').map(Number);
-    const date = new Date(y, m - 1, d - days);
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+    return isoDateKey(new Date(y, m - 1, d - days));
 }
 
 function fmt1(v) { return v != null ? Number(v).toFixed(1) : '–'; }
@@ -58,70 +55,16 @@ function setStatsBar(avg, high, low, metric) {
     document.getElementById('hist-chart-low').textContent  = low  != null ? `${fmt1(low)}${unit}`  : '–';
 }
 
-// ── Available dates ───────────────────────────────────────────────────────────
-async function loadMonth(year, month) {
-    const key = `${year}-${pad2(month + 1)}`;
-    if (monthCache.has(key)) return monthCache.get(key);
-    if (monthInFlight.has(key)) return monthInFlight.get(key);
-
-    const firstDay = `${year}-${pad2(month + 1)}-01`;
-    const lastDay  = new Date(year, month + 1, 0).getDate();
-    const lastDate = `${year}-${pad2(month + 1)}-${pad2(lastDay)}`;
-
-    const promise = (async () => {
-        try {
-            const res = await fetch(`/api/weather/history/available-dates?from=${firstDay}&to=${lastDate}`);
-            if (!res.ok) throw new Error(res.status);
-            const dates = await res.json();
-            const set = new Set(dates);
-            monthCache.set(key, set);
-            return set;
-        } catch {
-            const set = new Set();
-            monthCache.set(key, set);
-            return set;
-        } finally {
-            monthInFlight.delete(key);
-        }
-    })();
-    monthInFlight.set(key, promise);
-    return promise;
-}
-
-function isDateEnabled(date) {
-    const key = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
-    return monthCache.get(key)?.has(
-        `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
-    ) ?? false;
-}
-
-async function ensureMonthsLoaded(instance) {
-    const months = instance.config.showMonths || 1;
-    const promises = [];
-    for (let i = 0; i < months; i++) {
-        let year = instance.currentYear;
-        let month = instance.currentMonth + i;
-        while (month > 11) { month -= 12; year += 1; }
-        promises.push(loadMonth(year, month));
-    }
-    await Promise.all(promises);
-    instance.redraw();
-}
-
 // ── Date picker ───────────────────────────────────────────────────────────────
 async function initDatePicker() {
     const [y, m] = currentDate.split('-').map(Number);
-    await loadMonth(y, m - 1);
+    await availableDates.loadMonth(y, m - 1);
 
-    flatpickr(document.getElementById('hist-date-input'), {
-        dateFormat:    'Y-m-d',
-        maxDate:       'today',
-        disableMobile: true,
-        defaultDate:   currentDate,
-        enable:        [isDateEnabled],
+    flatpickr(document.getElementById('hist-date-input'), availableDates.pickerOptions({
+        defaultDate: currentDate,
         // Append inside the modal so flatpickr's position math runs within the
         // fixed stacking context, avoiding the viewport jump on first open.
-        appendTo:      document.getElementById('hist-modal'),
+        appendTo:    document.getElementById('hist-modal'),
         onOpen: (_s, _str, instance) => {
             // On mobile, flatpickr's JS-calculated position (near the input) is
             // overridden by CSS !important rules, but there's a single paint frame
@@ -135,20 +78,16 @@ async function initDatePicker() {
                 cal.style.transform = 'translateX(-50%)';
                 cal.style.width     = `${Math.min(272, window.innerWidth - 32)}px`;
             }
-            ensureMonthsLoaded(instance);
         },
-        onMonthChange: (_s, _str, instance) => ensureMonthsLoaded(instance),
-        onYearChange:  (_s, _str, instance) => ensureMonthsLoaded(instance),
         onChange: (selectedDates) => {
             if (!selectedDates[0]) return;
-            const d = selectedDates[0];
-            const dateStr = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+            const dateStr = isoDateKey(selectedDates[0]);
             if (dateStr !== currentDate) {
                 currentDate = dateStr;
                 loadRange(currentPeriod);
             }
         },
-    });
+    }));
 }
 
 // ── Single-day stats bar (from daily summary API) ─────────────────────────────

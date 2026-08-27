@@ -9,6 +9,8 @@
 // month and cached. Days with no records render as disabled cells.
 // =========================================================
 
+import { createAvailableDates, isoDateKey } from './available-dates.js';
+
 const PAGE_SIZE = 50;
 
 const state = {
@@ -22,11 +24,7 @@ const state = {
     endDate: '',
 };
 
-// Cache of available dates per month — "YYYY-MM" → Set<"YYYY-MM-DD">.
-// Populated on demand by loadMonth(); persists for the lifetime of the page.
-const monthCache = new Map();
-// In-flight month fetches so concurrent picker opens don't double-request.
-const monthInFlight = new Map();
+const availableDates = createAvailableDates('/api/admin/available-dates');
 
 let singlePicker = null;
 let rangePicker = null;
@@ -208,102 +206,14 @@ async function deleteRecord(id, rowEl) {
     }
 }
 
-// ---------- date utilities ----------
-
-function pad2(n) {
-    return String(n).padStart(2, '0');
-}
-
-function isoDate(d) {
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-
-function monthKey(year, month) {
-    return `${year}-${pad2(month + 1)}`;
-}
-
-function monthBounds(year, month) {
-    const first = `${year}-${pad2(month + 1)}-01`;
-    // Day 0 of the next month is the last day of the current month.
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    const last = `${year}-${pad2(month + 1)}-${pad2(lastDay)}`;
-    return { from: first, to: last };
-}
-
-// ---------- lazy month loader ----------
-
-async function loadMonth(year, month) {
-    const key = monthKey(year, month);
-    if (monthCache.has(key)) return monthCache.get(key);
-    if (monthInFlight.has(key)) return monthInFlight.get(key);
-
-    const { from, to } = monthBounds(year, month);
-    const promise = (async () => {
-        try {
-            const res = await fetch(`/api/admin/available-dates?from=${from}&to=${to}`);
-            if (!res.ok) throw new Error(`status ${res.status}`);
-            const dates = await res.json();
-            const set = new Set(dates);
-            monthCache.set(key, set);
-            return set;
-        } catch {
-            // On failure, cache empty so we don't retry forever this session.
-            const set = new Set();
-            monthCache.set(key, set);
-            return set;
-        } finally {
-            monthInFlight.delete(key);
-        }
-    })();
-    monthInFlight.set(key, promise);
-    return promise;
-}
-
-function isDateEnabled(date) {
-    const key = monthKey(date.getFullYear(), date.getMonth());
-    const set = monthCache.get(key);
-    // Not yet loaded — disable the cell; it will enable on the next redraw
-    // after loadMonth() resolves.
-    if (!set) return false;
-    return set.has(isoDate(date));
-}
-
-async function ensureMonthsLoaded(instance) {
-    // Flatpickr can show multiple months at once (showMonths > 1); load all
-    // visible months. We default to 1 month, but this stays correct if that
-    // is ever bumped.
-    const months = instance.config.showMonths || 1;
-    const promises = [];
-    for (let i = 0; i < months; i++) {
-        let year = instance.currentYear;
-        let month = instance.currentMonth + i;
-        while (month > 11) { month -= 12; year += 1; }
-        promises.push(loadMonth(year, month));
-    }
-    await Promise.all(promises);
-    instance.redraw();
-}
-
 // ---------- Flatpickr setup ----------
-
-function commonPickerOpts() {
-    return {
-        dateFormat: 'Y-m-d',
-        maxDate: 'today',
-        disableMobile: true,
-        enable: [isDateEnabled],
-        onOpen: (_sel, _str, instance) => ensureMonthsLoaded(instance),
-        onMonthChange: (_sel, _str, instance) => ensureMonthsLoaded(instance),
-        onYearChange:  (_sel, _str, instance) => ensureMonthsLoaded(instance),
-    };
-}
 
 function initPickers() {
     singlePicker = flatpickr('#db-single-date', {
-        ...commonPickerOpts(),
+        ...availableDates.pickerOptions(),
         mode: 'single',
         onChange: (selectedDates) => {
-            const val = selectedDates[0] ? isoDate(selectedDates[0]) : '';
+            const val = selectedDates[0] ? isoDateKey(selectedDates[0]) : '';
             state.startDate = val;
             state.endDate = '';
             state.page = 0;
@@ -313,7 +223,7 @@ function initPickers() {
     });
 
     rangePicker = flatpickr('#db-start-date', {
-        ...commonPickerOpts(),
+        ...availableDates.pickerOptions(),
         mode: 'range',
         plugins: [new rangePlugin({ input: '#db-end-date' })],
         onChange: (selectedDates) => {
@@ -322,8 +232,8 @@ function initPickers() {
             //   2nd click  → selectedDates.length === 2 (range complete)
             // We refresh only when the range is complete (or fully cleared).
             if (selectedDates.length === 2) {
-                state.startDate = isoDate(selectedDates[0]);
-                state.endDate   = isoDate(selectedDates[1]);
+                state.startDate = isoDateKey(selectedDates[0]);
+                state.endDate   = isoDateKey(selectedDates[1]);
                 state.page = 0;
                 syncFilterControls();
                 loadRecords();
@@ -336,7 +246,7 @@ function initPickers() {
             } else {
                 // length === 1: start picked, awaiting end. Reflect in state
                 // but don't fetch yet.
-                state.startDate = isoDate(selectedDates[0]);
+                state.startDate = isoDateKey(selectedDates[0]);
                 state.endDate = '';
                 syncFilterControls();
             }
@@ -377,7 +287,7 @@ function initDatabaseView() {
     document.querySelector('.section-tab[data-section="database"]')?.addEventListener('click', () => {
         if (!state.loaded) {
             const now = new Date();
-            loadMonth(now.getFullYear(), now.getMonth()); // warm the cache
+            availableDates.loadMonth(now.getFullYear(), now.getMonth()); // warm the cache
             loadRecords();
         }
     });
