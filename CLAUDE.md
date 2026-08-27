@@ -146,6 +146,7 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 | `metric-cards.js` | The metric cards — temperature, pressure, humidity/dew, surface wetness, wind, UV — plus the staleness hints. Entry point `renderMetrics(dto, dataStatus)` |
 | `system-health.js` | Header status dot, its label, and the lag / MQTT / records popover |
 | `metric-popovers.js` | Status-circle and badge popovers; owns the shared `#global-popup` and `closeAllPopovers()` |
+| `modal-shell.js` | Shared modal plumbing: one depth-counted body scroll lock and a focus trap, used by the astro and history modals |
 | `dashboard-constants.js` | Enum → colour / label lookup tables shared across cards, health and popovers |
 | `equalize-card-height.js` | Keeps dashboard card heights in step |
 
@@ -184,6 +185,8 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 | `history-modal.js` | History chart modal (date picker + period tabs) |
 | `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js` |
 | `database-view.js` / `config.js` | Admin pages only, not loaded by the dashboard |
+
+Both modals go through `modal-shell.js` for scroll locking and focus containment; neither may lock `<body>` itself. The lock is counted by modal depth, so only the outermost open and close touch `<body>` — locking per-modal meant the second modal read `window.scrollY` while the body was already fixed, saved 0, clobbered the first modal's offset, and unlocked the background on the first close, leaving a modal open over a scrollable page.
 
 `available-dates.js` is a factory rather than a singleton because its two callers hit different endpoints (`/api/weather/history/available-dates` and `/api/admin/available-dates`), so each instance owns its month cache. `isDateEnabled()` answers from cache only — a month that has not loaded reads as "nothing enabled", and `ensureMonthsLoaded()` redraws once the fetch resolves, which is why a picker briefly shows every cell disabled when it first opens.
 
