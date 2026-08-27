@@ -205,7 +205,24 @@ function clockText(ms) {
     return new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function updateSunHero(riseIso, setIso, dayLengthSeconds) {
+// Wording for "no event left in today's payload". The live altitude decides,
+// never the exhausted event list, because an empty list has two very different
+// causes:
+//   - no rise or set at all in this 24h window — the body stays up or down for
+//     the whole day, which happens at polar latitudes;
+//   - both events already past. Daily events are per calendar day, so a body
+//     that rises in the evening has its set stamped for *tomorrow*, and today's
+//     payload pairs that rise with the previous night's set.
+// Shared by both heroes so the sun and the moon can't drift apart on this.
+function horizonText(riseIso, setIso, currentAltitude) {
+    const isUp   = (currentAltitude ?? 0) > 0;
+    const allDay = riseIso == null && setIso == null;
+    return isUp
+        ? (allDay ? 'Above horizon all day' : 'Above horizon')
+        : (allDay ? 'Below horizon all day' : 'Below horizon');
+}
+
+export function updateSunHero(riseIso, setIso, dayLengthSeconds, currentAltitude) {
     const eventEl = document.getElementById('sun-hero-event');
     const timeEl  = document.getElementById('sun-sub-time');
     const dayEl   = document.getElementById('sun-sub-day');
@@ -218,7 +235,11 @@ export function updateSunHero(riseIso, setIso, dayLengthSeconds) {
         timeEl.textContent  = `${clockText(next.timeMs)} · `;
         dayEl.textContent   = dayText;
     } else {
-        eventEl.textContent = 'Below horizon';
+        // Ordinary nights land here too — after sunset both of today's events
+        // are past — and the altitude gives the same "Below horizon" answer
+        // the hardcoded string used to. It also gets polar day right, where
+        // the sun never sets and there is no next event to count down to.
+        eventEl.textContent = horizonText(riseIso, setIso, currentAltitude);
         timeEl.textContent  = '';
         dayEl.textContent   = dayText;
     }
@@ -234,18 +255,8 @@ export function updateMoonCountdown(riseIso, setIso, currentAltitude) {
         return;
     }
 
-    // No event left today. Two ways to land here, and the live altitude — not
-    // the exhausted event list — answers both:
-    //   - circumpolar: no rise or set at all inside this 24h window;
-    //   - both events already past. Daily events are per calendar day, so a
-    //     moon that rises in the evening has its set stamped for *tomorrow*
-    //     and today's payload pairs that rise with the previous night's set.
-    //     An empty candidate list therefore means "not in today's events",
-    //     never "down" — a moon that rose at 19:19 is plainly up at 22:21.
-    const isUp   = (currentAltitude ?? 0) > 0;
-    const allDay = riseIso == null && setIso == null;
-    el.textContent = isUp
-        ? (allDay ? 'Above horizon all day' : 'Above horizon')
-        : (allDay ? 'Below horizon all day' : 'Below horizon');
+    // No event left in today's payload — a moon that rose at 19:19 is plainly
+    // still up at 22:21, so the altitude answers this, not the empty list.
+    el.textContent = horizonText(riseIso, setIso, currentAltitude);
 }
 

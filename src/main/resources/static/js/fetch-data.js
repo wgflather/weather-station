@@ -203,7 +203,7 @@ function renderAstronomyLive(sunSnapshot, moonSnapshot) {
     // sun-curve "now" marker both depend on Date.now().
     const sun = state.astronomyDaily?.sunDailyEvents;
     if (sun) {
-        updateSunHero(sun.rise, sun.set, sun.dayLengthSeconds);
+        updateSunHero(sun.rise, sun.set, sun.dayLengthSeconds, sunSnapshot?.currentAltitude);
         updateSunNowMarker(sunSnapshot?.currentAltitude);
     }
     const moon = state.astronomyDaily?.moonDailyEvents;

@@ -230,10 +230,16 @@ let _sunsetMs       = null;
 // than absolute ms comparison so the logic works correctly for slots that
 // span into the next calendar day — e.g. the 8-hour ahead window showing
 // next morning shouldn't keep showing moon icons after sunrise.
-// Falls back to sunset-only check when only one value is available.
+// Falls back to a single-ended check when only one value is available: at high
+// latitudes the sun can rise without setting, or set without rising, and the
+// astronomy payload then carries only the event that happens. Both single-value
+// branches have to bail out before the time-of-day maths below, which would
+// otherwise run `tod(null)` — that is `new Date(0)`, the Unix epoch in local
+// time, a real-looking minute count that mislabels most of the day as night.
 function isNightHour(slotMs) {
     if (_sunriseMs == null && _sunsetMs == null) return false;
-    if (_sunriseMs == null) return slotMs >= _sunsetMs;
+    if (_sunriseMs == null) return slotMs >= _sunsetMs;   // sets, never rises
+    if (_sunsetMs  == null) return slotMs <  _sunriseMs;  // rises, never sets
 
     const tod = ms => { const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
     const slot = tod(slotMs);
