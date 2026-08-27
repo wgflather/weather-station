@@ -366,12 +366,21 @@ function initEventListeners() {
 // POLLING
 // ==========================================
 
+// Reschedules from a `finally` so a rejection can never end the loop. The
+// callers catch their own errors today, but a single throw escaping one of
+// them would otherwise stop every future poll — freezing the dashboard on
+// stale values with nothing on screen to say updates had stopped.
 function startPolling(fn, interval) {
     let stopped = false;
     async function loop() {
         if (stopped) return;
-        await fn();
-        setTimeout(loop, interval);
+        try {
+            await fn();
+        } catch (error) {
+            console.error('Poll failed:', error);
+        } finally {
+            if (!stopped) setTimeout(loop, interval);
+        }
     }
     loop();
     return () => stopped = true;

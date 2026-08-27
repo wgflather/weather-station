@@ -135,7 +135,14 @@ function renderDewPointStatus(humidity, isMixedDew = false) {
     const temp     = tempText && tempText !== '--' ? parseFloat(tempText) : null;
 
     if (dewPoint == null || temp == null) {
+        // Clear every field, not just the spread. A sensor that drops out
+        // mid-session would otherwise leave the last good T / Td and the risk
+        // badge on screen beside a blank spread — the card would go on
+        // asserting a condensation risk from a reading that no longer exists.
         spreadValEl.textContent = '--°';
+        if (dewTEl)  dewTEl.textContent  = '--';
+        if (dewTdEl) dewTdEl.textContent = '--';
+        resetDewBadge(badgeEl);
         return;
     }
 
@@ -145,14 +152,35 @@ function renderDewPointStatus(humidity, isMixedDew = false) {
     if (dewTEl)  dewTEl.textContent  = temp.toFixed(1);
     if (dewTdEl) dewTdEl.textContent = dewPoint.toFixed(1);
 
-    if (badgeEl && risk) {
-        const config      = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
-        badgeEl.className = `dew-status-badge ${config.cssClass}`;
-        // Wrap in a span so text-overflow:ellipsis works inside the flex container.
-        badgeEl.innerHTML = `<span class="dew-badge-text">${config.label}</span>`;
-        badgeEl._dewRisk  = risk;
-        badgeEl._dewMixed = isMixedDew;
+    if (!badgeEl) return;
+    // A reading with no risk classification clears the badge for the same
+    // reason as the branch above — never leave a stale verdict standing.
+    if (!risk) {
+        resetDewBadge(badgeEl);
+        return;
     }
+
+    const config      = DEW_POINT_RISK_CONFIG[risk] ?? DEW_POINT_RISK_CONFIG.UNLIKELY;
+    badgeEl.className = `dew-status-badge ${config.cssClass}`;
+    // Wrap in a span so text-overflow:ellipsis works inside the flex container.
+    badgeEl.innerHTML = `<span class="dew-badge-text">${config.label}</span>`;
+    badgeEl._dewRisk  = risk;
+    badgeEl._dewMixed = isMixedDew;
+}
+
+// Neutral "no reading" state — bare badge class and a `--`, matching the
+// wetness badge and the rest of the card's placeholders. (The template ships
+// "Caution" as the pre-render text; once a poll lands with no dew data this
+// replaces it, since a risk word with nothing behind it is the same problem in
+// smaller form.) Clearing `_dewRisk` also disables the badge's popover:
+// metric-popovers.js only opens it when a risk is stashed, so a click can no
+// longer surface a stale explanation.
+function resetDewBadge(badgeEl) {
+    if (!badgeEl) return;
+    badgeEl.className = 'dew-status-badge';
+    badgeEl.innerHTML = '<span class="dew-badge-text">--</span>';
+    badgeEl._dewRisk  = null;
+    badgeEl._dewMixed = false;
 }
 
 // ==========================================
