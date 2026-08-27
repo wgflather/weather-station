@@ -10,6 +10,8 @@
    Chart.js and its date-fns adapter must be loaded globally.
 ========================================================= */
 
+import { getTooltipEl, setTooltipContent } from './chart-tooltip.js';
+
 // ── Metric configuration ──────────────────────────────────────────────────────
 const DAILY_CFG = {
     temperature: {
@@ -34,19 +36,6 @@ const DAILY_CFG = {
         lowColor:  '#059669',
     },
 };
-
-// ── Tooltip element (shared with weather-chart.js) ────────────────────────────
-function getTooltipEl() {
-    let el = document.getElementById('weather-chart-tooltip');
-    if (!el) {
-        el = document.createElement('div');
-        el.id        = 'weather-chart-tooltip';
-        el.className = 'chartjs-tooltip';
-        el.innerHTML = '<div class="chartjs-tooltip-title"></div><div class="chartjs-tooltip-body"></div>';
-        document.body.appendChild(el);
-    }
-    return el;
-}
 
 // ── External tooltip handler ──────────────────────────────────────────────────
 function makeTooltipHandler(minPoints, maxPoints, cfg, minIdx, maxIdx) {
@@ -74,19 +63,18 @@ function makeTooltipHandler(minPoints, maxPoints, cfg, minIdx, maxIdx) {
             i === minIdx ? `<span style="color:#38bdf8;font-size:10px;font-weight:600"> · Period Low</span>`  :
             '';
 
-        const titleEl = el.querySelector('.chartjs-tooltip-title');
-        const bodyEl  = el.querySelector('.chartjs-tooltip-body');
-
-        titleEl.textContent = date.toLocaleDateString(undefined, {
+        const title = date.toLocaleDateString(undefined, {
             weekday: 'short', month: 'short', day: 'numeric',
         });
 
-        bodyEl.innerHTML =
-            `<div style="color:#e2e8f0"> ` +
-            `<span style="color:${cfg.lineColor};font-weight:700">${avg}${cfg.unit}</span>` +
-            ` avg${badge}</div>` +
-            `<div style="font-size:10.5px;color:rgba(148,163,184,0.8);margin-top:3px">` +
-            ` Range ${minV} – ${maxV}${cfg.unit}</div>`;
+        setTooltipContent(el, [title], [{
+            html:
+                `<div style="color:#e2e8f0"> ` +
+                `<span style="color:${cfg.lineColor};font-weight:700">${avg}${cfg.unit}</span>` +
+                ` avg${badge}</div>` +
+                `<div style="font-size:10.5px;color:rgba(148,163,184,0.8);margin-top:3px">` +
+                ` Range ${minV} – ${maxV}${cfg.unit}</div>`,
+        }]);
 
         // Position relative to viewport (tooltip is position: fixed).
         const rect = chart.canvas.getBoundingClientRect();

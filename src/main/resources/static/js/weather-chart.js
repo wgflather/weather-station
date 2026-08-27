@@ -1,3 +1,5 @@
+import { getTooltipEl, setTooltipContent, hideTooltip } from './chart-tooltip.js';
+
 const chartInstances = new Map();
 
 /* =========================================================
@@ -756,21 +758,9 @@ let lastInteractionWasTouch = false;
 let tooltipSuppressed = false;
 let suppressTimer     = null;
 
-function getTooltipEl() {
-    let el = document.getElementById('weather-chart-tooltip');
-    if (!el) {
-        el = document.createElement('div');
-        el.id = 'weather-chart-tooltip';
-        el.className = 'chartjs-tooltip';
-        document.body.appendChild(el);
-    }
-    return el;
-}
-
 // Hide the tooltip and clear Chart's active/hover state.
 function dismissTooltip(chart) {
-    const el = document.getElementById('weather-chart-tooltip');
-    if (el) el.style.opacity = '0';
+    hideTooltip();
     if (!chart) return;
     try {
         chart.setActiveElements([]);
@@ -835,17 +825,12 @@ function externalTooltipHandler(context) {
     }
 
     if (tooltip.body) {
-        let html = '';
-        (tooltip.title || []).forEach(line => {
-            html += `<div class="chartjs-tooltip-title">${line}</div>`;
-        });
+        const bodies = [];
         tooltip.body.forEach((bodyItem, i) => {
             const color = tooltip.labelTextColors?.[i] ?? '#e2e8f0';
-            bodyItem.lines.forEach(line => {
-                html += `<div class="chartjs-tooltip-body" style="color:${color}">${line}</div>`;
-            });
+            bodyItem.lines.forEach(line => bodies.push({ html: line, color }));
         });
-        el.innerHTML = html;
+        setTooltipContent(el, tooltip.title || [], bodies);
     }
 
     const canvasRect = chart.canvas.getBoundingClientRect();
