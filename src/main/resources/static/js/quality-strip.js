@@ -59,12 +59,17 @@ const STRIP_COLORS = {
     // failures and looked near-identical when both were grey.
     MISSING: 'rgba(148, 163, 184, 0.55)',
     EMPTY:   'rgba(2, 6, 23, 0.55)',
+    // Absent hardware. Recessive rather than dark: MISSING and EMPTY are both
+    // failures worth looking at, while this one is a statement that there is
+    // nothing here to judge, so it should not draw the eye at all.
+    NOT_CONFIGURED: 'rgba(100, 116, 139, 0.28)',
 };
 
 // A bucket counts as under-reporting below half the station's usual rate, and
 // as a dead metric when at least half its readings arrived with no value.
 const PARTIAL_RATIO = 0.5;
 const MISSING_RATIO = 0.5;
+const NOT_CONFIGURED_RATIO = 0.5;
 
 // The final bucket is partial by construction — it covers a window that is
 // still running. Below this much elapsed there are too few readings to judge
@@ -109,6 +114,7 @@ function countsFor(bucket, metricKey) {
         spike:   bucket[`${p}SpikeCount`]       ?? 0,
         anomaly: bucket[`${p}AnomalyCount`]     ?? 0,
         missing: bucket[`${p}MissingCount`]     ?? 0,
+        notConfigured: bucket[`${p}NotConfiguredCount`] ?? 0,
     };
 }
 
@@ -132,6 +138,10 @@ function bucketState(counts, expected) {
     if (counts.total === 0)                              return 'EMPTY';
     if (counts.anomaly > 0)                              return 'ANOMALY';
     if (counts.spike > 0)                                return 'SPIKE';
+    // Above MISSING because it explains more: both mean "no value here", but this
+    // one says why. Still below the point events, so a bucket where the firmware
+    // changed mid-window shows the spike rather than hiding it.
+    if (counts.notConfigured >= counts.total * NOT_CONFIGURED_RATIO) return 'NOT_CONFIGURED';
     if (counts.missing >= counts.total * MISSING_RATIO)  return 'MISSING';
     if (expected > 0 && counts.total < expected * PARTIAL_RATIO) return 'PARTIAL';
     return 'OK';
@@ -196,11 +206,18 @@ function gapText(gaps) {
 }
 
 function issueText(summary, gaps) {
+    // A metric the station never reports has nothing graded in the window, so the
+    // usual "No issues" would claim a clean bill of health for absent hardware.
+    const graded = (summary?.okCount ?? 0) + (summary?.spikeCount ?? 0)
+                 + (summary?.anomalyCount ?? 0) + (summary?.missingCount ?? 0);
+    if (!graded && summary?.notConfiguredCount) return 'No sensor configured';
+
     const parts = [];
 
     if (summary?.spikeCount)   parts.push(plural(summary.spikeCount, 'spike', 'spikes'));
     if (summary?.anomalyCount) parts.push(plural(summary.anomalyCount, 'anomaly', 'anomalies'));
     if (summary?.missingCount) parts.push(`${summary.missingCount} missing`);
+    if (summary?.notConfiguredCount) parts.push(`${summary.notConfiguredCount} not configured`);
 
     const gapPart = gapText(gaps);
     if (gapPart) parts.push(gapPart);
@@ -265,10 +282,18 @@ function bucketReadout(strip, metricKey, i) {
 
     if (counts.total === 0) return `${range} · no readings`;
 
+    // Nothing graded at all in the bucket: the station reported, but not this
+    // field. Saying "30 readings" alone would imply the sensor was working.
+    if (!counts.ok && !counts.spike && !counts.anomaly && !counts.missing
+        && counts.notConfigured) {
+        return `${range} · no sensor configured`;
+    }
+
     const parts = [range, plural(counts.total, 'reading', 'readings')];
     if (counts.spike)   parts.push(plural(counts.spike, 'spike', 'spikes'));
     if (counts.anomaly) parts.push(plural(counts.anomaly, 'anomaly', 'anomalies'));
     if (counts.missing) parts.push(`${counts.missing} missing`);
+    if (counts.notConfigured) parts.push(`${counts.notConfigured} not configured`);
 
     return parts.join(' · ');
 }

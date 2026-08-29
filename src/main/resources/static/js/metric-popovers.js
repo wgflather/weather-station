@@ -12,6 +12,7 @@
 import { qualityStripSlot, hydrateQualityStrip } from './quality-strip.js';
 import {
     DATA_QUALITY_COLORS,
+    DATA_QUALITY_LABELS,
     DATA_STATUS_COLORS,
     DATA_STATUS_INFO,
     DEW_POINT_RISK_INFO,
@@ -122,7 +123,7 @@ function buildPopupHTML(details, dataStatus, cardId) {
         </div>
         <div class="popup-row">
             <span class="popup-key">Quality</span>
-            <span class="popup-val" style="color:${qColor}; font-weight:600;">${details.quality ?? '--'}</span>
+            <span class="popup-val" style="color:${qColor}; font-weight:600;">${DATA_QUALITY_LABELS[details.quality] ?? details.quality ?? '--'}</span>
         </div>
         <div class="popup-row">
             <span class="popup-key">Arrived</span>
@@ -203,6 +204,17 @@ export function setStatusCircleColor(circleEl, quality, dataStatus, dataProvider
         // Always the flat "fresh API source" blue; never pulses, since the
         // data is polled on a fixed schedule, not a live sensor stream.
         const color = '#60a5fa';
+        circleEl.style.backgroundColor = color;
+        circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
+        circleEl.classList.remove('pulsing');
+        return;
+    }
+
+    if (quality === 'NOT_CONFIGURED') {
+        // The station never sends this field, so there is no sensor whose freshness
+        // could matter — ranking it against dataStatus would let a STALE lag colour
+        // the dot for hardware that does not exist. Flat neutral, never pulses.
+        const color = DATA_QUALITY_COLORS.NOT_CONFIGURED;
         circleEl.style.backgroundColor = color;
         circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
         circleEl.classList.remove('pulsing');
@@ -303,7 +315,7 @@ function buildWetnessPopupHTML(wetness) {
         </div>
         <div class="popup-row">
             <span class="popup-key">Quality</span>
-            <span class="popup-val" style="color:${qColor}; font-weight:600;">${details?.quality ?? '--'}</span>
+            <span class="popup-val" style="color:${qColor}; font-weight:600;">${DATA_QUALITY_LABELS[details?.quality] ?? details?.quality ?? '--'}</span>
         </div>
         <div class="popup-row">
             <span class="popup-key">Measured</span>

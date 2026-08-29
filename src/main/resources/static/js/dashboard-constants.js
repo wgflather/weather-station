@@ -13,6 +13,15 @@ export const DATA_QUALITY_COLORS = {
     SPIKE:   '#f59e0b',
     ANOMALY: '#ef4444',
     MISSING: '#111827',
+    // Absent hardware, not a fault: neutral slate so it reads as "nothing to
+    // report here" rather than joining the red/amber failure family. Kept out
+    // of QUALITY_SEVERITY deliberately — see setStatusCircleColor.
+    NOT_CONFIGURED: '#64748b',
+};
+
+/** Display text for `DataQuality`; anything unlisted falls back to the raw enum name. */
+export const DATA_QUALITY_LABELS = {
+    NOT_CONFIGURED: 'Not configured',
 };
 
 /** Sensor freshness, as `DataStatus` on the backend — derived from lag. */
@@ -35,6 +44,9 @@ export const DATA_STATUS_INFO = {
 // Ranked so the status circle can show whichever of the two axes is worse:
 // a stale OK reading and a live ANOMALY are both worth flagging, and the
 // circle only has one colour to spend.
+// NOT_CONFIGURED is absent from this table on purpose: it is not a point on the
+// health axis, so it can neither win nor lose the comparison meaningfully. The
+// status circle short-circuits on it before ranking.
 export const QUALITY_SEVERITY = { OK: 0, SPIKE: 1, ANOMALY: 2, MISSING: 3 };
 export const STATUS_SEVERITY  = { LIVE: 0, DELAYED: 1, STALE: 2, OFFLINE: 3, EMPTY: 3 };
 
