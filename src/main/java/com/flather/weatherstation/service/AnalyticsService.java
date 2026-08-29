@@ -126,6 +126,7 @@ public class AnalyticsService {
     int spikeCount = 0;
     int anomalyCount = 0;
     int missingCount = 0;
+    int notConfiguredCount = 0;
 
     for (QualityBucket bucket : bucketList) {
       MetricQualityCounts counts = bucket.qualityFor(metric);
@@ -134,10 +135,16 @@ public class AnalyticsService {
       spikeCount += counts.spikeCount();
       anomalyCount += counts.anomalyCount();
       missingCount += counts.missingCount();
+      notConfiguredCount += counts.notConfiguredCount();
     }
 
     return new MetricQualitySummary(
-        metric.getRequestKey(), okCount, spikeCount, anomalyCount, missingCount);
+        metric.getRequestKey(),
+        okCount,
+        spikeCount,
+        anomalyCount,
+        missingCount,
+        notConfiguredCount);
   }
 
   public List<MetricQualitySummary> getMetricSummaries(List<QualityBucket> bucketList) {

@@ -15,7 +15,10 @@ import java.time.Instant;
  *
  * <p>The per-metric counts do not necessarily sum to {@code totalCount}: the quality columns are
  * nullable, so a row written outside {@code DataQualityValidator} contributes to {@code totalCount}
- * while being counted in none of the four states. Never derive {@code ok} by subtraction.
+ * while being counted in none of the states. Never derive {@code ok} by subtraction.
+ *
+ * <p>{@code notConfigured} counts rows where the station omitted the field entirely. It is a
+ * statement about the hardware, not the reading, so it is kept out of the health counts.
  *
  * <p>Surface wetness and wind direction have no spike counts by design — {@code
  * DataQualityValidator.getSpikeLimit} only defines limits for temperature, pressure, humidity, wind
@@ -33,56 +36,93 @@ public record QualityBucket(
     int tempSpikeCount,
     int tempAnomalyCount,
     int tempMissingCount,
+    int tempNotConfiguredCount,
     int pressureOkCount,
     int pressureSpikeCount,
     int pressureAnomalyCount,
     int pressureMissingCount,
+    int pressureNotConfiguredCount,
     int humidityOkCount,
     int humiditySpikeCount,
     int humidityAnomalyCount,
     int humidityMissingCount,
+    int humidityNotConfiguredCount,
     int surfaceWetnessOkCount,
     int surfaceWetnessAnomalyCount,
     int surfaceWetnessMissingCount,
+    int surfaceWetnessNotConfiguredCount,
     int windOkCount,
     int windSpikeCount,
     int windAnomalyCount,
     int windMissingCount,
+    int windNotConfiguredCount,
     int windDirectionOkCount,
     int windDirectionAnomalyCount,
     int windDirectionMissingCount,
+    int windDirectionNotConfiguredCount,
     int uvIndexOkCount,
     int uvIndexSpikeCount,
     int uvIndexAnomalyCount,
-    int uvIndexMissingCount) {
+    int uvIndexMissingCount,
+    int uvIndexNotConfiguredCount) {
 
   public MetricQualityCounts qualityFor(Metric metric) {
     return switch (metric) {
       case TEMPERATURE ->
-          new MetricQualityCounts(tempOkCount, tempSpikeCount, tempAnomalyCount, tempMissingCount);
+          new MetricQualityCounts(
+              tempOkCount,
+              tempSpikeCount,
+              tempAnomalyCount,
+              tempMissingCount,
+              tempNotConfiguredCount);
 
       case PRESSURE ->
           new MetricQualityCounts(
-              pressureOkCount, pressureSpikeCount, pressureAnomalyCount, pressureMissingCount);
+              pressureOkCount,
+              pressureSpikeCount,
+              pressureAnomalyCount,
+              pressureMissingCount,
+              pressureNotConfiguredCount);
 
       case HUMIDITY ->
           new MetricQualityCounts(
-              humidityOkCount, humiditySpikeCount, humidityAnomalyCount, humidityMissingCount);
+              humidityOkCount,
+              humiditySpikeCount,
+              humidityAnomalyCount,
+              humidityMissingCount,
+              humidityNotConfiguredCount);
 
       case SURFACE_WETNESS ->
           new MetricQualityCounts(
-              surfaceWetnessOkCount, 0, surfaceWetnessAnomalyCount, surfaceWetnessMissingCount);
+              surfaceWetnessOkCount,
+              0,
+              surfaceWetnessAnomalyCount,
+              surfaceWetnessMissingCount,
+              surfaceWetnessNotConfiguredCount);
 
       case WIND ->
-          new MetricQualityCounts(windOkCount, windSpikeCount, windAnomalyCount, windMissingCount);
+          new MetricQualityCounts(
+              windOkCount,
+              windSpikeCount,
+              windAnomalyCount,
+              windMissingCount,
+              windNotConfiguredCount);
 
       case WIND_DIRECTION ->
           new MetricQualityCounts(
-              windDirectionOkCount, 0, windDirectionAnomalyCount, windDirectionMissingCount);
+              windDirectionOkCount,
+              0,
+              windDirectionAnomalyCount,
+              windDirectionMissingCount,
+              windDirectionNotConfiguredCount);
 
       case UV_INDEX ->
           new MetricQualityCounts(
-              uvIndexOkCount, uvIndexSpikeCount, uvIndexAnomalyCount, uvIndexMissingCount);
+              uvIndexOkCount,
+              uvIndexSpikeCount,
+              uvIndexAnomalyCount,
+              uvIndexMissingCount,
+              uvIndexNotConfiguredCount);
     };
   }
 }
