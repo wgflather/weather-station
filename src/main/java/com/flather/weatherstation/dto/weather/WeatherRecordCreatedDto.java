@@ -3,6 +3,7 @@ package com.flather.weatherstation.dto.weather;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import org.openapitools.jackson.nullable.JsonNullable;
 
 @RequiredArgsConstructor
 @AllArgsConstructor
@@ -11,22 +12,21 @@ import lombok.*;
 @ToString
 public class WeatherRecordCreatedDto {
   @NotNull private String deviceId;
+  private JsonNullable<Double> temperature;
 
-  private Double temperature;
+  private JsonNullable<Double> pressure;
 
-  private Double pressure;
+  private JsonNullable<Double> humidity;
 
-  private Double humidity;
+  private JsonNullable<Double> surfaceWetness;
 
-  private Double surfaceWetness;
-
-  private Double wind;
+  private JsonNullable<Double> wind;
 
   @JsonProperty("wind_direction")
-  private Double windDirection;
+  private JsonNullable<Double> windDirection;
 
   @JsonProperty("uv_index")
-  private Double uvIndex;
+  private JsonNullable<Double> uvIndex;
 
   @NotNull
   @JsonProperty("WIFI_RSSI")

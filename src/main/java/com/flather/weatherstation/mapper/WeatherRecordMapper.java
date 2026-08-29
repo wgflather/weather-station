@@ -9,6 +9,7 @@ import java.time.ZonedDateTime;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
+import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @Mapper(componentModel = "spring")
@@ -17,6 +18,10 @@ public abstract class WeatherRecordMapper {
   @Autowired protected ConfigurationCache configurationCache;
 
   public abstract WeatherRecord weatherDtoToEntity(WeatherRecordCreatedDto dto);
+
+  protected Double map(JsonNullable<Double> value) {
+    return value != null && value.isPresent() ? value.get() : null;
+  }
 
   @Mapping(target = "measuredAtTimeZoned", source = "measuredAt", qualifiedByName = "toZoned")
   public abstract WeatherRecordResponseDto weatherEntityToDto(WeatherRecord entity);

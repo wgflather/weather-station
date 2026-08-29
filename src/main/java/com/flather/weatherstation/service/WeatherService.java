@@ -1,6 +1,5 @@
 package com.flather.weatherstation.service;
 
-import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.cache.SensorStateCache;
 import com.flather.weatherstation.domain.constant.DataQuality;
 import com.flather.weatherstation.domain.constant.Metric;
@@ -14,6 +13,7 @@ import java.time.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
+import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +24,6 @@ public class WeatherService {
   private final WeatherReportRepository repository;
   private final DataQualityValidator qualityValidator;
   private final WeatherRecordMapper mapper;
-  private final ConfigurationCache configurationCache;
   private final SensorStateCache sensorStateCache;
 
   private Double medianOf(Metric metric, Median median) {
@@ -34,16 +33,18 @@ public class WeatherService {
             .toArray());
   }
 
-  private DataQuality validateIfOk(Metric metric, ValidationResult validationResult, Double value) {
+  private DataQuality validateIfOk(
+      Metric metric, ValidationResult validationResult, JsonNullable<Double> value) {
     DataQuality quality = validationResult.getByMetric(metric);
 
     if (quality.equals(DataQuality.OK) && sensorStateCache.getLastSavedMeasurement() == null) {
       return DataQuality.OK;
     }
 
-    // Can't do spike detection without a value — anomaly detection already marks null as MISSING.
-    return quality == DataQuality.OK && value != null
-        ? validateMetric(metric, validationResult, value)
+    // Can't do spike detection without a value — anomaly detection has already graded a metric
+    // that is absent (null or undefined) or unreadable, so there is nothing left to check.
+    return quality == DataQuality.OK && value != null && value.get() != null
+        ? validateMetric(metric, validationResult, value.get())
         : quality;
   }
 
@@ -83,8 +84,6 @@ public class WeatherService {
   @Transactional
   public WeatherRecordResponseDto saveWeatherRecord(WeatherRecordCreatedDto weatherRecordDto) {
 
-    WeatherRecord record = mapper.weatherDtoToEntity(weatherRecordDto);
-
     ValidationResult anomalyAndMissingValidationResult =
         qualityValidator.detectDataAnomaly(weatherRecordDto);
 
@@ -104,6 +103,8 @@ public class WeatherService {
 
     DataQuality windQuality =
         validateIfOk(Metric.WIND, anomalyAndMissingValidationResult, weatherRecordDto.getWind());
+
+    WeatherRecord record = mapper.weatherDtoToEntity(weatherRecordDto);
 
     record.setTemperatureDataQuality(tempQuality);
     record.setPressureDataQuality(pressureQuality);

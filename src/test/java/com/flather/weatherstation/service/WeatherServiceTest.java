@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openapitools.jackson.nullable.JsonNullable;
 
 @ExtendWith(MockitoExtension.class)
 class WeatherServiceTest {
@@ -46,9 +47,9 @@ class WeatherServiceTest {
     dto =
         WeatherRecordCreatedDto.builder()
             .deviceId("device-1")
-            .temperature(22.0)
-            .pressure(1013.0)
-            .humidity(55.0)
+            .temperature(JsonNullable.of(22.0))
+            .pressure(JsonNullable.of(1013.0))
+            .humidity(JsonNullable.of(55.0))
             .wifiRssi(-60.0)
             .build();
 

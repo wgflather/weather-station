@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -22,16 +23,33 @@ public class DataQualityValidator {
   private final ConfigurationCache properties;
 
   private void validateMetric(
-      Metric metric, Double value, double min, double max, Map<Metric, DataQuality> result) {
+      Metric metric,
+      JsonNullable<Double> value,
+      double min,
+      double max,
+      Map<Metric, DataQuality> result) {
 
-    if (value == null) {
+    // Jackson never hands us a bare null — EmptyStringToNaNDoubleDeserializer resolves an absent
+    // field to undefined() and a null one to NaN. A DTO built any other way (the builder, tests)
+    // leaves unset fields as a raw null, so guard rather than NPE on a metric nobody supplied.
+    // Not logged: absence is a steady state, not an event. A thermometer-only station leaves six
+    // metrics out of every payload, so a line per metric per reading would be thousands a day that
+    // say nothing new.
+    if (value == null || value.isUndefined()) {
+      result.put(metric, DataQuality.NOT_CONFIGURED);
+      return;
+    }
+
+    // of(null) is not reachable from the deserializer today, but isPresent() stays true for it, so
+    // the null has to be caught here rather than by a presence check.
+    if (value.get() == null || value.get().isNaN() || value.get().isInfinite()) {
       log.warn(ValidationLogMessages.missing(metric));
       result.put(metric, DataQuality.MISSING);
       return;
     }
 
-    if (value < min || value > max) {
-      log.warn(ValidationLogMessages.anomaly(metric, value));
+    if (value.get() < min || value.get() > max) {
+      log.warn(ValidationLogMessages.anomaly(metric, value.get()));
       result.put(metric, DataQuality.ANOMALY);
       return;
     }

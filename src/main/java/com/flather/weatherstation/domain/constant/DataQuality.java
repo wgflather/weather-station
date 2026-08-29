@@ -4,5 +4,6 @@ public enum DataQuality {
   OK,
   SPIKE,
   ANOMALY,
-  MISSING
+  MISSING,
+  NOT_CONFIGURED
 }

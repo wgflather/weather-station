@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openapitools.jackson.nullable.JsonNullable;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -116,6 +117,37 @@ class DataQualityValidatorTest {
     assertThat(result.surfaceWetness()).isEqualTo(DataQuality.MISSING);
   }
 
+  // ---- absent metrics ----
+
+  @Test
+  void undefinedMetric_markedNotConfigured() {
+    WeatherRecordCreatedDto dto =
+        WeatherRecordCreatedDto.builder()
+            .deviceId("device-1")
+            .temperature(JsonNullable.undefined())
+            .wifiRssi(-60.0)
+            .build();
+
+    ValidationResult result = validator.detectDataAnomaly(dto);
+
+    assertThat(result.temperature()).isEqualTo(DataQuality.NOT_CONFIGURED);
+  }
+
+  @Test
+  void metricNeverSetOnBuilder_markedNotConfigured_ratherThanThrowing() {
+    // The builder leaves unset fields as a raw null rather than undefined(); the validator's null
+    // guard is what stops that being an NPE.
+    WeatherRecordCreatedDto dto =
+        WeatherRecordCreatedDto.builder().deviceId("device-1").wifiRssi(-60.0).build();
+
+    ValidationResult result = validator.detectDataAnomaly(dto);
+
+    assertThat(result.temperature()).isEqualTo(DataQuality.NOT_CONFIGURED);
+    assertThat(result.wind()).isEqualTo(DataQuality.NOT_CONFIGURED);
+    assertThat(result.windDirection()).isEqualTo(DataQuality.NOT_CONFIGURED);
+    assertThat(result.uvIndex()).isEqualTo(DataQuality.NOT_CONFIGURED);
+  }
+
   // ---- detectDataSpike ----
 
   @Test
@@ -189,11 +221,20 @@ class DataQualityValidatorTest {
       Double temp, Double pressure, Double humidity, Double wetness) {
     return WeatherRecordCreatedDto.builder()
         .deviceId("device-1")
-        .temperature(temp)
-        .pressure(pressure)
-        .humidity(humidity)
-        .surfaceWetness(wetness)
+        .temperature(sent(temp))
+        .pressure(sent(pressure))
+        .humidity(sent(humidity))
+        .surfaceWetness(sent(wetness))
         .wifiRssi(-60.0)
         .build();
+  }
+
+  /**
+   * A field the station sent. A null argument stands for an explicit JSON {@code null} — the sensor
+   * is fitted but had no reading — which the deserializer resolves to {@code NaN}. Leaving a field
+   * off the builder entirely is the separate "no such sensor" case.
+   */
+  private static JsonNullable<Double> sent(Double value) {
+    return JsonNullable.of(value == null ? Double.NaN : value);
   }
 }

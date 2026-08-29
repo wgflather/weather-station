@@ -25,6 +25,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.openapitools.jackson.nullable.JsonNullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -47,8 +48,8 @@ class WeatherControllerTest {
     WeatherRecordCreatedDto dto =
         WeatherRecordCreatedDto.builder()
             .deviceId("device-1")
-            .temperature(22.5)
-            .pressure(1013.0)
+            .temperature(JsonNullable.of(22.5))
+            .pressure(JsonNullable.of(1013.0))
             .wifiRssi(-70.0)
             .build();
 
