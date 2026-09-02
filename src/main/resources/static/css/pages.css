@@ -827,6 +827,13 @@ span.flatpickr-weekday {
     background: rgba(148, 163, 184, 0.16);
 }
 
+/* Underscore, not a dash: the class comes from DataQuality.toLowerCase() in
+   metricCell(), so the enum name is used verbatim. */
+.db-badge-not_configured {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+}
+
 .db-delete-btn {
     padding: 4px 12px;
     font-family: 'Figtree', sans-serif;
