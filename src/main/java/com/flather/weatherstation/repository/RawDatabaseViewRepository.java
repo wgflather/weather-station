@@ -26,6 +26,7 @@ public interface RawDatabaseViewRepository extends JpaRepository<WeatherRecord, 
        OR w.humidityDataQuality = :quality
        OR w.surfaceWetnessDataQuality = :quality
        OR w.windDataQuality = :quality
+       OR w.windDirectionDataQuality = :quality
        OR w.uvIndexDataQuality = :quality
     """)
   Page<WeatherRecord> findAllByQuality(
@@ -40,6 +41,7 @@ public interface RawDatabaseViewRepository extends JpaRepository<WeatherRecord, 
        OR w.humidityDataQuality = :quality
        OR w.surfaceWetnessDataQuality = :quality
        OR w.windDataQuality = :quality
+       OR w.windDirectionDataQuality = :quality
        OR w.uvIndexDataQuality = :quality
     """)
   Page<WeatherRecord> findAllBy(Pageable pageable, @Param("quality") DataQuality dataQuality);
@@ -74,6 +76,7 @@ public interface RawDatabaseViewRepository extends JpaRepository<WeatherRecord, 
        OR w.humidityDataQuality = :quality
        OR w.surfaceWetnessDataQuality = :quality
        OR w.windDataQuality = :quality
+       OR w.windDirectionDataQuality = :quality
        OR w.uvIndexDataQuality = :quality)
     AND w.measuredAt >= :start AND w.measuredAt < :end
     """)
@@ -85,11 +88,21 @@ public interface RawDatabaseViewRepository extends JpaRepository<WeatherRecord, 
 
   Page<WeatherRecord> findByWindDataQuality(DataQuality quality, Pageable pageable);
 
+  Page<WeatherRecord> findByWindDirectionDataQuality(DataQuality quality, Pageable pageable);
+
   Page<WeatherRecord> findByUvIndexDataQuality(DataQuality quality, Pageable pageable);
 
   @Query(
       "SELECT w FROM WeatherRecord w WHERE w.windDataQuality = :quality AND w.measuredAt >= :start AND w.measuredAt < :end")
   Page<WeatherRecord> findByWindQualityBetween(
+      @Param("quality") DataQuality quality,
+      @Param("start") Instant start,
+      @Param("end") Instant end,
+      Pageable pageable);
+
+  @Query(
+      "SELECT w FROM WeatherRecord w WHERE w.windDirectionDataQuality = :quality AND w.measuredAt >= :start AND w.measuredAt < :end")
+  Page<WeatherRecord> findByWindDirectionQualityBetween(
       @Param("quality") DataQuality quality,
       @Param("start") Instant start,
       @Param("end") Instant end,

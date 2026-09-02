@@ -3,6 +3,7 @@ package com.flather.weatherstation.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
@@ -75,6 +76,22 @@ class DatabaseRawViewServiceTest {
     service.getRecords(false, DataQuality.SPIKE, PAGE, Metric.TEMPERATURE, null, null);
 
     verify(repository).findByTemperatureDataQuality(DataQuality.SPIKE, PAGE);
+  }
+
+  /**
+   * Regression: WIND_DIRECTION used to route to findByWindDataQuality — the wind <em>speed</em>
+   * column — so filtering by wind direction silently returned the wrong rows. Nothing failed,
+   * because the two enum constants read alike and no test distinguished them.
+   */
+  @Test
+  void getRecords_withWindDirection_doesNotFallBackToWindSpeed() {
+    given(repository.findByWindDirectionDataQuality(DataQuality.ANOMALY, PAGE))
+        .willReturn(EMPTY_PAGE);
+
+    service.getRecords(false, DataQuality.ANOMALY, PAGE, Metric.WIND_DIRECTION, null, null);
+
+    verify(repository).findByWindDirectionDataQuality(DataQuality.ANOMALY, PAGE);
+    verify(repository, never()).findByWindDataQuality(any(), any());
   }
 
   // ---- getRecords: date-range path ----

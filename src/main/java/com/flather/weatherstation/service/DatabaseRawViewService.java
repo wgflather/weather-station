@@ -82,7 +82,8 @@ public class DatabaseRawViewService {
       case SURFACE_WETNESS ->
           repository.findBySurfaceWetnessQualityBetween(quality, start, end, pageable);
       case WIND -> repository.findByWindQualityBetween(quality, start, end, pageable);
-      case WIND_DIRECTION -> repository.findByWindQualityBetween(quality, start, end, pageable);
+      case WIND_DIRECTION ->
+          repository.findByWindDirectionQualityBetween(quality, start, end, pageable);
       case UV_INDEX -> repository.findByUvIndexQualityBetween(quality, start, end, pageable);
     };
   }
@@ -104,7 +105,7 @@ public class DatabaseRawViewService {
       case HUMIDITY -> repository.findByHumidityDataQuality(quality, pageable);
       case SURFACE_WETNESS -> repository.findBySurfaceWetnessDataQuality(quality, pageable);
       case WIND -> repository.findByWindDataQuality(quality, pageable);
-      case WIND_DIRECTION -> repository.findByWindDataQuality(quality, pageable);
+      case WIND_DIRECTION -> repository.findByWindDirectionDataQuality(quality, pageable);
       case UV_INDEX -> repository.findByUvIndexDataQuality(quality, pageable);
     };
   }
