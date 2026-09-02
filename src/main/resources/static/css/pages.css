@@ -1000,9 +1000,13 @@ span.flatpickr-weekday {
     box-sizing: border-box;
 }
 
-.login-card {
-    width: 360px;
-    max-width: 100%;
+/* Both classes on purpose. pages.css is @imported on line 1 of style.css, so
+   every style.css rule lands later in the cascade — and .weather_block sets
+   width:100% at equal specificity, which was stretching the card across the
+   whole viewport. Matching both classes wins without an !important. */
+.login-card.weather_block {
+    width: 100%;
+    max-width: 360px;
 }
 
 .login-card h3 {
