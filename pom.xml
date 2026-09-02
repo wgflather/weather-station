@@ -162,6 +162,16 @@
             <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Testcontainers 2.0.4 uses commons-io but does not declare it. Only the
+             Linux unix-socket Docker transport reaches that code, so the gap is
+             invisible on Windows (npipe) and fails in CI with
+             NoClassDefFoundError: org/apache/commons/io/IOUtils. -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.21.0</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
