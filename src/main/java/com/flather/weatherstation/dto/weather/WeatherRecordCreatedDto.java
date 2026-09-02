@@ -28,7 +28,6 @@ public class WeatherRecordCreatedDto {
   @JsonProperty("uv_index")
   private JsonNullable<Double> uvIndex;
 
-  @NotNull
   @JsonProperty("WIFI_RSSI")
   private Double wifiRssi;
 }

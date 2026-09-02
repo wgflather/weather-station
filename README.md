@@ -50,7 +50,7 @@ Firmware publishes one JSON object per reading to the configured MQTT topic. The
 | Field | Unit | Required |
 |---|---|---|
 | `deviceId` | — | yes |
-| `WIFI_RSSI` | dBm | yes |
+| `WIFI_RSSI` | dBm | no |
 | `temperature` | °C | no |
 | `pressure` | hPa | no |
 | `humidity` | % | no |
@@ -58,6 +58,8 @@ Firmware publishes one JSON object per reading to the configured MQTT topic. The
 | `wind` | m/s | no |
 | `wind_direction` | ° (0–360) | no |
 | `uv_index` | UV index | no |
+
+`deviceId` is the only mandatory field. `WIFI_RSSI` is a link-quality diagnostic rather than a weather measurement — it is stored with the reading but not currently surfaced anywhere in the UI, and a station on Ethernet or behind a serial gateway can simply omit it.
 
 Field naming is inconsistent for historical reasons — most metrics are camelCase, but `wind_direction`, `uv_index` and `WIFI_RSSI` are not. Send them exactly as spelled above.
 
@@ -71,7 +73,7 @@ Each metric field carries one of three meanings, and the distinction matters —
 | `null` | the sensor is fitted but failed to read | `MISSING` |
 | omit the field entirely | the station has no such sensor | `NOT_CONFIGURED` |
 
-Omitting a field is the supported way to run a partial station. A station with only a thermometer sends `deviceId`, `WIFI_RSSI` and `temperature`, and the remaining six metrics report as `NOT_CONFIGURED` rather than appearing broken. **Do not send `null` for a sensor you do not have** — that reads as a fitted sensor failing on every single reading.
+Omitting a field is the supported way to run a partial station. A station with only a thermometer sends `deviceId` and `temperature`, and the remaining six metrics report as `NOT_CONFIGURED` rather than appearing broken. **Do not send `null` for a sensor you do not have** — that reads as a fitted sensor failing on every single reading.
 
 A field's state may vary between readings; nothing is cached from a previous message.
 

@@ -40,7 +40,6 @@ public class WeatherRecord {
   @Column(name = "uv_index")
   private Double uvIndex;
 
-  @NotNull
   @Column(name = "wifi_rssi")
   private Double wifiRssi;
 
