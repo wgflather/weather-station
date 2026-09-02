@@ -64,6 +64,24 @@
        since outer shadows need less density. Driven by JS each tick.  */
     --sky-ambient: rgba(100, 180, 255, 0.15);
 
+    /* Recessed control surfaces — inputs, selects, unselected tabs.
+       Deliberately hue-free, the same trick the cards use: a neutral
+       translucent fill lets the sky behind do the tinting, so these work on
+       an orange dusk as well as a blue midnight. The navy they used to be
+       (rgba(28,52,102,...)) was committed to one hue and fought every warm
+       sky. Black rather than the cards' white because a control should read
+       as recessed into its card, not raised off it.
+       Not JS-driven, and they don't need to be — but they are tokens so that
+       switching to sky-driven fills later is one edit here. */
+    --control-bg:          rgba(0, 0, 0, 0.18);  /* resting            */
+    --control-bg-soft:     rgba(0, 0, 0, 0.12);  /* lighter well       */
+    --control-bg-hover:    rgba(0, 0, 0, 0.26);  /* hover / focus      */
+    --control-bg-active:   rgba(0, 0, 0, 0.34);  /* pressed / selected */
+    --control-bg-readonly: rgba(0, 0, 0, 0.24);  /* inert, not typable */
+    /* Selected item in a segmented toggle. Light, not dark: it sits inside
+       a recessed track and has to read as raised out of it. */
+    --control-thumb-bg:    rgba(255, 255, 255, 0.16);
+
     /* Sky gradient — driven by sun altitude from JS (see renderSkyBackground).
        Defaults match the original static palette so the page looks right
        before the first live snapshot arrives, or if altitude data is

@@ -21,14 +21,14 @@
     font-weight: var(--fw-label);
     text-decoration: none;
     color: var(--text-secondary);
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .back-to-dashboard:hover {
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
     border-color: rgba(150, 200, 255, 0.28);
     color: var(--text-strong);
 }
@@ -51,7 +51,7 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-muted);
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     cursor: pointer;
@@ -59,12 +59,12 @@
 }
 
 .section-tab:hover {
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
     color: var(--text-secondary);
 }
 
 .section-tab.active {
-    background-color: rgba(32, 58, 112, 0.7);
+    background-color: var(--control-bg-active);
     color: var(--text-strong);
     border-color: rgba(150, 200, 255, 0.3);
 }
@@ -103,7 +103,7 @@
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: var(--text-muted);
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     cursor: pointer;
@@ -111,12 +111,12 @@
 }
 
 .config-tab:hover {
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
     color: var(--text-secondary);
 }
 
 .config-tab.active {
-    background-color: rgba(32, 58, 112, 0.7);
+    background-color: var(--control-bg-active);
     color: var(--text-strong);
     border-color: rgba(150, 200, 255, 0.3);
 }
@@ -162,7 +162,7 @@
 .config-field input {
     width: 100%;
     box-sizing: border-box;
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     padding: 7px 10px;
@@ -176,12 +176,12 @@
 
 .config-field input:focus {
     border-color: rgba(160, 210, 255, 0.55);
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
 }
 
 .config-field input:read-only {
     color: var(--text-muted);
-    background-color: rgba(20, 42, 82, 0.45);
+    background-color: var(--control-bg-readonly);
     cursor: default;
 }
 
@@ -227,7 +227,7 @@
     font-size: 7px;
     line-height: 1;
     color: var(--text-muted);
-    background-color: rgba(20, 42, 82, 0.55);
+    background-color: var(--control-bg-readonly);
     border: 1px solid var(--card-border);
     border-radius: 4px;
     cursor: pointer;
@@ -235,12 +235,12 @@
 }
 
 .num-step:hover {
-    background-color: rgba(32, 58, 112, 0.7);
+    background-color: var(--control-bg-active);
     color: var(--text-secondary);
 }
 
 .num-step:active {
-    background-color: rgba(40, 68, 125, 0.85);
+    background-color: var(--control-bg-active);
 }
 
 .config-actions {
@@ -257,7 +257,7 @@
     font-weight: var(--fw-label);
     letter-spacing: 0.02em;
     color: var(--text-secondary);
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     cursor: pointer;
@@ -265,7 +265,7 @@
 }
 
 .config-save-btn:hover {
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
     border-color: rgba(150, 200, 255, 0.28);
     color: var(--text-strong);
 }
@@ -316,7 +316,7 @@
     box-sizing: border-box;
     padding: 7px 28px 7px 10px;
     color: var(--text-secondary);
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     font-family: 'Figtree', sans-serif;
@@ -326,14 +326,14 @@
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%237aa6d4'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a3adbb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 10px center;
     background-size: 12px;
 }
 
 .db-select:hover:not(:disabled) {
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
     border-color: rgba(150, 200, 255, 0.28);
     color: var(--text-strong);
 }
@@ -347,9 +347,15 @@
     cursor: default;
 }
 
+/* Opaque and fixed on purpose — the one place in here a --control-* token is
+   wrong. The native select popup is painted by the browser outside the page's
+   compositing, so it never sees the sky behind it: a translucent fill would
+   blend with the browser's own popup background (white on most platforms) and
+   swallow the light text. Hue-free grey rather than the old navy, so it does
+   not read as blue next to everything that now adapts. */
 .db-select option {
-    background: #142a52;
-    color: #e2eeff;
+    background: #1b1e24;
+    color: #e8ecf2;
 }
 
 .db-date-filter {
@@ -379,7 +385,7 @@
 /* Segmented Date / Range toggle */
 .db-mode-toggle {
     display: flex;
-    background: rgba(15, 30, 65, 0.7);
+    background: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 8px;
     padding: 2px;
@@ -403,12 +409,12 @@
 }
 
 .db-mode-btn.active {
-    background: rgba(50, 88, 150, 0.8);
+    background: var(--control-thumb-bg);
     color: var(--text-strong);
 }
 
 .db-mode-btn:not(.active):hover {
-    background: rgba(32, 58, 112, 0.45);
+    background: var(--control-bg-soft);
     color: var(--text-secondary);
 }
 
@@ -434,7 +440,7 @@
 .db-date-input {
     width: 130px;
     box-sizing: border-box;
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     padding: 7px 10px;
@@ -455,7 +461,7 @@
 .db-date-input:focus,
 .db-date-input.active {
     border-color: rgba(160, 210, 255, 0.55);
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
 }
 
 /* =========================================================
@@ -463,7 +469,7 @@
    Flatpickr appends its calendar to <body>, so these are global.
 ========================================================= */
 .flatpickr-calendar {
-    background: rgba(28, 50, 96, 0.78);
+    background: var(--popup-bg-strong);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     border: 1px solid var(--card-border);
@@ -741,7 +747,17 @@ span.flatpickr-weekday {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-muted);
-    background: rgba(52, 84, 140, 0.97);
+    /* Was a near-opaque navy, on the assumption that sticky positioning made
+       rows scroll underneath. It doesn't: .db-table-wrap sets overflow-x:auto,
+       which forces overflow-y to auto, so the wrapper — not the viewport — is
+       this header's scroll container, and with no max-height it has zero
+       vertical scroll room. The sticky never engages and nothing passes behind.
+       So the fill is free to be a hue-free token that picks up the sky. The
+       blur is insurance: add a max-height to the wrapper and the sticky comes
+       alive, at which point a 0.34 alpha alone would show rows through. */
+    background: var(--control-bg-active);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
     border-bottom: 1px solid var(--divider);
 }
 
@@ -855,7 +871,7 @@ span.flatpickr-weekday {
     font-size: 12px;
     font-weight: var(--fw-label);
     color: var(--text-secondary);
-    background-color: rgba(28, 52, 102, 0.42);
+    background-color: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 10px;
     cursor: pointer;
@@ -863,7 +879,7 @@ span.flatpickr-weekday {
 }
 
 .db-page-btn:hover:not(:disabled) {
-    background-color: rgba(32, 58, 112, 0.6);
+    background-color: var(--control-bg-hover);
     border-color: rgba(150, 200, 255, 0.28);
     color: var(--text-strong);
 }
@@ -948,7 +964,7 @@ span.flatpickr-weekday {
 
 .provider-toggle {
     display: flex;
-    background: rgba(15, 30, 65, 0.7);
+    background: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 8px;
     padding: 2px;
@@ -972,12 +988,12 @@ span.flatpickr-weekday {
 }
 
 .provider-btn.active {
-    background: rgba(50, 88, 150, 0.8);
+    background: var(--control-thumb-bg);
     color: var(--text-strong);
 }
 
 .provider-btn:not(.active):hover {
-    background: rgba(32, 58, 112, 0.45);
+    background: var(--control-bg-soft);
     color: var(--text-secondary);
 }
 
@@ -1036,7 +1052,7 @@ span.flatpickr-weekday {
 .form-group input {
     width: 100%;
     box-sizing: border-box;
-    background: rgba(30, 58, 138, 0.5);
+    background: var(--control-bg);
     border: 1px solid rgba(140, 190, 255, 0.3);
     border-radius: 8px;
     padding: 9px 12px;
@@ -1050,7 +1066,7 @@ span.flatpickr-weekday {
 
 .form-group input:focus {
     border-color: rgba(125, 211, 252, 0.6);
-    background: rgba(30, 58, 138, 0.8);
+    background: var(--control-bg-hover);
     box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
 }
 
@@ -1117,7 +1133,7 @@ span.flatpickr-weekday {
     width: 360px;
     max-width: 100%;
     padding: 22px 22px 18px;
-    background: rgba(28, 50, 96, 0.92);
+    background: var(--popup-bg-strong);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     border: 1px solid var(--card-border);
@@ -1154,12 +1170,12 @@ span.flatpickr-weekday {
 
 .confirm-cancel-btn {
     color: var(--text-secondary);
-    background: rgba(28, 52, 102, 0.5);
+    background: var(--control-bg);
     border: 1px solid var(--card-border);
 }
 
 .confirm-cancel-btn:hover {
-    background: rgba(32, 58, 112, 0.7);
+    background: var(--control-bg-active);
     color: var(--text-strong);
 }
 
@@ -1474,7 +1490,7 @@ span.flatpickr-weekday {
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: var(--text-muted);
-    background: rgba(28, 52, 102, 0.42);
+    background: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 8px;
     cursor: pointer;
@@ -1482,12 +1498,12 @@ span.flatpickr-weekday {
 }
 
 .history-period-btn:hover:not(.active) {
-    background: rgba(32, 58, 112, 0.6);
+    background: var(--control-bg-hover);
     color: var(--text-secondary);
 }
 
 .history-period-btn.active {
-    background: rgba(32, 58, 112, 0.7);
+    background: var(--control-bg-active);
     color: var(--text-strong);
     border-color: rgba(150, 200, 255, 0.3);
 }
@@ -1588,7 +1604,7 @@ span.flatpickr-weekday {
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: var(--text-muted);
-    background: rgba(28, 52, 102, 0.42);
+    background: var(--control-bg);
     border: 1px solid var(--card-border);
     border-radius: 8px;
     cursor: pointer;
@@ -1596,12 +1612,12 @@ span.flatpickr-weekday {
 }
 
 .history-metric-tab:hover:not(.active) {
-    background: rgba(32, 58, 112, 0.6);
+    background: var(--control-bg-hover);
     color: var(--text-secondary);
 }
 
 .history-metric-tab.active {
-    background: rgba(32, 58, 112, 0.7);
+    background: var(--control-bg-active);
     color: var(--text-strong);
     border-color: rgba(150, 200, 255, 0.3);
 }
