@@ -79,8 +79,8 @@ A reading outside its min/max is stored but flagged `ANOMALY`.
 | UV index | — | — |
 
 Set these to the plausible range for *your site*, not the sensor's datasheet
-range. A station in Cyprus seeing −45 °C means the sensor failed, not that it got
-cold.
+range. A station that has never seen below −10 °C reporting −45 °C means the
+sensor failed, not that it got cold.
 
 ### Spike limits
 

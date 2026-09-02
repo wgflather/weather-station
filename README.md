@@ -15,8 +15,11 @@ Built for **one station in one place**. It is a personal project, not a product.
 </p>
 
 <p align="center">
-  <img src="img/sun-details.png" alt="Sun details" height="335">
-  <img src="img/configuration.png" alt="Station configuration" height="335">
+  <img src="img/sun-details.png" alt="Sun details" width="82%">
+</p>
+
+<p align="center">
+  <img src="img/configuration.png" alt="Station configuration" width="82%">
 </p>
 
 ## Features
