@@ -44,10 +44,18 @@ replay_pid*
 Thumbs.db
 
 ### SENSITIVE DATA ###
+# Glob rather than a list of exact names: a future application-prod.yml (or any
+# other profile) must not be committable just because nobody remembered to add
+# it here. application.yml has no dash so it is unaffected; the two tracked
+# files that DO match are un-ignored explicitly below.
 .env
+!.env.example
 *.properties
-application-local.yml
-application-dev.yml
+application-*.yml
+!application-test.yml
+# Anchored: an unanchored `config/` would also match the Java package at
+# src/main/java/.../config/, silently un-staging new classes added there.
+/config/
 
 # Compiled class file
 *.class
