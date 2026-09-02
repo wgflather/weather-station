@@ -1,0 +1,66 @@
+# Full stack — PostgreSQL and Mosquitto alongside the app, for anyone who
+# doesn't already run them. Overlay, not a replacement:
+#
+#   cp .env.example .env     # then edit the passwords
+#   docker compose -f docker-compose.yml -f docker-compose.full.yml up -d
+#
+# Wiring happens through environment variables rather than a config file
+# because Spring Boot ranks OS environment variables above external config,
+# so these win over anything in ./config — which is what you want here, and
+# exactly why the base file must not set them.
+
+services:
+  weather-station:
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-weather_station}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-weather}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      MQTT_PROTOCOL: tcp
+      MQTT_CLIENTID: weather-station
+      MQTT_TOPIC: ${MQTT_TOPIC:-weather/station}
+      # MqttConsumer skips setUserName() when the username is blank, so leaving
+      # these unset is what makes anonymous access to the bundled broker work.
+      USER_USERNAME: ${ADMIN_USERNAME:-admin}
+      USER_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+    depends_on:
+      postgres:
+        # Flyway runs at startup, so the app must not race the database.
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: weather-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-weather_station}
+      POSTGRES_USER: ${POSTGRES_USER:-weather}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - weather-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-weather} -d ${POSTGRES_DB:-weather_station}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    # No ports: published — the app reaches it over the compose network. Add a
+    # mapping only if you want to connect from the host with a DB client.
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: weather-mosquitto
+    ports:
+      - "${MQTT_HOST_PORT:-1883}:1883"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - weather-mqtt-data:/mosquitto/data
+    restart: unless-stopped
+
+volumes:
+  weather-db:
+  weather-mqtt-data:

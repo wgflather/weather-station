@@ -1,9 +1,39 @@
-version: '1.0'
+# App only — for a station that already has PostgreSQL and an MQTT broker
+# running elsewhere (the common case for a Home Assistant setup).
+#
+#   docker compose pull && docker compose up -d
+#
+# Connection details come from ./config/application-local.yml, which is mounted
+# in and never baked into the image. Deliberately no SPRING_DATASOURCE_* or
+# MQTT_* environment variables here: Spring Boot ranks OS environment variables
+# ABOVE external config files, so setting them would silently override that
+# file. The full-stack overlay is where those get injected.
+#
+# For a machine with nothing set up yet, add the overlay:
+#   docker compose -f docker-compose.yml -f docker-compose.full.yml up -d
+
 services:
-  weather-backend:
-    image: weather-app:latest
+  weather-station:
+    image: ghcr.io/wgflather/weather-station:latest
+    container_name: weather-station
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
     volumes:
-      - ./config:/src/config/
+      - ./config:/app/config:ro
+      - weather-logs:/app/logs
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      TZ: ${TZ:-UTC}
+    healthcheck:
+      # busybox wget — present in the alpine base, no extra layer needed.
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Generous: a cold JVM plus Flyway migrations on a Pi is not fast, and a
+      # short window here would restart-loop the app before it ever came up.
+      start_period: 90s
     restart: unless-stopped
+
+volumes:
+  weather-logs:
