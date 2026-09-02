@@ -1,0 +1,45 @@
+# Keep credentials and build junk out of the build context.
+#
+# This file is load-bearing, not tidiness. The build used to `git clone` the
+# repo from inside the image, which only ever saw tracked files. It now copies
+# from the local build context, so anything gitignored-but-present on disk is
+# fair game — and application-local.yml sits under src/main/resources, which
+# `COPY src/ src/` pulls in wholesale. Without the exclusions below, Maven
+# would package real MQTT/Postgres/admin credentials into the jar.
+
+# Secrets and local config.
+# Scoped patterns, not a bare *.properties: Docker ignore patterns don't cross
+# '/', so *.properties would only ever catch the root anyway, while
+# .mvn/wrapper/maven-wrapper.properties MUST survive — the wrapper reads it to
+# know which Maven to download, and the build dies without it.
+**/application-local.*
+**/application-dev.*
+**/application-prod.*
+**/application-testcontainers.*
+.env
+/config/
+
+# Build output
+target/
+
+# VCS and tooling
+.git
+.gitignore
+.gitattributes
+.github
+.idea
+.vscode
+.claude
+.aider*
+
+# Runtime artefacts from local runs
+logs/
+spring-client-*/
+hs_err_pid*
+replay_pid*
+
+# Docs — not needed to build, and changing them shouldn't bust the cache
+*.md
+Modelfile
+docker-compose*.yml
+Dockerfile
