@@ -19,3 +19,16 @@ spring:
 mqtt:
   enabled: true
 
+# SecurityConfig permits everything outside /admin/**, so actuator is reachable
+# without auth — hence health only, with no details. The response is a bare
+# {"status":"UP"}, which is all the container healthcheck needs and gives an
+# anonymous visitor nothing about the database or broker.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
