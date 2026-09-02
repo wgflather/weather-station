@@ -177,11 +177,15 @@
             <artifactId>mapstruct-processor</artifactId>
             <version>1.6.3</version>
         </dependency>
+        <!-- test scope only: at runtime scope this shipped inside the production
+             image and let Spring Boot silently auto-configure an embedded H2 when
+             no datasource was set, turning a missing-config error into a Flyway
+             dialect failure. No test references H2 either. -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <version>2.4.240</version>
-            <scope>runtime</scope>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
