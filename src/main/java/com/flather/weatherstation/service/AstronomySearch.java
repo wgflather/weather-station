@@ -4,6 +4,7 @@ import static com.flather.weatherstation.util.TimeUtil.toTime;
 import static com.flather.weatherstation.util.TimeUtil.toZoned;
 
 import com.flather.weatherstation.domain.constant.DailyCurveResolution;
+import com.flather.weatherstation.domain.constant.DayPeriod;
 import com.flather.weatherstation.dto.astronomy.*;
 import io.github.cosinekitty.astronomy.Body;
 import io.github.cosinekitty.astronomy.Direction;
@@ -238,6 +239,22 @@ public class AstronomySearch {
     ZonedDateTime sunsetTime = engine.findWhenAtAltitude(Body.Sun, Direction.Set, HORIZON_DEG);
     Duration duration = Duration.between(sunriseTime, sunsetTime);
     return duration.getSeconds();
+  }
+
+  public DayPeriodInterval getDayPeriodIntervalByDate(LocalDate date, DayPeriod period) {
+    switch (period) {
+      case DAY -> {
+        return new DayPeriodInterval(
+            engine.calculateRiseSet(Body.Sun, Direction.Rise, date),
+            engine.calculateRiseSet(Body.Sun, Direction.Set, date));
+      }
+      case NIGHT -> {
+        return new DayPeriodInterval(
+            engine.calculateRiseSet(Body.Sun, Direction.Set, date.minusDays(1)),
+            engine.calculateRiseSet(Body.Sun, Direction.Rise, date));
+      }
+      default -> throw new IllegalArgumentException("Unsupported DayPeriod: " + period);
+    }
   }
 
   /**
