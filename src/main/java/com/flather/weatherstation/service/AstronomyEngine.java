@@ -207,6 +207,21 @@ public class AstronomyEngine {
   }
 
   /**
+   * Same as {@link #calculateRiseSet} but for an arbitrary calendar date rather than today.
+   * Searches one day forward from local midnight on {@code date}, so the result is that date's own
+   * event.
+   *
+   * <p>Returns {@code null} under polar conditions, where the body never crosses the horizon on
+   * that date. Callers that split a day at sunrise/sunset must treat null as "this date has no
+   * day/night boundary" rather than substituting a default.
+   */
+  public ZonedDateTime calculateRiseSet(Body body, Direction direction, LocalDate date) {
+    Time start = toTime(date.atStartOfDay(zoneId()));
+    Time foundTime = Astronomy.searchRiseSet(body, observer(), direction, start, SEARCH_LIMIT_DAYS);
+    return Optional.ofNullable(foundTime).map(this::toZoned).orElse(null);
+  }
+
+  /**
    * Searches forward day-by-day (up to 30 days) for the next rise or set of the given body. Returns
    * the first match found, which may be today or on a future date. Returns {@code null} only if no
    * event occurs within the 30-day window (extreme polar conditions).

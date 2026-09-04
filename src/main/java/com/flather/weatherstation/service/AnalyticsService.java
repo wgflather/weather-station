@@ -16,6 +16,7 @@ import com.flather.weatherstation.repository.WeatherReportRepository;
 import com.flather.weatherstation.util.DateRangeHelper;
 import com.flather.weatherstation.util.MeteoMath;
 import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 import org.apache.commons.math3.util.Precision;
@@ -354,10 +355,12 @@ public class AnalyticsService {
   }
 
   public TrendResult getTempTrend() {
-    return MeteoMath.calculateTrend(extractDataPoints(WeatherRecord::getTemperature));
+    return MeteoMath.calculateTrend(
+        extractDataPoints(WeatherRecord::getTemperature), ChronoUnit.HOURS);
   }
 
   public TrendResult getPressureTrend() {
-    return MeteoMath.calculateTrend(extractDataPoints(WeatherRecord::getPressure));
+    return MeteoMath.calculateTrend(
+        extractDataPoints(WeatherRecord::getPressure), ChronoUnit.HOURS);
   }
 }

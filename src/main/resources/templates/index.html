@@ -402,16 +402,34 @@
                         <button class="history-metric-tab" data-metric="humidity">Humidity</button>
                     </div>
                 </div>
-                <div class="hist-period-stats" id="hist-period-stats">
-                    <span class="hist-period-stat">Avg <span id="hist-chart-avg">–</span></span>
-                    <span class="hist-period-sep">·</span>
-                    <span class="hist-period-stat hist-period-high">High <span id="hist-chart-high">–</span></span>
-                    <span class="hist-period-sep">·</span>
-                    <span class="hist-period-stat hist-period-low">Low <span id="hist-chart-low">–</span></span>
+                <div class="hist-periods" id="hist-periods" role="group" aria-label="Show or hide periods">
+                    <div class="hist-periods-head" aria-hidden="true">
+                        <span></span><span>Avg</span><span>High</span><span>Low</span>
+                    </div>
+                    <div class="hist-period-row" data-period="fullDay">
+                        <span class="hist-period-name"><i class="hist-period-dot"></i><span class="hist-period-label"><span>All day</span><span class="hist-period-window" hidden></span></span></span>
+                        <span class="hist-period-val" data-stat="avg">–</span>
+                        <span class="hist-period-val" data-stat="high">–</span>
+                        <span class="hist-period-val" data-stat="low">–</span>
+                    </div>
+                    <div class="hist-period-row" data-period="day">
+                        <span class="hist-period-name"><i class="hist-period-dot"></i><span class="hist-period-label"><span>Daylight</span><span class="hist-period-window" hidden></span></span></span>
+                        <span class="hist-period-val" data-stat="avg">–</span>
+                        <span class="hist-period-val" data-stat="high">–</span>
+                        <span class="hist-period-val" data-stat="low">–</span>
+                    </div>
+                    <div class="hist-period-row" data-period="night">
+                        <span class="hist-period-name"><i class="hist-period-dot"></i><span class="hist-period-label"><span>Night</span><span class="hist-period-window" hidden></span></span></span>
+                        <span class="hist-period-val" data-stat="avg">–</span>
+                        <span class="hist-period-val" data-stat="high">–</span>
+                        <span class="hist-period-val" data-stat="low">–</span>
+                    </div>
                 </div>
+                <div class="hist-summary-cards" id="hist-summary-cards" hidden></div>
                 <div class="chart-container">
                     <canvas id="hist-modal-chart"></canvas>
                 </div>
+                <div class="hist-legend" id="hist-legend" role="group" aria-label="Show or hide series" hidden></div>
                 <p class="history-chart-empty" id="hist-chart-empty" hidden>No chart data for this period</p>
             </div>
         </div>
