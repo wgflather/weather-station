@@ -19,5 +19,15 @@ public class HourlyWeatherRecordDto {
 
   private Double surfaceWetnessAvg;
 
+  private Double uvIndexAvg;
+
+  private Double windSpeedAvg;
+
+  private Double windSpeedMax;
+
+  private Double windDirectionAvg;
+
+  private Double windDirectionConsistency;
+
   private Instant hour;
 }

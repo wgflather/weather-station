@@ -1,13 +1,13 @@
 package com.flather.weatherstation.dto.weather;
 
-import java.time.LocalDate;
+import com.flather.weatherstation.domain.constant.DayPeriod;
 import lombok.*;
 
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 @Data
-public class DailyWeatherRecordDto {
+public class PeriodMetricDto {
 
   private String deviceId;
 
@@ -27,5 +27,12 @@ public class DailyWeatherRecordDto {
   private Double surfaceWetnessMax;
   private Double surfaceWetnessAvg;
 
-  private LocalDate date;
+  private Double uvIndexMax;
+  private Double uvIndexAvg;
+
+  private Double windSpeedMin;
+  private Double windSpeedMax;
+  private Double windSpeedAvg;
+
+  private DayPeriod period;
 }

@@ -1,6 +1,7 @@
 package com.flather.weatherstation.repository;
 
-import com.flather.weatherstation.domain.entity.DailyWeatherRecord;
+import com.flather.weatherstation.domain.constant.DayPeriod;
+import com.flather.weatherstation.domain.entity.DayPeriodMetrics;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -10,13 +11,17 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface DailyWeatherRecordRepository extends JpaRepository<DailyWeatherRecord, Long> {
+public interface DailyWeatherRecordRepository extends JpaRepository<DayPeriodMetrics, Long> {
 
-  List<DailyWeatherRecord> findByDateBetweenOrderByDateAsc(LocalDate from, LocalDate to);
+  List<DayPeriodMetrics> findByDateBetweenOrderByDateAsc(LocalDate from, LocalDate to);
 
-  Optional<DailyWeatherRecord> findByDate(LocalDate date);
+  List<DayPeriodMetrics> findByDate(LocalDate date);
 
+  Optional<DayPeriodMetrics> findByDateAndPeriod(LocalDate date, DayPeriod period);
+
+  // DISTINCT because each date now has up to three rows (FULL / DAY / NIGHT) and callers want the
+  // dates that have data, not one entry per period.
   @Query(
-      "SELECT d.date FROM DailyWeatherRecord d WHERE d.date BETWEEN :from AND :to ORDER BY d.date DESC")
+      "SELECT DISTINCT d.date FROM DayPeriodMetrics d WHERE d.date BETWEEN :from AND :to ORDER BY d.date DESC")
   List<LocalDate> findDatesBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }
