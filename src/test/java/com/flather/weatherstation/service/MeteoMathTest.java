@@ -8,6 +8,7 @@ import com.flather.weatherstation.dto.analytics.TrendResult;
 import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.util.MeteoMath;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -39,14 +40,15 @@ class MeteoMathTest {
 
   @Test
   void trend_emptyList_returnsStable() {
-    TrendResult result = MeteoMath.calculateTrend(List.of());
+    TrendResult result = MeteoMath.calculateTrend(List.of(), ChronoUnit.HOURS);
     assertThat(result.direction()).isEqualTo(TrendDirection.STABLE);
     assertThat(result.changeValue()).isEqualTo(0.0);
   }
 
   @Test
   void trend_singlePoint_returnsStable() {
-    TrendResult result = MeteoMath.calculateTrend(List.of(new DataPoint(Instant.now(), 20.0)));
+    TrendResult result =
+        MeteoMath.calculateTrend(List.of(new DataPoint(Instant.now(), 20.0)), ChronoUnit.HOURS);
     assertThat(result.direction()).isEqualTo(TrendDirection.STABLE);
   }
 
@@ -55,7 +57,7 @@ class MeteoMathTest {
     List<DataPoint> points =
         List.of(
             new DataPoint(Instant.now(), null), new DataPoint(Instant.now().plusSeconds(60), null));
-    TrendResult result = MeteoMath.calculateTrend(points);
+    TrendResult result = MeteoMath.calculateTrend(points, ChronoUnit.HOURS);
     assertThat(result.direction()).isEqualTo(TrendDirection.STABLE);
   }
 
@@ -69,7 +71,7 @@ class MeteoMathTest {
             new DataPoint(base.plusSeconds(1200), 20.0),
             new DataPoint(base.plusSeconds(1800), 25.0),
             new DataPoint(base.plusSeconds(2400), 30.0));
-    TrendResult result = MeteoMath.calculateTrend(points);
+    TrendResult result = MeteoMath.calculateTrend(points, ChronoUnit.HOURS);
     assertThat(result.direction()).isEqualTo(TrendDirection.UP);
     assertThat(result.changeValue()).isGreaterThan(0.0);
   }
@@ -84,7 +86,7 @@ class MeteoMathTest {
             new DataPoint(base.plusSeconds(1200), 20.0),
             new DataPoint(base.plusSeconds(1800), 15.0),
             new DataPoint(base.plusSeconds(2400), 10.0));
-    TrendResult result = MeteoMath.calculateTrend(points);
+    TrendResult result = MeteoMath.calculateTrend(points, ChronoUnit.HOURS);
     assertThat(result.direction()).isEqualTo(TrendDirection.DOWN);
     assertThat(result.changeValue()).isLessThan(0.0);
   }
@@ -98,7 +100,7 @@ class MeteoMathTest {
             new DataPoint(base.plusSeconds(600), 20.05),
             new DataPoint(base.plusSeconds(1200), 19.95),
             new DataPoint(base.plusSeconds(1800), 20.02));
-    TrendResult result = MeteoMath.calculateTrend(points);
+    TrendResult result = MeteoMath.calculateTrend(points, ChronoUnit.HOURS);
     assertThat(result.direction()).isEqualTo(TrendDirection.STABLE);
     assertThat(result.changeValue()).isEqualTo(0.0);
   }

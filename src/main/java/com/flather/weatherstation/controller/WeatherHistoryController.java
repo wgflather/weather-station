@@ -1,8 +1,9 @@
 package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.domain.constant.Metric;
+import com.flather.weatherstation.dto.analytics.DailyHistoryDto;
+import com.flather.weatherstation.dto.analytics.FullDaySummary;
 import com.flather.weatherstation.dto.dashboard.ChartDto;
-import com.flather.weatherstation.dto.weather.DailyWeatherRecordDto;
 import com.flather.weatherstation.dto.weather.HourlyWeatherRecordDto;
 import com.flather.weatherstation.service.WeatherHistoryService;
 import java.time.Instant;
@@ -25,7 +26,6 @@ public class WeatherHistoryController {
   public static final String DAILY_SUMMARY_PATH = DAILY_PATH + "/summary";
   public static final String CHART_PATH = BASE_PATH + "/chart";
   public static final String CHART_DAY_PATH = BASE_PATH + "/chart/day";
-  public static final String CHART_DAILY_PATH = BASE_PATH + "/chart/daily";
   public static final String AVAILABLE_DATES_PATH = BASE_PATH + "/available-dates";
 
   private final WeatherHistoryService historyService;
@@ -50,14 +50,6 @@ public class WeatherHistoryController {
     return ResponseEntity.ok(historyService.getDayChart(date, metric));
   }
 
-  @GetMapping(CHART_DAILY_PATH)
-  public ResponseEntity<ChartDto> getDailyChart(
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-      @RequestParam Metric metric) {
-    return ResponseEntity.ok(historyService.getDailyChartPoints(from, to, metric));
-  }
-
   @GetMapping(HOURLY_PATH)
   public ResponseEntity<List<HourlyWeatherRecordDto>> getHourlyHistory(
       @RequestParam Instant from, @RequestParam Instant to) {
@@ -65,15 +57,21 @@ public class WeatherHistoryController {
   }
 
   @GetMapping(DAILY_SUMMARY_PATH)
-  public ResponseEntity<DailyWeatherRecordDto> getDailySummary(
+  public ResponseEntity<FullDaySummary> getDailySummary(
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
     return ResponseEntity.ok(historyService.getHistoryDailySummary(date));
   }
 
+  /**
+   * Chart data and stat cards for a range, in one response. Which cards come back depends on the
+   * metric — one that cannot answer a question omits that card, and one with no cards defined
+   * returns an empty list — so the client renders whatever arrives rather than expecting three.
+   */
   @GetMapping(DAILY_PATH)
-  public ResponseEntity<List<DailyWeatherRecordDto>> getDailyHistory(
+  public ResponseEntity<DailyHistoryDto> getDailyHistory(
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-    return ResponseEntity.ok(historyService.getDailyHistory(from, to));
+      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+      @RequestParam Metric metric) {
+    return ResponseEntity.ok(historyService.getDailyHistory(from, to, metric));
   }
 }
