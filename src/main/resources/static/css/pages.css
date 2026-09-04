@@ -1629,40 +1629,231 @@ span.flatpickr-weekday {
     border-color: rgba(150, 200, 255, 0.3);
 }
 
-/* Period stats bar — shown inside the chart card for multi-day views */
-.hist-period-stats {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 0 10px;
-    flex-wrap: wrap;
+/* Period breakdown — All day / Daylight / Night, one row per period.
+   The rows are the toggles: clicking one hides that period here and, in the
+   multi-day view, drops its series from the chart. Making the data the control
+   avoids a second strip of chrome above an already busy card. */
+.hist-periods {
+    padding: 4px 0 12px;
+    max-width: 420px;
 }
 
-.hist-period-stat {
-    font-size: 0.68rem;
+/* Head and rows share one explicit column template rather than subgrid, so the
+   period names stay aligned even where subgrid is unsupported. */
+.hist-periods-head,
+.hist-period-row {
+    display: grid;
+    /* First column is sized for the widest thing it holds — the "06:14 → 20:31"
+       caption — not for the period names, which are shorter. */
+    grid-template-columns: 106px repeat(3, minmax(0, 1fr));
+    column-gap: 10px;
+}
+
+.hist-periods-head {
+    padding: 0 6px 3px 0;
+}
+
+.hist-periods-head span {
+    font-size: 0.6rem;
     font-weight: var(--fw-label);
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.5px;
+    text-align: right;
+    opacity: 0.75;
+}
+
+.hist-period-row {
+    /* Buttons shrink-to-fit, which would make the row grid narrower than the
+       header grid and knock the columns out of alignment. */
+    width: 100%;
+    align-items: center;
+    padding: 4px 6px 4px 0;
+    margin: 0;
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    text-align: left;
+    transition: opacity 0.15s var(--ease-standard);
+}
+
+
+
+.hist-period-name {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.72rem;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
     white-space: nowrap;
 }
 
-.hist-period-stat span {
-    color: var(--text-primary);
-    font-weight: var(--fw-value);
-    font-variant-numeric: tabular-nums;
-    margin-left: 3px;
-    text-transform: none;
-    letter-spacing: 0;
+.hist-period-label {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
 }
 
-.hist-period-high span { color: #fb923c; }
-.hist-period-low  span { color: #38bdf8; }
+/* The hours a period actually covered. Only the single-day view sets it — across a
+   range every day has its own sunrise — and it matters most on Night, which now runs
+   from the previous evening and would otherwise read as if it sat inside this date. */
+.hist-period-window {
+    font-size: 0.62rem;
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.2px;
+}
 
-.hist-period-sep {
-    color: var(--divider);
-    font-size: 0.75rem;
-    line-height: 1;
+/* Filled while the period is shown, hollow once it is hidden — the swatch
+   doubles as the legend key for the chart line. */
+.hist-period-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    border: 1.5px solid var(--period-color, var(--text-muted));
+    background: var(--period-color, var(--text-muted));
+    transition: background 0.15s var(--ease-standard);
+}
+
+.hist-period-val {
+    font-size: 0.76rem;
+    font-weight: var(--fw-value);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* No data for this period on this date — the row stays, because its absence is
+   itself information: dates rolled up before the day/night split have All day alone. */
+.hist-period-row.is-unavailable { opacity: 0.3; }
+
+.hist-period-row.is-unavailable .hist-period-dot {
+    background: transparent;
+    border-color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hist-period-row,
+    .hist-period-dot,
+    .hist-legend-item { transition: none; }
+}
+
+@media (max-width: 480px) {
+    .hist-periods-head,
+    .hist-period-row { grid-template-columns: 92px repeat(3, minmax(0, 1fr)); column-gap: 6px; }
+    .hist-period-name   { font-size: 0.68rem; }
+    .hist-period-val    { font-size: 0.71rem; }
+    .hist-period-window { font-size: 0.58rem; letter-spacing: 0; }
+}
+
+/* =========================================================
+   HISTORY SUMMARY CARDS + CHART LEGEND
+========================================================= */
+
+/* Stat cards for a range: warmest / coldest / trend. They wrap rather than scroll,
+   because a metric may contribute two cards or three and the row should not imply
+   a fixed set. */
+.hist-summary-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 4px 0 14px;
+}
+
+.hist-summary-card {
+    flex: 1 1 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    background: var(--control-bg-soft);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+}
+
+.hist-summary-label {
+    font-size: 0.62rem;
+    font-weight: var(--fw-label);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hist-summary-value {
+    font-size: 1.15rem;
+    font-weight: var(--fw-value);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.hist-summary-context {
+    font-size: 0.66rem;
+    font-weight: var(--fw-regular);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Deliberately not green-for-up: on a weather dashboard a rise is not "good", and
+   colouring it as though it were editorialises the number. The sign carries it. */
+.hist-summary-card[data-kind="TREND"] .hist-summary-value {
+    color: var(--text-strong);
+}
+
+/* Legend doubles as the series toggle for the daily chart. */
+.hist-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 12px 0 2px;
+}
+
+.hist-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    margin: 0;
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    font-family: 'Figtree', sans-serif;
+    font-size: 0.7rem;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: opacity 0.15s var(--ease-standard);
+}
+
+.hist-legend-item:focus-visible {
+    outline: 2px solid rgba(150, 200, 255, 0.6);
+    outline-offset: 1px;
+}
+
+/* A dash rather than a dot: it reads as the line it stands for on the chart. */
+.hist-legend-swatch {
+    width: 14px;
+    height: 2.5px;
+    flex: none;
+    border-radius: 2px;
+    background: var(--period-color, var(--text-muted));
+}
+
+.hist-legend-item[aria-pressed="false"] { opacity: 0.4; }
+
+.hist-legend-item[aria-pressed="false"] .hist-legend-swatch {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--period-color, var(--text-muted));
+}
+
+@media (max-width: 480px) {
+    .hist-summary-card { flex-basis: 100px; padding: 8px 10px; }
+    .hist-summary-value { font-size: 1rem; }
+    .hist-legend { gap: 10px; }
 }
 
 .history-chart-card .chart-container {
@@ -1674,6 +1865,13 @@ span.flatpickr-weekday {
 .history-chart-card .chart-container canvas {
     position: absolute;
     inset: 0;
+}
+
+/* Chart.js writes an inline `display: block` onto the canvas it owns, which beats
+   the [hidden] attribute — without !important, hiding the canvas for an empty
+   range leaves the previous range's chart painted under the "no data" message. */
+.history-chart-card .chart-container canvas[hidden] {
+    display: none !important;
 }
 
 .history-chart-empty {
