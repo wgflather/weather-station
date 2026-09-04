@@ -33,7 +33,7 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 | `WeatherDashboardController` | `/` | Serves the Thymeleaf dashboard (`index.html`) |
 | `WeatherForecastController` | `/api/forecast` | Cloud strip (`/clouds`) and astro forecast (`/astro`) |
 | `AstronomyController` | `/api/astronomy` | Daily sun/moon events (`/daily`), altitude curve (`/curve`) |
-| `WeatherHistoryController` | `/api/weather/history` | Available dates, hourly/daily records, chart data |
+| `WeatherHistoryController` | `/api/weather/history` | Available dates, hourly records, day chart, and `/daily` — chart data plus stat cards for one range and metric in a single payload |
 | `ConfigController` | `/api/admin/config` | Station configuration CRUD (`GET`, `PUT` location/validation/hardware) |
 | `DatabaseViewController` | `/api/admin/db` | Raw database view for admin |
 | `LoginController` | `/login` | Login page |
@@ -49,8 +49,9 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 - **`AstronomySearch`** — binary-search horizon crossing finder used by `AstronomyEngine`.
 - **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists.
 - **`SeeingCalculator`** — Hufnagel-Valley HV 5/7 atmospheric turbulence model; inputs are jet-stream speed (200 hPa) and surface wind speed; outputs FWHM seeing in arc-seconds (Excellent / Good / Fair / Poor / Very Poor).
-- **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DailyWeatherRecord` for history modal charts.
-- **`WeatherRetentionService`** — scheduled cleanup of old raw records.
+- **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date.
+- **`SummaryCardService`** — builds the history modal's stat cards (warmest/coldest/trend) per metric. Which period a metric reads is a per-metric decision — see below.
+- **`WeatherRetentionService`** — scheduled hourly/daily rollups and raw cleanup, in a 02:00–02:10 window.
 - **`StationConfigurationService`** — CRUD for `StationConfiguration`; publishes `ConfigurationUpdatedEvent` on save.
 - **`DatabaseRawViewService`** — paged raw record queries for the admin view.
 - **`MeteoMath`** (util) — dew point, pressure trend classification, surface wetness status.
@@ -77,7 +78,7 @@ Cached by `CacheConfig` (Caffeine):
 
 ### Domain (`domain/`)
 
-**Entities:** `WeatherRecord`, `StationConfiguration`, `HourlyWeatherRecord`, `DailyWeatherRecord`.
+**Entities:** `WeatherRecord`, `StationConfiguration`, `HourlyWeatherRecord`, `DayPeriodMetrics` (one row per date *per period* in `daily_weather_record`).
 
 **Enums:** `DataQuality`, `DataStatus`, `Metric`, `PressureTrend`, `DewPointRisk`, `SurfaceWetnessStatus`, `TrendDirection`, `CelestialBody`, `SolarCondition`, `DailyCurveResolution`.
 
@@ -96,20 +97,74 @@ PostgreSQL with Flyway migrations (`src/main/resources/db/migration/`). JPA is s
 | V7 | `wind` / `uv_index` columns (+ quality columns, validation thresholds) |
 | V8 | `wind_direction` column (+ quality column) |
 | V9 | Index on `weather_records (measured_at DESC)` |
+| V10 | Wind/UV columns on both rollup tables, `period` discriminator on `daily_weather_record` (unique key becomes `(device_id, date, period)`) |
 
 Note on indexes: V1 created three `(quality, measured_at DESC)` composites for temperature, pressure and humidity only — nothing equivalent exists for surface wetness, wind, wind direction or UV index. Those composites only help queries filtering on a *rare* quality (`SPIKE`/`ANOMALY`); `= 'OK'` matches almost every row, so the planner ignores them. V9's plain `measured_at` index is what serves the time-range queries (quality strip, retention, raw admin view, charts).
 
-Local DB: `localhost:5432/weather_station` (`application-local.yml`). Active profile: `local`.
+Local DB: `localhost:5432/weather` (`application-local.yml`). Active profile: `local`.
+
+### Day / night periods (`daily_weather_record`)
+
+Each date holds up to three rows, keyed by `(device_id, date, period)`:
+
+| Period | Window | Written when |
+|---|---|---|
+| `FULL` | local midnight → midnight | always |
+| `DAY` | this date's sunrise → sunset | the sun crosses the horizon |
+| `NIGHT` | **previous** date's sunset → this date's sunrise | as above |
+
+**The three do not partition the date, and that is deliberate.** A night is contiguous — it runs
+from the previous evening through to this morning — so this date's evening counts towards its own
+`FULL` row and towards the *following* date's `NIGHT`. The alternative, splitting night at midnight,
+welds an evening onto the pre-dawn hours of a different night and puts the coldest and warmest parts
+of two separate nights in one row. Readers that stack the three periods must not imply they sum.
+
+`AstronomySearch.getDayPeriodIntervalByDate(date, period)` is the single definition of these windows
+and is called by both sides: `WeatherRetentionService` when writing the aggregate, and
+`WeatherHistoryService` when describing it to the client. Keep it that way — two copies of "night for
+date D" would let the caption drift from the numbers it labels. It deliberately is **not**
+`@Cacheable`: every other cache in that class keys on `dailyKey()` (today), which would hand back
+today's window for all 29 dates of a rollup run and silently write wrong aggregates. It returns
+`DayPeriodInterval`, whose `isValid()` rejects polar days (no crossing) and the near-polar case where
+a sunset resolves just after midnight and pairs into a 30-hour "night" — hence the 24-hour ceiling.
+When either window is invalid, only `FULL` is written.
+
+Both rollups **upsert across the whole raw-retention window on every run**, not just yesterday. That
+makes the tables self-healing — downtime, a late reading, or a newly added column is repaired on the
+next pass instead of needing a backfill — and it means changing a window definition re-forms the
+existing rows within a day. It also makes ordering load-bearing: `deleteRawOlderThan` runs *after*
+the loop, because the oldest date's night reaches into the previous date's evening.
+
+`RAW_RETENTION_DAYS` is declared in both `WeatherRetentionService` (what gets deleted) and
+`WeatherHistoryService` (raw-vs-hourly chart routing). They must agree; if the reader's value is the
+larger, chart requests near the boundary route to raw rows that were already deleted and come back
+empty rather than falling back to the hourly table.
+
+Reading side: `FullDaySummary` carries the three metric blocks plus `dayPeriod` / `nightPeriod`
+windows, recomputed on read rather than stored. The windows are populated only by
+`/daily/summary` (one date) — `/daily` passes null, since across a range every day has its own
+sunrise. Each window is emitted only when its metrics block exists, so a caption never sits above a
+row of dashes.
+
+`/daily` returns `DailyHistoryDto` — `days` (one `FullDaySummary` per date) plus `summary` (the
+cards) — from a single query. They are bundled because the modal reloads the range on every metric
+tab anyway, so separate calls only cost a second round trip. A metric with no card builder yields an
+empty card list rather than an error, so its chart still renders.
+
+Card periods are a per-metric decision in `SummaryCardService`, not a default: temperature reads
+`DAY` (that is what "warmest day" means), while pressure and humidity read `FULL` because their
+extremes fall outside daylight — a depression bottoming out at 03:00, a humidity peak before dawn.
+Trend thresholds are per-metric for the same reason: 0.5 °C is a real shift, 0.5 hPa is noise.
 
 ### DTOs & Mappers
 
 MapStruct mappers in `mapper/` handle all entity↔DTO conversion — never map manually. Key DTO packages:
-- `dto/analytics/` — temperature, pressure, humidity, wetness, trend result
-- `dto/astronomy/` — daily events, sun/moon snapshots, twilight times, curve points
+- `dto/analytics/` — temperature, pressure, humidity, wetness, trend result, `FullDaySummary`, `MetricSummary`, `SummaryCard`
+- `dto/astronomy/` — daily events, sun/moon snapshots, twilight times, curve points, `DayPeriodInterval`
 - `dto/dashboard/` — live dashboard, chart, system health
 - `dto/forecast/` — `WeatherConditionPoint`, `AstroForecastPoint`, `ForecastDto`, `AstroForecastDto`
 - `dto/weather/` — weather record create/response
-- `dto/projection/` — `DataPoint`, `ExtremesProjection`, `DailySummaryProjection`
+- `dto/projection/` — `DataPoint`, `ExtremesProjection`
 
 ### Config (`config/`)
 
@@ -174,7 +229,7 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 | `chart-labels.js` | H / L / Now label geometry, the collision engine, and the `minMaxLabels` Chart.js plugin |
 | `chart-interaction.js` | The 24-h chart's external tooltip handler, its placement, and touch suppression |
 | `chart-tooltip.js` | The single floating tooltip element, shared with `daily-chart.js` |
-| `daily-chart.js` | Multi-day chart used by the history modal |
+| `daily-chart.js` | Multi-day chart used by the history modal; one avg line per visible period. Exports `periodColor()` so the legend swatches match the lines |
 | `FetchScheduler.js` | Incremental chart data fetcher (fetches only new buckets) |
 | `quality-strip.js` | 24-h data-quality strip inside metric status-circle popovers; owns the shared `/api/weather/quality` fetch cache |
 
@@ -182,7 +237,9 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 
 | File | Role |
 |---|---|
-| `history-modal.js` | History chart modal (date picker + period tabs) |
+| `history-modal.js` | History chart modal (date picker + range tabs, period breakdown, legend toggles) |
+| `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block |
+| `metric-units.js` | The one place a metric's display unit is written down; used by the modal, its cards and the daily chart |
 | `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js` |
 | `database-view.js` / `config.js` | Admin pages only, not loaded by the dashboard |
 
