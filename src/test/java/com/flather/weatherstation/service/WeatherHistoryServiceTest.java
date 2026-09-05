@@ -2,6 +2,7 @@ package com.flather.weatherstation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.offset;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -274,6 +275,77 @@ class WeatherHistoryServiceTest {
 
   private static PeriodMetricDto periodDto(DayPeriod period, double temperatureAvg) {
     return PeriodMetricDto.builder().period(period).temperatureAvg(temperatureAvg).build();
+  }
+
+  // ---- surface wetness: raw ADC out of the rollup, percentage out of the API ----
+
+  /**
+   * The ADC→percentage transform is decreasing, so the stored minimum count is the wettest moment
+   * and has to come back as the maximum percentage. Converting each field in place would leave min
+   * above max — the assertion that would catch it is the ordering, so it is asserted explicitly.
+   */
+  @Test
+  void getHistoryDailySummary_surfaceWetness_convertsToPercentageAndSwapsMinMax() {
+    LocalDate date = LocalDate.of(2026, 6, 15);
+    DayPeriodMetrics row = periodRow(date, DayPeriod.FULL);
+
+    given(dailyRepository.findByDate(date)).willReturn(List.of(row));
+    given(mapper.toDto(row))
+        .willReturn(
+            PeriodMetricDto.builder()
+                .period(DayPeriod.FULL)
+                .surfaceWetnessMin(700.0) // lowest ADC count = wettest
+                .surfaceWetnessMax(3226.0) // highest ADC count = driest
+                .surfaceWetnessAvg(3194.0)
+                .build());
+
+    PeriodMetricDto result = service.getHistoryDailySummary(date).fullDay();
+
+    // 3226 and 700 against the 150/3230 baselines, per MeteoMath.rawToWetnessPct
+    assertThat(result.getSurfaceWetnessMin()).isCloseTo(0.13, offset(0.01));
+    assertThat(result.getSurfaceWetnessMax()).isCloseTo(82.14, offset(0.01));
+    assertThat(result.getSurfaceWetnessAvg()).isCloseTo(1.17, offset(0.01));
+    assertThat(result.getSurfaceWetnessMin()).isLessThan(result.getSurfaceWetnessMax());
+  }
+
+  @Test
+  void getHistoryDailySummary_surfaceWetness_leavesAbsentReadingsNull() {
+    LocalDate date = LocalDate.of(2026, 6, 15);
+    DayPeriodMetrics row = periodRow(date, DayPeriod.FULL);
+
+    given(dailyRepository.findByDate(date)).willReturn(List.of(row));
+    given(mapper.toDto(row)).willReturn(periodDto(DayPeriod.FULL, 21.5));
+
+    PeriodMetricDto result = service.getHistoryDailySummary(date).fullDay();
+
+    assertThat(result.getSurfaceWetnessMin()).isNull();
+    assertThat(result.getSurfaceWetnessMax()).isNull();
+    assertThat(result.getSurfaceWetnessAvg()).isNull();
+    assertThat(result.getTemperatureAvg()).isEqualTo(21.5);
+  }
+
+  /** {@code /daily} goes through the same assembly, so the conversion has to reach it too. */
+  @Test
+  void getDailyHistory_surfaceWetness_convertsThePeriodRowsToo() {
+    LocalDate date = LocalDate.of(2026, 6, 15);
+    DayPeriodMetrics row = periodRow(date, DayPeriod.FULL);
+
+    given(dailyRepository.findByDateBetweenOrderByDateAsc(date, date)).willReturn(List.of(row));
+    given(mapper.toDto(row))
+        .willReturn(
+            PeriodMetricDto.builder()
+                .period(DayPeriod.FULL)
+                .surfaceWetnessMin(700.0)
+                .surfaceWetnessMax(3226.0)
+                .build());
+    given(summaryCardService.buildSummary(List.of(row), Metric.SURFACE_WETNESS))
+        .willReturn(new MetricSummary(Metric.SURFACE_WETNESS, List.of()));
+
+    DailyHistoryDto result = service.getDailyHistory(date, date, Metric.SURFACE_WETNESS);
+
+    PeriodMetricDto fullDay = result.days().getFirst().fullDay();
+    assertThat(fullDay.getSurfaceWetnessMin()).isCloseTo(0.13, offset(0.01));
+    assertThat(fullDay.getSurfaceWetnessMax()).isCloseTo(82.14, offset(0.01));
   }
 
   @Test

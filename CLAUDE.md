@@ -178,13 +178,27 @@ Two metrics need real work in SQL:
   agreement is worth more. Note the transform is **decreasing**: a higher ADC count is a *drier*
   surface.
 
-Known gap: `/daily` and `/daily/summary` still return wetness as raw ADC — `DayPeriodMetrics`
-holds the rollup's raw values and `PeriodMetricDto` copies them straight through. Converting those
-is not symmetric with the charts, because `min`/`max` **invert** under a decreasing transform: the
-stored minimum ADC is the *maximum* percentage, so anything converting stored extremes has to swap
-the pair. Converting before aggregating (i.e. in the rollup) would avoid the swap but bakes the
-baselines into rows whose raw is later deleted, and the baselines are editable from the admin panel.
-`SummaryCardService` has no wetness cards today, so nothing renders these yet.
+The daily rows convert in Java instead, because they are loaded as **entities** by derived queries
+(`findByDateBetweenOrderByDateAsc`, `findByDate`) rather than as projections, so there is no query to
+put the arithmetic in. `WeatherHistoryService.toWetnessPercentage` rescales each `PeriodMetricDto`
+once, applied to the assembled map rather than inside the mapping loop — `putIfAbsent` means a
+period already present is not re-mapped, and converting twice would square the transform.
+
+**It swaps `min` and `max` rather than converting them where they stand.** Because the transform is
+decreasing, the stored *minimum* ADC count is the wettest moment of the period and has to become the
+*maximum* percentage; converting in place leaves `surfaceWetnessMin` holding the larger number and
+labels the wettest moment "min". Both raw values are read before either is written, or the first
+assignment feeds the second. This is the one asymmetry with the charts, which carry only `avg` and
+so never meet it.
+
+Storing percentages in the rollup instead would avoid the swap — `MIN(pct(x))` comes out already
+correct — but it bakes the baselines into rows whose raw is later deleted, and the baselines are
+editable from the admin panel, so a recalibration would repair only the self-healing window and
+leave older history on the old numbers. Read-time conversion keeps recalibration retroactive.
+
+Still outstanding: `SummaryCardService` reads `DayPeriodMetrics` directly and has no wetness cards.
+Adding one needs the same care — `extremeHigh()` on the raw column finds the *driest* period, not
+the wettest, and reports ADC counts under a metric that declares "%".
 
 Frontend note: nothing charts the newer metrics yet. `index.html` offers only temperature, pressure
 and humidity tabs, and `metric-units.js` has no entry for them, so `unitFor` returns `''`.

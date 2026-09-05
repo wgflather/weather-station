@@ -16,6 +16,7 @@ import com.flather.weatherstation.dto.weather.PeriodMetricDto;
 import com.flather.weatherstation.mapper.WeatherHistoryMapper;
 import com.flather.weatherstation.repository.DailyWeatherRecordRepository;
 import com.flather.weatherstation.repository.HourlyWeatherRecordRepository;
+import com.flather.weatherstation.util.MeteoMath;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -138,6 +139,11 @@ public class WeatherHistoryService {
       // would otherwise collide here — this keeps that a stale reading rather than an exception.
       byPeriod.putIfAbsent(row.getPeriod(), mapper.toDto(row));
     }
+
+    // Applied to the map's values, not inside the loop above: putIfAbsent means a period already
+    // present is not re-mapped, and converting a DTO twice would square the transform.
+    byPeriod.values().forEach(this::toWetnessPercentage);
+
     return new FullDaySummary(
         date,
         includeIntervals ? intervalFor(date, DayPeriod.NIGHT, byPeriod) : null,
@@ -145,6 +151,46 @@ public class WeatherHistoryService {
         byPeriod.get(DayPeriod.FULL),
         byPeriod.get(DayPeriod.DAY),
         byPeriod.get(DayPeriod.NIGHT));
+  }
+
+  /**
+   * Rewrites a period's surface wetness from the raw ADC count the rollup stores into the
+   * percentage everything else shows — the charts convert in SQL, the live card through {@code
+   * MeteoMath.rawToWetnessPct}, and these rows would otherwise be the one place a caller met ~3200
+   * under a field the API describes as a percentage.
+   *
+   * <p><strong>Min and max are swapped, not converted in place.</strong> The transform is
+   * decreasing — a higher ADC count is a drier surface — so the stored <em>minimum</em> count is
+   * the wettest moment of the period and has to become the <em>maximum</em> percentage. Converting
+   * each field where it stands would leave {@code surfaceWetnessMin} holding the larger number and
+   * label the wettest moment "min".
+   *
+   * <p>Read before write for the same reason: both raw values are taken before either is assigned,
+   * or the first assignment feeds the second.
+   */
+  private void toWetnessPercentage(PeriodMetricDto dto) {
+    // A period with no mapped metrics is absent, not an error — FullDaySummary carries null for it
+    // either way, so there is nothing here to rescale.
+    if (dto == null) {
+      return;
+    }
+
+    var validation = configurationCache.getValidationConfig();
+    int dryBaseline = validation.surfaceWetnessDryBaseline();
+    int wetBaseline = validation.surfaceWetnessWetBaseline();
+
+    Double rawMin = dto.getSurfaceWetnessMin();
+    Double rawMax = dto.getSurfaceWetnessMax();
+
+    dto.setSurfaceWetnessMin(wetnessPercentage(rawMax, dryBaseline, wetBaseline));
+    dto.setSurfaceWetnessMax(wetnessPercentage(rawMin, dryBaseline, wetBaseline));
+    dto.setSurfaceWetnessAvg(
+        wetnessPercentage(dto.getSurfaceWetnessAvg(), dryBaseline, wetBaseline));
+  }
+
+  /** Null stays null: a period with no wetness reading has no percentage either. */
+  private static Double wetnessPercentage(Double raw, int dryBaseline, int wetBaseline) {
+    return raw == null ? null : MeteoMath.rawToWetnessPct(raw, dryBaseline, wetBaseline);
   }
 
   /**

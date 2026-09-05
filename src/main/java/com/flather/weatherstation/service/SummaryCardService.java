@@ -56,6 +56,13 @@ public class SummaryCardService {
       case HUMIDITY -> new MetricSummary(metric, humidityCards(data));
       // No cards defined yet is an empty answer, not an error. The cards travel with the chart
       // data, so throwing here would take the whole range down for a metric that charts fine.
+      //
+      // Adding SURFACE_WETNESS here needs care that the other metrics do not: these builders read
+      // DayPeriodMetrics directly, which holds the raw ADC count, and the ADC→percentage transform
+      // is decreasing. extremeHigh() on the raw column finds the *driest* period, not the wettest,
+      // and the value it reports is in ADC counts rather than the "%" the metric declares.
+      // WeatherHistoryService.toWetnessPercentage does the equivalent conversion for the period
+      // rows, swapping min and max as it goes.
       default -> {
         log.debug("No summary cards defined for metric {}", metric);
         yield new MetricSummary(metric, List.of());
