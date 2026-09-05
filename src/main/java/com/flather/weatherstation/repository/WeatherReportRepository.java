@@ -316,4 +316,82 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
       @Param("from") Instant from,
       @Param("to") Instant to,
       @Param("bucketInterval") String bucketInterval);
+
+  @Query(
+      value =
+          """
+                          SELECT
+                              date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
+                              ROUND(AVG(surface_wetness)::numeric, 1)::double precision AS value
+                          FROM weather_records
+                          WHERE surface_wetness_data_quality = 'OK'
+                            AND measured_at >= :from
+                            AND measured_at < :to
+                          GROUP BY bucket
+                          ORDER BY bucket ASC
+                          """,
+      nativeQuery = true)
+  List<DataPoint> findChartSurfaceWetness(
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("bucketInterval") String bucketInterval);
+
+  /**
+   * Wind direction cannot use the {@code ROUND(AVG())} shape every other chart query uses: bearings
+   * are angles, and averaging them numerically puts a bucket spent oscillating around north at
+   * 180°, due south. Each reading becomes a unit vector instead, the vectors are averaged, and the
+   * resultant's angle is the bearing.
+   *
+   * <p>This deliberately mirrors {@code WeatherRetentionRepository.rollupHourly} — same calm gate,
+   * same consistency gate, same wrap handling — because {@code getDayChart} serves this query for
+   * days inside the raw-retention window and the pre-rolled column beyond it. The two must agree
+   * across that boundary or the same weather would chart differently either side of it.
+   *
+   * <p>The gates: readings at or below the calm threshold are excluded (a vane in still air reports
+   * noise), and a resultant shorter than the consistency threshold yields null rather than a
+   * meaningless bearing.
+   *
+   * <p>The modulo runs <em>after</em> the rounding, and that order is load-bearing. A mean wrapping
+   * through north lands on -1e-14, which {@code + 360} turns into 359.99999999999999; taking the
+   * modulo first leaves that untouched and the rounding then lifts it to exactly 360.0 — a bearing
+   * outside the range this expression exists to enforce. Rounding first collapses it to 360.0 while
+   * the modulo can still fold it back to 0. Verified against Postgres: bearings oscillating around
+   * north (350°, 10°, 355°, 5°) return 0, not 360 and not 180.
+   */
+  @Query(
+      value =
+          """
+                          WITH components AS (
+                              SELECT
+                                  date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
+                                  AVG(CASE WHEN wind_direction_data_quality = 'OK'
+                                            AND wind_data_quality = 'OK'
+                                            AND wind > :calmThreshold
+                                           THEN sin(radians(wind_direction)) END) AS sin_mean,
+                                  AVG(CASE WHEN wind_direction_data_quality = 'OK'
+                                            AND wind_data_quality = 'OK'
+                                            AND wind > :calmThreshold
+                                           THEN cos(radians(wind_direction)) END) AS cos_mean
+                              FROM weather_records
+                              WHERE measured_at >= :from
+                                AND measured_at < :to
+                              GROUP BY bucket
+                          )
+                          SELECT
+                              bucket,
+                              CASE WHEN sqrt(sin_mean * sin_mean + cos_mean * cos_mean) >= :minConsistency
+                                   THEN (ROUND(
+                                             (degrees(atan2(sin_mean, cos_mean))::numeric + 360),
+                                             1) % 360)::double precision
+                              END AS value
+                          FROM components
+                          ORDER BY bucket ASC
+                          """,
+      nativeQuery = true)
+  List<DataPoint> findChartWindDirection(
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("bucketInterval") String bucketInterval,
+      @Param("calmThreshold") double calmThreshold,
+      @Param("minConsistency") double minConsistency);
 }

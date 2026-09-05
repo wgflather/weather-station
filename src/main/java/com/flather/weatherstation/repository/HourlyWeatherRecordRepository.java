@@ -46,4 +46,48 @@ public interface HourlyWeatherRecordRepository extends JpaRepository<HourlyWeath
           """,
       nativeQuery = true)
   List<DataPoint> findChartHumidity(@Param("from") Instant from, @Param("to") Instant to);
+
+  @Query(
+      value =
+          """
+                  SELECT hour, wind_speed_avg AS value
+                  FROM hourly_weather_record
+                  WHERE hour >= :from AND hour < :to
+                  ORDER BY hour ASC
+                  """,
+      nativeQuery = true)
+  List<DataPoint> findChartWindSpeed(@Param("from") Instant from, @Param("to") Instant to);
+
+  @Query(
+      value =
+          """
+                  SELECT hour, wind_direction_avg AS value
+                  FROM hourly_weather_record
+                  WHERE hour >= :from AND hour < :to
+                  ORDER BY hour ASC
+                  """,
+      nativeQuery = true)
+  List<DataPoint> findChartWindDirection(@Param("from") Instant from, @Param("to") Instant to);
+
+  @Query(
+      value =
+          """
+                  SELECT hour, uv_index_avg AS value
+                  FROM hourly_weather_record
+                  WHERE hour >= :from AND hour < :to
+                  ORDER BY hour ASC
+                  """,
+      nativeQuery = true)
+  List<DataPoint> findChartUvIndex(@Param("from") Instant from, @Param("to") Instant to);
+
+  @Query(
+      value =
+          """
+                  SELECT hour, surface_wetness_avg AS value
+                  FROM hourly_weather_record
+                  WHERE hour >= :from AND hour < :to
+                  ORDER BY hour ASC
+                  """,
+      nativeQuery = true)
+  List<DataPoint> findChartSurfaceWetness(@Param("from") Instant from, @Param("to") Instant to);
 }
