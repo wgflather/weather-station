@@ -33,7 +33,7 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 | `WeatherDashboardController` | `/` | Serves the Thymeleaf dashboard (`index.html`) |
 | `WeatherForecastController` | `/api/forecast` | Cloud strip (`/clouds`) and astro forecast (`/astro`) |
 | `AstronomyController` | `/api/astronomy` | Daily sun/moon events (`/daily`), altitude curve (`/curve`) |
-| `WeatherHistoryController` | `/api/weather/history` | Available dates, hourly records, day chart, and `/daily` — chart data plus stat cards for one range and metric in a single payload |
+| `WeatherHistoryController` | `/api/weather/history` | Available dates, hourly records, `/chart/day` (one local day, the only chart endpoint), and `/daily` — chart data plus stat cards for one range and metric in a single payload |
 | `ConfigController` | `/api/admin/config` | Station configuration CRUD (`GET`, `PUT` location/validation/hardware) |
 | `DatabaseViewController` | `/api/admin/db` | Raw database view for admin |
 | `LoginController` | `/login` | Login page |
@@ -49,7 +49,7 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 - **`AstronomySearch`** — binary-search horizon crossing finder used by `AstronomyEngine`.
 - **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists.
 - **`SeeingCalculator`** — Hufnagel-Valley HV 5/7 atmospheric turbulence model; inputs are jet-stream speed (200 hPa) and surface wind speed; outputs FWHM seeing in arc-seconds (Excellent / Good / Fair / Poor / Very Poor).
-- **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date.
+- **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date. `getDayChart(date, metric)` is the only chart entry point: it resolves the date to midnight-to-midnight in the *station's* zone (not the caller's, which would straddle two station days and disagree with the per-period rows beside it) and routes on age — see `RAW_RETENTION_DAYS` below. It once delegated to a `getChart(metric, from, to)` behind a second `/chart` endpoint; nothing consumed the range form, so both are gone.
 - **`SummaryCardService`** — builds the history modal's stat cards (warmest/coldest/trend) per metric. Which period a metric reads is a per-metric decision — see below.
 - **`WeatherRetentionService`** — scheduled hourly/daily rollups and raw cleanup, in a 02:00–02:10 window.
 - **`StationConfigurationService`** — CRUD for `StationConfiguration`; publishes `ConfigurationUpdatedEvent` on save.
@@ -136,9 +136,11 @@ existing rows within a day. It also makes ordering load-bearing: `deleteRawOlder
 the loop, because the oldest date's night reaches into the previous date's evening.
 
 `RAW_RETENTION_DAYS` is declared in both `WeatherRetentionService` (what gets deleted) and
-`WeatherHistoryService` (raw-vs-hourly chart routing). They must agree; if the reader's value is the
-larger, chart requests near the boundary route to raw rows that were already deleted and come back
-empty rather than falling back to the hourly table.
+`WeatherHistoryService` (raw-vs-hourly chart routing, now read only by `getDayChart` — a day inside
+the window is bucketed live from `weather_record`, one beyond it comes pre-rolled from the hourly
+table). They must agree; if the reader's value is the larger, chart requests near the boundary route
+to raw rows that were already deleted and come back empty rather than falling back to the hourly
+table.
 
 Reading side: `FullDaySummary` carries the three metric blocks plus `dayPeriod` / `nightPeriod`
 windows, recomputed on read rather than stored. The windows are populated only by
