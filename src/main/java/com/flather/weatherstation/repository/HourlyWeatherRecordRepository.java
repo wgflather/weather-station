@@ -83,11 +83,19 @@ public interface HourlyWeatherRecordRepository extends JpaRepository<HourlyWeath
   @Query(
       value =
           """
-                  SELECT hour, surface_wetness_avg AS value
+                  SELECT hour,
+                         ROUND(
+                             (((:dryBaseline - LEAST(:dryBaseline, GREATEST(:wetBaseline, surface_wetness_avg)))
+                               / (:dryBaseline - :wetBaseline)) * 100)::numeric,
+                             1)::double precision AS value
                   FROM hourly_weather_record
                   WHERE hour >= :from AND hour < :to
                   ORDER BY hour ASC
                   """,
       nativeQuery = true)
-  List<DataPoint> findChartSurfaceWetness(@Param("from") Instant from, @Param("to") Instant to);
+  List<DataPoint> findChartSurfaceWetness(
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("dryBaseline") int dryBaseline,
+      @Param("wetBaseline") int wetBaseline);
 }

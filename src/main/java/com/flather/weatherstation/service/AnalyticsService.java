@@ -306,6 +306,7 @@ public class AnalyticsService {
   public List<ChartPointDto> getMetricChart(
       Instant from, Instant to, Metric metric, int resolution) {
     String bucketInterval = resolution + "minutes";
+    var validation = configurationCache.getValidationConfig();
 
     List<DataPoint> points =
         switch (metric) {
@@ -314,7 +315,13 @@ public class AnalyticsService {
           case HUMIDITY -> repository.findChartHumidity(from, to, bucketInterval);
           case WIND -> repository.findChartWind(from, to, bucketInterval);
           case UV_INDEX -> repository.findChartUvIndex(from, to, bucketInterval);
-          case SURFACE_WETNESS -> repository.findChartSurfaceWetness(from, to, bucketInterval);
+          case SURFACE_WETNESS ->
+              repository.findChartSurfaceWetness(
+                  from,
+                  to,
+                  bucketInterval,
+                  validation.surfaceWetnessDryBaseline(),
+                  validation.surfaceWetnessWetBaseline());
           case WIND_DIRECTION ->
               repository.findChartWindDirection(
                   from,
@@ -331,7 +338,9 @@ public class AnalyticsService {
    * Aggregated data points to chart points, in the station's zone.
    *
    * <p>Deliberately metric-agnostic: every query feeding it already returns the value in the unit
-   * its metric is charted in, so this does not need to know which metric it is holding.
+   * its metric is charted in, surface wetness included — its percentage conversion lives in the two
+   * {@code findChartSurfaceWetness} queries so that both chart tiers convert identically without
+   * this method having to know which metric it is holding.
    *
    * <p>Shared with {@code WeatherHistoryService} rather than kept private so the pre-rolled tier
    * lands on the same shape as the raw one.

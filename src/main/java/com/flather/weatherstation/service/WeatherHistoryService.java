@@ -55,8 +55,11 @@ public class WeatherHistoryService {
    * bucketed live from {@code weather_record}, beyond it they come pre-rolled from the hourly
    * table.
    *
-   * <p>Both tiers finish through {@code AnalyticsService.toChartPoints}, so a day answered by
-   * either table comes back in the same shape.
+   * <p>Each tier's query returns values already in the unit the metric is charted in, so the two
+   * agree without this method knowing which metric it is serving. Surface wetness is the case that
+   * matters: it is stored as a raw ADC count in both tables and converted to a percentage inside
+   * each {@code findChartSurfaceWetness} query, so converting in only one of them would change the
+   * axis halfway across the retention boundary.
    */
   public ChartDto getDayChart(LocalDate date, Metric metric) {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
@@ -170,7 +173,12 @@ public class WeatherHistoryService {
       case WIND -> hourlyRepository.findChartWindSpeed(from, to);
       case WIND_DIRECTION -> hourlyRepository.findChartWindDirection(from, to);
       case UV_INDEX -> hourlyRepository.findChartUvIndex(from, to);
-      case SURFACE_WETNESS -> hourlyRepository.findChartSurfaceWetness(from, to);
+      case SURFACE_WETNESS ->
+          hourlyRepository.findChartSurfaceWetness(
+              from,
+              to,
+              configurationCache.getValidationConfig().surfaceWetnessDryBaseline(),
+              configurationCache.getValidationConfig().surfaceWetnessWetBaseline());
     };
   }
 }

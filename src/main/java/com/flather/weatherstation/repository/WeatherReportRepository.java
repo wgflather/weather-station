@@ -317,12 +317,30 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
       @Param("to") Instant to,
       @Param("bucketInterval") String bucketInterval);
 
+  /**
+   * Surface wetness charted as a percentage rather than as the raw ADC count it is stored as — the
+   * count is meaningless without the station's calibration, and {@link Metric#SURFACE_WETNESS}
+   * already declares its unit as "%".
+   *
+   * <p>{@code MeteoMath.rawToWetnessPct} is the definition of record for this formula; the live
+   * dashboard card converts through it, so a change to what the baselines mean has to land in both.
+   * Grep for that method before touching the arithmetic here.
+   *
+   * <p>The conversion wraps the average rather than each reading, matching {@code
+   * HourlyWeatherRecordRepository.findChartSurfaceWetness}, which can only convert the averaged
+   * value its table stores. Converting per reading would be marginally better at the clamps and
+   * would make the two chart tiers disagree either side of the retention boundary; agreement is
+   * worth more here. Note the transform is decreasing — a higher ADC count is a drier surface.
+   */
   @Query(
       value =
           """
                           SELECT
                               date_bin(CAST(:bucketInterval AS interval), measured_at, :from) AS bucket,
-                              ROUND(AVG(surface_wetness)::numeric, 1)::double precision AS value
+                              ROUND(
+                                  (((:dryBaseline - LEAST(:dryBaseline, GREATEST(:wetBaseline, AVG(surface_wetness))))
+                                    / (:dryBaseline - :wetBaseline)) * 100)::numeric,
+                                  1)::double precision AS value
                           FROM weather_records
                           WHERE surface_wetness_data_quality = 'OK'
                             AND measured_at >= :from
@@ -334,7 +352,9 @@ public interface WeatherReportRepository extends JpaRepository<WeatherRecord, Lo
   List<DataPoint> findChartSurfaceWetness(
       @Param("from") Instant from,
       @Param("to") Instant to,
-      @Param("bucketInterval") String bucketInterval);
+      @Param("bucketInterval") String bucketInterval,
+      @Param("dryBaseline") int dryBaseline,
+      @Param("wetBaseline") int wetBaseline);
 
   /**
    * Wind direction cannot use the {@code ROUND(AVG())} shape every other chart query uses: bearings
