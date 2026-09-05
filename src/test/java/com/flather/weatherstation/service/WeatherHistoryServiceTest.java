@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.config.LocationContext;
+import com.flather.weatherstation.config.WeatherValidationConfig;
 import com.flather.weatherstation.domain.constant.DayPeriod;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.DayPeriodMetrics;
@@ -53,10 +55,34 @@ class WeatherHistoryServiceTest {
 
   private static final ZoneId UTC = ZoneId.of("UTC");
 
+  // The station's own calibration, so a swapped pair would be visible in the assertion below.
+  private static final int WET_BASELINE = 150;
+  private static final int DRY_BASELINE = 3230;
+
   @BeforeEach
   void setup() {
     LocationContext location = new LocationContext(52.5, 13.4, 34.0, UTC, null);
     given(configurationCache.getLocationContext()).willReturn(location);
+    given(configurationCache.getValidationConfig())
+        .willReturn(
+            new WeatherValidationConfig(
+                -50,
+                60,
+                900,
+                1100,
+                0,
+                100,
+                20,
+                5.0,
+                10.0,
+                WET_BASELINE,
+                DRY_BASELINE,
+                0.0,
+                60.0,
+                15.0,
+                0.0,
+                15.0,
+                5.0));
   }
 
   // ---- getDayChart: date resolution and routing based on age ----
@@ -102,13 +128,37 @@ class WeatherHistoryServiceTest {
 
     given(hourlyRepository.findChartTemperature(eq(expectedFrom), any(Instant.class)))
         .willReturn(List.of(dataPoint));
+    given(analyticsService.toChartPoints(List.of(dataPoint)))
+        .willReturn(List.of(new ChartPointDto(expectedFrom.atZone(UTC), 20.0)));
 
     ChartDto result = service.getDayChart(date, Metric.TEMPERATURE);
 
     assertThat(result.metric()).isEqualTo("Temperature");
     assertThat(result.chartPoints()).hasSize(1);
     verify(hourlyRepository).findChartTemperature(eq(expectedFrom), any(Instant.class));
-    verifyNoInteractions(analyticsService);
+    verify(analyticsService, never()).getMetricChart(any(), any(), any(), anyInt());
+  }
+
+  /**
+   * The tier decides which table is read, not how the value is scaled. Surface wetness is converted
+   * to a percentage inside each tier's own query, so the hourly one has to be handed the same
+   * baselines the raw one gets — otherwise the chart reads 0–100 on one side of the retention
+   * boundary and raw ADC counts on the other. Both are ints, so the order is pinned too: swapping
+   * them compiles and would invert every wetness chart.
+   */
+  @Test
+  void getDayChart_oldDateSurfaceWetness_passesBaselinesToTheHourlyQuery() {
+    LocalDate date = LocalDate.now(UTC).minusDays(40);
+    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
+
+    given(hourlyRepository.findChartSurfaceWetness(any(), any(), anyInt(), anyInt()))
+        .willReturn(List.of());
+
+    service.getDayChart(date, Metric.SURFACE_WETNESS);
+
+    verify(hourlyRepository)
+        .findChartSurfaceWetness(
+            eq(expectedFrom), any(Instant.class), eq(DRY_BASELINE), eq(WET_BASELINE));
   }
 
   @Test
