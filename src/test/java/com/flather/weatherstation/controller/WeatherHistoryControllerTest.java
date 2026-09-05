@@ -1,7 +1,6 @@
 package com.flather.weatherstation.controller;
 
 import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -61,40 +60,12 @@ class WeatherHistoryControllerTest {
   }
 
   @Test
-  void shouldReturnHistoryChart_byInstantRange() throws Exception {
-    Instant from = Instant.parse("2026-06-15T00:00:00Z");
-    Instant to = Instant.parse("2026-06-16T00:00:00Z");
-
-    ChartDto chart =
-        new ChartDto(
-            "temperature",
-            List.of(new ChartPointDto(ZonedDateTime.parse("2026-06-15T10:00Z"), 20.0)),
-            Instant.parse("2026-06-16T01:00:00Z"),
-            DataProvider.LOCAL_SENSOR);
-
-    given(historyService.getChart(eq(Metric.TEMPERATURE), eq(from), eq(to))).willReturn(chart);
-
-    mockMvc
-        .perform(
-            get(WeatherHistoryController.CHART_PATH)
-                .param("metric", "temperature")
-                .param("from", "2026-06-15T00:00:00Z")
-                .param("to", "2026-06-16T00:00:00Z")
-                .accept(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.metric").value("temperature"))
-        .andExpect(jsonPath("$.chartPoints", hasSize(1)));
-
-    verify(historyService).getChart(eq(Metric.TEMPERATURE), eq(from), eq(to));
-  }
-
-  @Test
   void shouldReturnDayChart_byDateAndMetric() throws Exception {
     LocalDate date = LocalDate.of(2026, 6, 15);
     ChartDto chart =
         new ChartDto(
             "pressure",
-            List.of(),
+            List.of(new ChartPointDto(ZonedDateTime.parse("2026-06-15T10:00Z"), 1013.0)),
             Instant.parse("2026-06-16T00:00:00Z"),
             DataProvider.LOCAL_SENSOR);
 
@@ -107,7 +78,8 @@ class WeatherHistoryControllerTest {
                 .param("metric", "pressure")
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.metric").value("pressure"));
+        .andExpect(jsonPath("$.metric").value("pressure"))
+        .andExpect(jsonPath("$.chartPoints", hasSize(1)));
 
     verify(historyService).getDayChart(date, Metric.PRESSURE);
   }
@@ -317,10 +289,9 @@ class WeatherHistoryControllerTest {
   void shouldReturn400_whenHistoryChartMetricIsInvalid() throws Exception {
     mockMvc
         .perform(
-            get(WeatherHistoryController.CHART_PATH)
+            get(WeatherHistoryController.CHART_DAY_PATH)
                 .param("metric", "unknown")
-                .param("from", "2026-06-15T00:00:00Z")
-                .param("to", "2026-06-16T00:00:00Z")
+                .param("date", "2026-06-15")
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isBadRequest());
   }

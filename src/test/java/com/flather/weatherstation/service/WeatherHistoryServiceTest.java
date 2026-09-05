@@ -59,20 +59,34 @@ class WeatherHistoryServiceTest {
     given(configurationCache.getLocationContext()).willReturn(location);
   }
 
-  // ---- getChart: routing based on age ----
+  // ---- getDayChart: date resolution and routing based on age ----
 
   @Test
-  void getChart_recentDate_usesAnalyticsService() {
-    Instant from = Instant.now().minusSeconds(86400); // 1 day ago
-    Instant to = Instant.now();
+  void getDayChart_convertsDateToStationLocalDayBounds() {
+    LocalDate date = LocalDate.now(UTC).minusDays(1);
+    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
+    Instant expectedTo = date.plusDays(1).atStartOfDay(UTC).toInstant();
+
+    given(analyticsService.getMetricChart(expectedFrom, expectedTo, Metric.HUMIDITY, 60))
+        .willReturn(List.of());
+
+    ChartDto result = service.getDayChart(date, Metric.HUMIDITY);
+
+    assertThat(result.metric()).isEqualTo("Humidity");
+    verify(analyticsService).getMetricChart(expectedFrom, expectedTo, Metric.HUMIDITY, 60);
+  }
+
+  @Test
+  void getDayChart_recentDate_usesAnalyticsService() {
+    LocalDate date = LocalDate.now(UTC).minusDays(1);
     ChartPointDto point = new ChartPointDto(ZonedDateTime.now(UTC), 21.0);
 
     given(
             analyticsService.getMetricChart(
-                eq(from), any(Instant.class), eq(Metric.TEMPERATURE), eq(60)))
+                any(Instant.class), any(Instant.class), eq(Metric.TEMPERATURE), eq(60)))
         .willReturn(List.of(point));
 
-    ChartDto result = service.getChart(Metric.TEMPERATURE, from, to);
+    ChartDto result = service.getDayChart(date, Metric.TEMPERATURE);
 
     assertThat(result.metric()).isEqualTo("Temperature");
     assertThat(result.chartPoints()).hasSize(1);
@@ -80,49 +94,32 @@ class WeatherHistoryServiceTest {
   }
 
   @Test
-  void getChart_oldDate_usesHourlyRepository() {
-    // 40 days ago is beyond the 30-day raw retention cutoff
-    Instant from = Instant.now().minusSeconds(40L * 86400);
-    Instant to = Instant.now().minusSeconds(35L * 86400);
-    DataPoint dataPoint = new DataPoint(from, 20.0);
+  void getDayChart_oldDate_usesHourlyRepository() {
+    // 40 days back is beyond the raw retention cutoff, so the pre-rolled table answers
+    LocalDate date = LocalDate.now(UTC).minusDays(40);
+    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
+    DataPoint dataPoint = new DataPoint(expectedFrom, 20.0);
 
-    given(hourlyRepository.findChartTemperature(eq(from), any(Instant.class)))
+    given(hourlyRepository.findChartTemperature(eq(expectedFrom), any(Instant.class)))
         .willReturn(List.of(dataPoint));
 
-    ChartDto result = service.getChart(Metric.TEMPERATURE, from, to);
+    ChartDto result = service.getDayChart(date, Metric.TEMPERATURE);
 
     assertThat(result.metric()).isEqualTo("Temperature");
-    verify(hourlyRepository).findChartTemperature(eq(from), any(Instant.class));
+    assertThat(result.chartPoints()).hasSize(1);
+    verify(hourlyRepository).findChartTemperature(eq(expectedFrom), any(Instant.class));
     verifyNoInteractions(analyticsService);
   }
 
   @Test
-  void getChart_oldDatePressure_usesHourlyPressureMethod() {
-    Instant from = Instant.now().minusSeconds(40L * 86400);
-    Instant to = Instant.now().minusSeconds(35L * 86400);
+  void getDayChart_oldDatePressure_usesHourlyPressureMethod() {
+    LocalDate date = LocalDate.now(UTC).minusDays(40);
 
     given(hourlyRepository.findChartPressure(any(), any())).willReturn(List.of());
 
-    service.getChart(Metric.PRESSURE, from, to);
+    service.getDayChart(date, Metric.PRESSURE);
 
     verify(hourlyRepository).findChartPressure(any(), any());
-  }
-
-  // ---- getDayChart ----
-
-  @Test
-  void getDayChart_convertsDateToInstantRange_andDelegates() {
-    LocalDate date = LocalDate.of(2026, 6, 15);
-    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
-
-    given(
-            analyticsService.getMetricChart(
-                eq(expectedFrom), any(Instant.class), eq(Metric.HUMIDITY), eq(60)))
-        .willReturn(List.of());
-
-    ChartDto result = service.getDayChart(date, Metric.HUMIDITY);
-
-    assertThat(result.metric()).isEqualTo("Humidity");
   }
 
   // ---- getAvailableDates ----

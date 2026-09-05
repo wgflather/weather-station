@@ -44,14 +44,21 @@ public class WeatherHistoryService {
   private final SummaryCardService summaryCardService;
   private final WeatherHistoryMapper mapper;
 
+  /**
+   * One local calendar day of hourly chart points.
+   *
+   * <p>The date is resolved in the <em>station's</em> zone, not the caller's — a browser sitting in
+   * another zone would otherwise ask for a window straddling two of the station's days, and the
+   * chart would disagree with the per-period rows beside it, which are keyed on the station's date.
+   *
+   * <p>Which table answers depends on the day's age: inside the raw-retention window the points are
+   * bucketed live from {@code weather_record}, beyond it they come pre-rolled from the hourly
+   * table.
+   */
   public ChartDto getDayChart(LocalDate date, Metric metric) {
     ZoneId zoneId = configurationCache.getLocationContext().zoneId();
     Instant from = date.atStartOfDay(zoneId).toInstant();
     Instant to = date.plusDays(1).atStartOfDay(zoneId).toInstant();
-    return getChart(metric, from, to);
-  }
-
-  public ChartDto getChart(Metric metric, Instant from, Instant to) {
     Instant rawCutoff = Instant.now().minus(RAW_RETENTION_DAYS, ChronoUnit.DAYS);
 
     List<ChartPointDto> dtos =
