@@ -208,8 +208,13 @@ least-squares fit over daily averages means something; wetness is close to bimod
 (dry for days, soaked for an afternoon), so a slope over it reports where the wet days fell in the
 range rather than a direction the weather took.
 
-Frontend note: nothing charts the newer metrics yet. `index.html` offers only temperature, pressure
-and humidity tabs, and `metric-units.js` has no entry for them, so `unitFor` returns `''`.
+Frontend: surface wetness is wired through — a `Wetness` tab in `index.html`, a `surfaceWetness`
+entry in `metric-units.js`, a `COLOR_SCALES`/`METRIC_CONFIG` pair in `chart-metrics.js` and a
+`DAILY_CFG` entry in `daily-chart.js`. Its colour ramp puts its stops on `SurfaceWetnessStatus`'s own
+boundaries (10 / 40 / 70), so the line changes colour where the status label would, and it is
+teal-led rather than blue so a 0-100 % wetness chart is not mistaken for humidity. Nothing else
+charts the remaining metrics: wind, wind direction and UV have backend queries but no tab, no unit
+and no config, so `unitFor` returns `''` for them.
 
 Reading side: `FullDaySummary` carries the three metric blocks plus `dayPeriod` / `nightPeriod`
 windows, recomputed on read rather than stored. The windows are populated only by

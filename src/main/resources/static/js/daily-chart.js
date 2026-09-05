@@ -36,6 +36,13 @@ const DAILY_CFG = {
         highColor: '#6ee7b7',
         lowColor:  '#059669',
     },
+    surfaceWetness: {
+        label:     'Surface Wetness',
+        unit:      unitFor('surfaceWetness'),
+        lineColor: '#2dd4bf',
+        highColor: '#5eead4',
+        lowColor:  '#0f766e',
+    },
 };
 
 // ── Period series ─────────────────────────────────────────────────────────────

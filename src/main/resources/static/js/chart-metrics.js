@@ -30,6 +30,17 @@ export const COLOR_SCALES = {
         { stop:  80, r:  14, g: 165, b: 233 },
         { stop: 100, r:  37, g:  99, b: 235 },
     ],
+    // Stops sit on SurfaceWetnessStatus's boundaries — dry (<10), damp (<40),
+    // wet (<70), soaked — so the line changes colour where the status label does.
+    // Teal-led rather than humidity's slate->blue: the two are both 0-100 % and
+    // would otherwise be hard to tell apart at a glance.
+    surfaceWetness: [
+        { stop:   0, r: 214, g: 211, b: 209 },
+        { stop:  10, r: 153, g: 246, b: 228 },
+        { stop:  40, r:  45, g: 212, b: 191 },
+        { stop:  70, r:  13, g: 148, b: 136 },
+        { stop: 100, r:  15, g:  76, b: 129 },
+    ],
     // low/stormy (indigo) -> normal (slate) -> high/fair (green->amber)
     pressure: [
         { stop:  985, r: 129, g: 140, b: 248 },
@@ -123,6 +134,22 @@ export const METRIC_CONFIG = {
         maxNodeColor:  '#7dd3fc',
         minNodeColor:  '#0ea5e9',
         innerBorder:   '#e0f2fe',
+        closeThreshold: 2,
+    },
+    surfaceWetness: {
+        label:         'Surface Wetness',
+        tooltipSuffix: '%',
+        yAxisSuffix:   '%',
+        yStep:         10,
+        // null line/fill: the value gradient above carries the meaning here, the
+        // same as temperature, wind and UV.
+        lineColor:     null,
+        shadowColor:   'rgba(45, 212, 191, 0.25)',
+        fillTop:       null,
+        fillMid:       null,
+        maxNodeColor:  '#0d9488',
+        minNodeColor:  '#d6d3d1',
+        innerBorder:   '#ccfbf1',
         closeThreshold: 2,
     },
     wind: {

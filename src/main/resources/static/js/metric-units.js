@@ -9,9 +9,10 @@
 // "21.5°C" and "62%" do not want one.
 
 export const METRIC_UNITS = {
-    temperature: '°C',
-    pressure:    ' hPa',
-    humidity:    '%',
+    temperature:    '°C',
+    pressure:       ' hPa',
+    humidity:       '%',
+    surfaceWetness: '%',
 };
 
 /** The unit for a metric, or an empty string for one that has none configured yet. */

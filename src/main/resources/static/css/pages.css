@@ -1600,6 +1600,7 @@ span.flatpickr-weekday {
 /* Metric tab switcher */
 .history-metric-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
