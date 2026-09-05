@@ -1,10 +1,12 @@
 package com.flather.weatherstation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.offset;
 import static org.mockito.BDDMockito.given;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.config.LocationContext;
+import com.flather.weatherstation.config.WeatherValidationConfig;
 import com.flather.weatherstation.domain.constant.CardKind;
 import com.flather.weatherstation.domain.constant.DayPeriod;
 import com.flather.weatherstation.domain.constant.Metric;
@@ -38,6 +40,12 @@ class SummaryCardServiceTest {
   void setup() {
     given(configurationCache.getLocationContext())
         .willReturn(new LocationContext(52.5, 13.4, 34.0, UTC, null));
+    // 150 / 3230 are the station's own wetness baselines, so the expected percentages are real.
+    given(configurationCache.getValidationConfig())
+        .willReturn(
+            new WeatherValidationConfig(
+                -50, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 150, 3230, 0.0, 60.0, 15.0, 0.0, 15.0,
+                5.0));
   }
 
   private static DayPeriodMetrics day(LocalDate date, DayPeriod period, double min, double max) {
@@ -211,6 +219,76 @@ class SummaryCardServiceTest {
       assertThat(summary.metric()).isEqualTo(metric);
       assertThat(summary.cards()).isEmpty();
     }
+  }
+
+  // ---- surface wetness: stored inverted, reported as a percentage ----
+
+  private static DayPeriodMetrics wetnessDay(LocalDate date, double rawMin, double rawMax) {
+    DayPeriodMetrics row = new DayPeriodMetrics();
+    row.setDate(date);
+    row.setPeriod(DayPeriod.FULL);
+    row.setSurfaceWetnessMin(rawMin);
+    row.setSurfaceWetnessMax(rawMax);
+    row.setSurfaceWetnessAvg((rawMin + rawMax) / 2);
+    return row;
+  }
+
+  /**
+   * The whole hazard in one test: a higher ADC count is a drier surface, so the wettest day is the
+   * one with the <em>lowest</em> stored reading. Selecting it with the same comparator the other
+   * metrics use would return the driest day under a "Wettest day" heading.
+   */
+  @Test
+  void wettestDay_picksTheLowestRawCount_andReportsItAsAPercentage() {
+    List<DayPeriodMetrics> data =
+        List.of(
+            wetnessDay(START, 3000.0, 3226.0), // barely damp
+            wetnessDay(START.plusDays(1), 700.0, 3200.0), // soaked at some point
+            wetnessDay(START.plusDays(2), 2500.0, 3210.0));
+
+    MetricSummary summary = service.buildSummary(data, Metric.SURFACE_WETNESS);
+    SummaryCard wettest = cardOfKind(summary, CardKind.EXTREME_HIGH);
+
+    assertThat(wettest.label()).isEqualTo("Wettest day");
+    assertThat(wettest.date()).isEqualTo(START.plusDays(1));
+    assertThat(wettest.value()).isCloseTo(82.14, offset(0.01));
+  }
+
+  @Test
+  void driestDay_picksTheHighestRawCount_andReportsTheSmallerPercentage() {
+    List<DayPeriodMetrics> data =
+        List.of(
+            wetnessDay(START, 3000.0, 3226.0), // driest moment of the range
+            wetnessDay(START.plusDays(1), 700.0, 3200.0));
+
+    MetricSummary summary = service.buildSummary(data, Metric.SURFACE_WETNESS);
+    SummaryCard driest = cardOfKind(summary, CardKind.EXTREME_LOW);
+    SummaryCard wettest = cardOfKind(summary, CardKind.EXTREME_HIGH);
+
+    assertThat(driest.label()).isEqualTo("Driest day");
+    assertThat(driest.date()).isEqualTo(START);
+    assertThat(driest.value()).isCloseTo(0.13, offset(0.01));
+    // The pair has to stay the right way round once converted.
+    assertThat(driest.value()).isLessThan(wettest.value());
+  }
+
+  /**
+   * Wetness gets the two extremes and nothing else. A least-squares fit over a signal that is dry
+   * for days and then soaked for an afternoon reports where the wet days happened to fall in the
+   * range, not a direction the weather took.
+   */
+  @Test
+  void surfaceWetness_hasNoTrendCard() {
+    List<DayPeriodMetrics> data =
+        List.of(
+            wetnessDay(START, 700.0, 1000.0),
+            wetnessDay(START.plusDays(1), 1800.0, 2100.0),
+            wetnessDay(START.plusDays(2), 3000.0, 3200.0));
+
+    MetricSummary summary = service.buildSummary(data, Metric.SURFACE_WETNESS);
+
+    assertThat(summary.cards()).hasSize(2);
+    assertThat(cardOfKind(summary, CardKind.TREND)).isNull();
   }
 
   @Test

@@ -196,9 +196,17 @@ correct — but it bakes the baselines into rows whose raw is later deleted, and
 editable from the admin panel, so a recalibration would repair only the self-healing window and
 leave older history on the old numbers. Read-time conversion keeps recalibration retroactive.
 
-Still outstanding: `SummaryCardService` reads `DayPeriodMetrics` directly and has no wetness cards.
-Adding one needs the same care — `extremeHigh()` on the raw column finds the *driest* period, not
-the wettest, and reports ADC counts under a metric that declares "%".
+`SummaryCardService` reads `DayPeriodMetrics` directly, so its wetness cards carry the inversion
+too, but as a *selection* swap rather than a value swap: "Wettest day" is built by `extremeLow` —
+the smallest stored count — and reported as an `EXTREME_HIGH`, because converted it is the largest
+percentage on screen. `extremeHigh`/`extremeLow` therefore take the `CardKind` and a display
+transform separately from the row selection; the four-argument overloads pass `AS_STORED` and the
+matching kind, so the other metrics read exactly as before.
+
+Wetness gets **two cards, not three** — no trend. The other metrics vary continuously, so a
+least-squares fit over daily averages means something; wetness is close to bimodal and event-driven
+(dry for days, soaked for an afternoon), so a slope over it reports where the wet days fell in the
+range rather than a direction the weather took.
 
 Frontend note: nothing charts the newer metrics yet. `index.html` offers only temperature, pressure
 and humidity tabs, and `metric-units.js` has no entry for them, so `unitFor` returns `''`.
@@ -215,9 +223,11 @@ tab anyway, so separate calls only cost a second round trip. A metric with no ca
 empty card list rather than an error, so its chart still renders.
 
 Card periods are a per-metric decision in `SummaryCardService`, not a default: temperature reads
-`DAY` (that is what "warmest day" means), while pressure and humidity read `FULL` because their
-extremes fall outside daylight — a depression bottoming out at 03:00, a humidity peak before dawn.
-Trend thresholds are per-metric for the same reason: 0.5 °C is a real shift, 0.5 hPa is noise.
+`DAY` (that is what "warmest day" means), while pressure, humidity and surface wetness read `FULL`
+because their extremes fall outside daylight — a depression bottoming out at 03:00, a humidity peak
+before dawn, dew that forms after dark and burns off by mid-morning. Trend thresholds are per-metric
+for the same reason: 0.5 °C is a real shift, 0.5 hPa is noise. Whether a metric gets a trend card at
+all is also a decision — wetness has none; see the wetness note above.
 
 ### DTOs & Mappers
 

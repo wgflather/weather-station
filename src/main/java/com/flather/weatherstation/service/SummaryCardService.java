@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.DoubleUnaryOperator;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,9 @@ public class SummaryCardService {
   private static final double PRESSURE_TREND_THRESHOLD = 2.0; // hPa
   private static final double HUMIDITY_TREND_THRESHOLD = 3.0; // %
 
+  /** No conversion: the metric is charted in the unit it is stored in. */
+  private static final DoubleUnaryOperator AS_STORED = DoubleUnaryOperator.identity();
+
   private final ConfigurationCache configurationCache;
 
   /**
@@ -54,15 +58,9 @@ public class SummaryCardService {
       case TEMPERATURE -> new MetricSummary(metric, temperatureCards(data));
       case PRESSURE -> new MetricSummary(metric, pressureCards(data));
       case HUMIDITY -> new MetricSummary(metric, humidityCards(data));
+      case SURFACE_WETNESS -> new MetricSummary(metric, surfaceWetnessCards(data));
       // No cards defined yet is an empty answer, not an error. The cards travel with the chart
       // data, so throwing here would take the whole range down for a metric that charts fine.
-      //
-      // Adding SURFACE_WETNESS here needs care that the other metrics do not: these builders read
-      // DayPeriodMetrics directly, which holds the raw ADC count, and the ADC→percentage transform
-      // is decreasing. extremeHigh() on the raw column finds the *driest* period, not the wettest,
-      // and the value it reports is in ADC counts rather than the "%" the metric declares.
-      // WeatherHistoryService.toWetnessPercentage does the equivalent conversion for the period
-      // rows, swapping min and max as it goes.
       default -> {
         log.debug("No summary cards defined for metric {}", metric);
         yield new MetricSummary(metric, List.of());
@@ -108,6 +106,41 @@ public class SummaryCardService {
         trend(data, metric, DayPeriod.FULL, "Humidity trend", HUMIDITY_TREND_THRESHOLD));
   }
 
+  /**
+   * Surface wetness reads the whole day for humidity's reason rather than pressure's: dew forms
+   * after dark and burns off through the morning, so daylight rows would miss the wettest hours of
+   * most nights.
+   *
+   * <p>It is the one metric stored on an <em>inverted</em> scale — {@code daily_weather_record}
+   * holds the raw ADC count, and a higher count is a drier surface. So the selections swap: the
+   * wettest day is the one with the smallest stored minimum, found by {@code extremeLow} but
+   * reported as an {@link CardKind#EXTREME_HIGH} because converted it is the largest percentage on
+   * screen. Passing the conversion in rather than converting the rows keeps the entities untouched
+   * and the arithmetic in one expression.
+   *
+   * <p>The two extremes are the whole set: there is deliberately <strong>no trend card</strong>.
+   * The other three metrics vary continuously, so a least-squares fit over their daily averages
+   * describes something. Wetness is close to bimodal and event-driven — dry for days, then soaked
+   * for an afternoon — so a fitted slope over it mostly reports how many wet days happened to fall
+   * near the end of the range, dressed up as a direction.
+   */
+  private List<SummaryCard> surfaceWetnessCards(List<DayPeriodMetrics> data) {
+    Metric metric = Metric.SURFACE_WETNESS;
+    var validation = configurationCache.getValidationConfig();
+    DoubleUnaryOperator toPercentage =
+        raw ->
+            MeteoMath.rawToWetnessPct(
+                raw,
+                validation.surfaceWetnessDryBaseline(),
+                validation.surfaceWetnessWetBaseline());
+
+    return cards(
+        extremeLow(
+            data, metric, DayPeriod.FULL, "Wettest day", CardKind.EXTREME_HIGH, toPercentage),
+        extremeHigh(
+            data, metric, DayPeriod.FULL, "Driest day", CardKind.EXTREME_LOW, toPercentage));
+  }
+
   /** Collects the cards a metric produced, dropping the ones with no data behind them. */
   private static List<SummaryCard> cards(SummaryCard... candidates) {
     List<SummaryCard> present = new ArrayList<>(candidates.length);
@@ -121,6 +154,21 @@ public class SummaryCardService {
 
   private SummaryCard extremeHigh(
       List<DayPeriodMetrics> data, Metric metric, DayPeriod period, String label) {
+    return extremeHigh(data, metric, period, label, CardKind.EXTREME_HIGH, AS_STORED);
+  }
+
+  /**
+   * The row holding the largest stored maximum. {@code kind} and {@code display} are separate from
+   * the selection because a metric stored on an inverted scale finds its highest <em>displayed</em>
+   * value here — see {@link #surfaceWetnessCards}.
+   */
+  private SummaryCard extremeHigh(
+      List<DayPeriodMetrics> data,
+      Metric metric,
+      DayPeriod period,
+      String label,
+      CardKind kind,
+      DoubleUnaryOperator display) {
     Optional<DayPeriodMetrics> highest =
         rowsOf(data, period)
             .filter(day -> day.getMaxByMetric(metric) != null)
@@ -130,12 +178,23 @@ public class SummaryCardService {
         .map(
             day ->
                 SummaryCard.onDate(
-                    CardKind.EXTREME_HIGH, label, day.getMaxByMetric(metric), day.getDate()))
+                    kind, label, display.applyAsDouble(day.getMaxByMetric(metric)), day.getDate()))
         .orElse(null);
   }
 
   private SummaryCard extremeLow(
       List<DayPeriodMetrics> data, Metric metric, DayPeriod period, String label) {
+    return extremeLow(data, metric, period, label, CardKind.EXTREME_LOW, AS_STORED);
+  }
+
+  /** The row holding the smallest stored minimum; {@code kind} and {@code display} as above. */
+  private SummaryCard extremeLow(
+      List<DayPeriodMetrics> data,
+      Metric metric,
+      DayPeriod period,
+      String label,
+      CardKind kind,
+      DoubleUnaryOperator display) {
     Optional<DayPeriodMetrics> lowest =
         rowsOf(data, period)
             .filter(day -> day.getMinByMetric(metric) != null)
@@ -145,7 +204,7 @@ public class SummaryCardService {
         .map(
             day ->
                 SummaryCard.onDate(
-                    CardKind.EXTREME_LOW, label, day.getMinByMetric(metric), day.getDate()))
+                    kind, label, display.applyAsDouble(day.getMinByMetric(metric)), day.getDate()))
         .orElse(null);
   }
 
