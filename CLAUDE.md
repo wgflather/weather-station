@@ -227,12 +227,36 @@ cards) — from a single query. They are bundled because the modal reloads the r
 tab anyway, so separate calls only cost a second round trip. A metric with no card builder yields an
 empty card list rather than an error, so its chart still renders.
 
-Card periods are a per-metric decision in `SummaryCardService`, not a default: temperature reads
-`DAY` (that is what "warmest day" means), while pressure, humidity and surface wetness read `FULL`
-because their extremes fall outside daylight — a depression bottoming out at 03:00, a humidity peak
-before dawn, dew that forms after dark and burns off by mid-morning. Trend thresholds are per-metric
-for the same reason: 0.5 °C is a real shift, 0.5 hPa is noise. Whether a metric gets a trend card at
-all is also a decision — wetness has none; see the wetness note above.
+Every card decision in `SummaryCardService` is per-metric, not a default. Three axes, each chosen
+per metric and each stated in the builder's own javadoc:
+
+**Which period.** Temperature takes *one card from each side of the split* — "Warmest day" from
+`DAY`, "Coldest night" from `NIGHT` — because that is the pair of questions the day/night rows exist
+to answer. Both cards previously read `DAY`, which wasted half the split and produced a daytime
+*low*: a quantity nobody asks for, since the cold part of a date happens before dawn and lives in
+that date's `NIGHT` row. Pressure, humidity and wetness read `FULL`, because their extremes fall
+outside daylight — a depression bottoming out at 03:00, a humidity peak before dawn, dew that forms
+after dark. Consequence to expect: a range of dates rolled up before the split has `FULL` rows only,
+so temperature yields **no** extreme cards for it rather than falling back.
+
+**Ranked on the average or on the extreme.** Temperature and humidity rank on the period *average*;
+pressure and wetness on the stored min/max. The label has to match what the number measures — a
+"Warmest day" answered by the single highest sample is a claim about a day answered by a property of
+a moment, set by whichever minute the sun was on the enclosure, and not comparable between days. It
+matters most for humidity, whose peak pins near 100 % on most nights, so a peak-ranked card decides
+a near-tie across half the range. Pressure keeps the extreme because the deepest low *is* the storm,
+and wetness because its peak answers "did it get wet at all" while its mean is near zero for days.
+
+**Whether there is a trend at all.** Wetness has none — a least-squares fit over a bimodal,
+event-driven signal reports where the wet days fell in the range, not a direction. Thresholds are
+likewise per-metric: 0.5 °C is a real shift, 0.5 hPa is noise.
+
+`extremeHigh`/`extremeLow` take a `Function<DayPeriodMetrics, Double>` that supplies **the value the
+card displays**, and rank on that same function — selection and display must not come from different
+columns, or a card picks its day by one quantity and prints another. The accessor is also what the
+null filter runs on, so a period row whose metric is null (a night the sensor missed,
+`getMinByMetric(UV_INDEX)` which is always null) is skipped rather than reaching
+`Comparator.comparing` and throwing.
 
 ### DTOs & Mappers
 

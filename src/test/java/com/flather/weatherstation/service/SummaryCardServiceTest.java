@@ -62,33 +62,73 @@ class SummaryCardServiceTest {
     return summary.cards().stream().filter(c -> c.kind() == kind).findFirst().orElse(null);
   }
 
+  /**
+   * The coldest night is the one that was coldest <em>on average</em>, not the one that touched the
+   * lowest reading. The fixture separates the two: the night with the lowest minimum is the mildest
+   * of the three overall, so a minimum-ranked card would pick it and a mean-ranked one will not.
+   */
   @Test
-  void coldestDay_picksTheLowestMinimum_notTheHighest() {
+  void coldestNight_ranksNightsByAverage_notByTheLowestReading() {
     List<DayPeriodMetrics> data =
         List.of(
-            day(START, DayPeriod.DAY, 12.0, 25.0),
-            day(START.plusDays(1), DayPeriod.DAY, 4.0, 19.0), // the genuinely coldest
-            day(START.plusDays(2), DayPeriod.DAY, 15.0, 31.0));
+            day(START, DayPeriod.NIGHT, 2.0, 14.0), //          avg  8.0
+            day(
+                START.plusDays(1),
+                DayPeriod.NIGHT,
+                0.0,
+                20.0), // avg 10.0 — lowest reading, mildest night
+            day(
+                START.plusDays(2),
+                DayPeriod.NIGHT,
+                5.0,
+                7.0)); // avg  6.0 — genuinely the coldest night
 
     SummaryCard low =
         cardOfKind(service.buildSummary(data, Metric.TEMPERATURE), CardKind.EXTREME_LOW);
 
     assertThat(low).isNotNull();
+    assertThat(low.label()).isEqualTo("Coldest night");
+    assertThat(low.value()).isEqualTo(6.0);
+    assertThat(low.date()).isEqualTo(START.plusDays(2));
+  }
+
+  /**
+   * The two temperature cards come from opposite sides of the split, and each ranks on its mean.
+   */
+  @Test
+  void temperatureCards_takeTheWarmestDayAndTheColdestNight() {
+    List<DayPeriodMetrics> data =
+        List.of(
+            day(START, DayPeriod.DAY, 12.0, 25.0), //             avg 18.5 — warmest daytime
+            day(START.plusDays(1), DayPeriod.DAY, 4.0, 31.0), //  avg 17.5, but the highest peak
+            day(START, DayPeriod.NIGHT, 2.0, 10.0), //            avg  6.0
+            day(START.plusDays(1), DayPeriod.NIGHT, 0.0, 8.0)); // avg  4.0 — coldest night
+
+    MetricSummary summary = service.buildSummary(data, Metric.TEMPERATURE);
+    SummaryCard high = cardOfKind(summary, CardKind.EXTREME_HIGH);
+    SummaryCard low = cardOfKind(summary, CardKind.EXTREME_LOW);
+
+    // 31.0 is the highest reading in the range; ranking on peaks would report it and the wrong day.
+    assertThat(high.label()).isEqualTo("Warmest day");
+    assertThat(high.value()).isEqualTo(18.5);
+    assertThat(high.date()).isEqualTo(START);
+
+    assertThat(low.label()).isEqualTo("Coldest night");
     assertThat(low.value()).isEqualTo(4.0);
     assertThat(low.date()).isEqualTo(START.plusDays(1));
   }
 
+  /**
+   * Dates rolled up before the day/night split have a FULL row alone, so a range covering them can
+   * offer a warmest day with no coldest night beside it.
+   */
   @Test
-  void extremeCards_carryDistinctKinds() {
-    List<DayPeriodMetrics> data =
-        List.of(
-            day(START, DayPeriod.DAY, 12.0, 25.0),
-            day(START.plusDays(1), DayPeriod.DAY, 4.0, 31.0));
+  void coldestNight_isOmittedWhenTheRangeHasNoNightRows() {
+    MetricSummary summary =
+        service.buildSummary(List.of(day(START, DayPeriod.DAY, 12.0, 25.0)), Metric.TEMPERATURE);
 
-    MetricSummary summary = service.buildSummary(data, Metric.TEMPERATURE);
-
-    assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH).value()).isEqualTo(31.0);
-    assertThat(cardOfKind(summary, CardKind.EXTREME_LOW).value()).isEqualTo(4.0);
+    assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH)).isNotNull();
+    assertThat(cardOfKind(summary, CardKind.EXTREME_LOW)).isNull();
   }
 
   @Test
@@ -121,19 +161,26 @@ class SummaryCardServiceTest {
     assertThat(trend.value()).isEqualTo(6.0);
   }
 
+  /**
+   * FULL rows are ignored by both cards. The fixture makes them tempting on purpose — the FULL rows
+   * hold the highest and the lowest averages in the range — so either card reading them would be
+   * visible here rather than only on real data.
+   */
   @Test
-  void cardsReadDaytimeRows_ignoringFullAndNight() {
+  void temperatureCards_ignoreFullDayRows() {
     List<DayPeriodMetrics> data =
         List.of(
-            day(START, DayPeriod.DAY, 12.0, 25.0),
-            day(START, DayPeriod.NIGHT, -5.0, 8.0), // colder, but not daytime
-            day(START, DayPeriod.FULL, -5.0, 25.0),
-            day(START.plusDays(1), DayPeriod.DAY, 9.0, 27.0));
+            day(START, DayPeriod.DAY, 12.0, 25.0), //                 avg 18.5 — expected high
+            day(START, DayPeriod.NIGHT, -5.0, 8.0), //                avg  1.5
+            day(START, DayPeriod.FULL, 35.0, 45.0), //                avg 40.0 — would win the high
+            day(START.plusDays(1), DayPeriod.DAY, 9.0, 27.0), //      avg 18.0
+            day(START.plusDays(1), DayPeriod.NIGHT, -8.0, 6.0), //    avg -1.0 — expected low
+            day(START.plusDays(1), DayPeriod.FULL, -30.0, -20.0)); // avg -25.0 — would win the low
 
     MetricSummary summary = service.buildSummary(data, Metric.TEMPERATURE);
 
-    assertThat(cardOfKind(summary, CardKind.EXTREME_LOW).value()).isEqualTo(9.0);
-    assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH).value()).isEqualTo(27.0);
+    assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH).value()).isEqualTo(18.5);
+    assertThat(cardOfKind(summary, CardKind.EXTREME_LOW).value()).isEqualTo(-1.0);
   }
 
   // ---- pressure ----
@@ -179,26 +226,39 @@ class SummaryCardServiceTest {
 
   // ---- humidity ----
 
+  private static DayPeriodMetrics humidityRow(
+      LocalDate date, DayPeriod period, double min, double max, double avg) {
+    DayPeriodMetrics row = new DayPeriodMetrics();
+    row.setDate(date);
+    row.setPeriod(period);
+    row.setHumidityMin(min);
+    row.setHumidityMax(max);
+    row.setHumidityAvg(avg);
+    return row;
+  }
+
+  /**
+   * Two properties at once: humidity reads FULL rows, and it ranks them on the mean. Both peaks sit
+   * near 100 % — which is why the peak is the wrong thing to rank on for this metric — so a
+   * peak-ranked card would be deciding between 97 and 99 and would report a different day.
+   */
   @Test
-  void humidityCards_readTheWholeDay_soThePreDawnPeakIsNotLost() {
-    DayPeriodMetrics full = new DayPeriodMetrics();
-    full.setDate(START);
-    full.setPeriod(DayPeriod.FULL);
-    full.setHumidityMin(38.0);
-    full.setHumidityMax(97.0); // humidity peaks before dawn, not during the day
-    full.setHumidityAvg(65.0);
+  void humidityCards_readFullDayRows_rankedByAverage() {
+    List<DayPeriodMetrics> data =
+        List.of(
+            humidityRow(START, DayPeriod.FULL, 38.0, 97.0, 65.0),
+            humidityRow(START, DayPeriod.DAY, 38.0, 61.0, 48.0),
+            humidityRow(START.plusDays(1), DayPeriod.FULL, 60.0, 99.0, 80.0),
+            humidityRow(START.plusDays(1), DayPeriod.DAY, 55.0, 78.0, 70.0));
 
-    DayPeriodMetrics daytime = new DayPeriodMetrics();
-    daytime.setDate(START);
-    daytime.setPeriod(DayPeriod.DAY);
-    daytime.setHumidityMin(38.0);
-    daytime.setHumidityMax(61.0);
-    daytime.setHumidityAvg(48.0);
+    MetricSummary summary = service.buildSummary(data, Metric.HUMIDITY);
+    SummaryCard high = cardOfKind(summary, CardKind.EXTREME_HIGH);
+    SummaryCard low = cardOfKind(summary, CardKind.EXTREME_LOW);
 
-    MetricSummary summary = service.buildSummary(List.of(full, daytime), Metric.HUMIDITY);
-
-    assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH).value()).isEqualTo(97.0);
-    assertThat(cardOfKind(summary, CardKind.EXTREME_LOW).value()).isEqualTo(38.0);
+    assertThat(high.value()).isEqualTo(80.0);
+    assertThat(high.date()).isEqualTo(START.plusDays(1));
+    assertThat(low.value()).isEqualTo(65.0);
+    assertThat(low.date()).isEqualTo(START);
   }
 
   @Test
@@ -293,14 +353,19 @@ class SummaryCardServiceTest {
 
   @Test
   void cardsWithoutDataAreOmittedRatherThanEmpty() {
-    // One day cannot support a trend, and a range with no daytime rows supports nothing.
-    MetricSummary single =
-        service.buildSummary(List.of(day(START, DayPeriod.DAY, 12.0, 25.0)), Metric.TEMPERATURE);
-    assertThat(single.cards()).hasSize(2);
-    assertThat(cardOfKind(single, CardKind.TREND)).isNull();
+    // Both extremes are answerable from a single date, but a trend is not: the fit needs two
+    // points on different days.
+    MetricSummary oneDate =
+        service.buildSummary(
+            List.of(day(START, DayPeriod.DAY, 12.0, 25.0), day(START, DayPeriod.NIGHT, 2.0, 8.0)),
+            Metric.TEMPERATURE);
+    assertThat(oneDate.cards()).hasSize(2);
+    assertThat(cardOfKind(oneDate, CardKind.TREND)).isNull();
 
-    MetricSummary nightOnly =
-        service.buildSummary(List.of(day(START, DayPeriod.NIGHT, 1.0, 5.0)), Metric.TEMPERATURE);
-    assertThat(nightOnly.cards()).isEmpty();
+    // Dates rolled up before the day/night split have a FULL row alone, and no temperature card
+    // reads FULL — so such a range yields nothing rather than falling back to it.
+    MetricSummary fullOnly =
+        service.buildSummary(List.of(day(START, DayPeriod.FULL, 1.0, 5.0)), Metric.TEMPERATURE);
+    assertThat(fullOnly.cards()).isEmpty();
   }
 }

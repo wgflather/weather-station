@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.DoubleUnaryOperator;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,15 +70,24 @@ public class SummaryCardService {
   }
 
   /**
-   * Temperature reads the daytime rows. Its diurnal swing is the whole reason the day/night split
-   * exists, and "warmest day" plainly means the warmest daytime — a full-day figure blends the
-   * night back in and flattens exactly the difference the cards are meant to show.
+   * Temperature takes one card from each side of the split — the warmest daytime and the coldest
+   * night — because that is the pair of questions the day/night rows exist to answer. Both cards
+   * reading {@code DAY} wasted half of it, and a daytime <em>low</em> is a quantity nobody asks
+   * for: the cold part of a date happens before dawn, which lives in that date's {@code NIGHT} row.
+   *
+   * <p>Both rank on the period <em>average</em>, not on a single reading. "Warmest day" is a claim
+   * about a day, so it has to be answered by something that describes one; the highest sample is a
+   * property of a moment, is set by whichever minute the sun was on the enclosure, and cannot be
+   * compared between days.
+   *
+   * <p>Note the night for date D runs from D-1's sunset to D's sunrise, so the date on a "Coldest
+   * night" card is the morning the night ended on.
    */
   private List<SummaryCard> temperatureCards(List<DayPeriodMetrics> data) {
     Metric metric = Metric.TEMPERATURE;
     return cards(
-        extremeHigh(data, metric, DayPeriod.DAY, "Warmest day"),
-        extremeLow(data, metric, DayPeriod.DAY, "Coldest day"),
+        extremeHigh(data, DayPeriod.DAY, "Warmest day", day -> day.getAvgByMetric(metric)),
+        extremeLow(data, DayPeriod.NIGHT, "Coldest night", day -> day.getAvgByMetric(metric)),
         trend(data, metric, DayPeriod.DAY, "Daylight trend", TEMPERATURE_TREND_THRESHOLD));
   }
 
@@ -88,8 +98,8 @@ public class SummaryCardService {
   private List<SummaryCard> pressureCards(List<DayPeriodMetrics> data) {
     Metric metric = Metric.PRESSURE;
     return cards(
-        extremeHigh(data, metric, DayPeriod.FULL, "Highest pressure"),
-        extremeLow(data, metric, DayPeriod.FULL, "Lowest pressure"),
+        extremeHigh(data, DayPeriod.FULL, "Highest pressure", day -> day.getMaxByMetric(metric)),
+        extremeLow(data, DayPeriod.FULL, "Lowest pressure", day -> day.getMinByMetric(metric)),
         trend(data, metric, DayPeriod.FULL, "Pressure trend", PRESSURE_TREND_THRESHOLD));
   }
 
@@ -97,12 +107,16 @@ public class SummaryCardService {
    * Humidity reads the whole day too, but for the opposite reason to pressure: its cycle is strong
    * and inverted against temperature, so the daily maximum falls before dawn. Reading daylight rows
    * would quietly discard the most humid part of every day.
+   *
+   * <p>It ranks on the average rather than the peak, and here that matters more than it does for
+   * temperature: relative humidity pins near 100 % on most nights, so a peak-ranked card would find
+   * a near-tie across half the range and report whichever day happened to win it.
    */
   private List<SummaryCard> humidityCards(List<DayPeriodMetrics> data) {
     Metric metric = Metric.HUMIDITY;
     return cards(
-        extremeHigh(data, metric, DayPeriod.FULL, "Most humid day"),
-        extremeLow(data, metric, DayPeriod.FULL, "Driest day"),
+        extremeHigh(data, DayPeriod.FULL, "Most humid day", day -> day.getAvgByMetric(metric)),
+        extremeLow(data, DayPeriod.FULL, "Driest day", day -> day.getAvgByMetric(metric)),
         trend(data, metric, DayPeriod.FULL, "Humidity trend", HUMIDITY_TREND_THRESHOLD));
   }
 
@@ -136,9 +150,19 @@ public class SummaryCardService {
 
     return cards(
         extremeLow(
-            data, metric, DayPeriod.FULL, "Wettest day", CardKind.EXTREME_HIGH, toPercentage),
+            data,
+            DayPeriod.FULL,
+            "Wettest day",
+            CardKind.EXTREME_HIGH,
+            day -> day.getMinByMetric(metric),
+            toPercentage),
         extremeHigh(
-            data, metric, DayPeriod.FULL, "Driest day", CardKind.EXTREME_LOW, toPercentage));
+            data,
+            DayPeriod.FULL,
+            "Driest day",
+            CardKind.EXTREME_LOW,
+            day -> day.getMaxByMetric(metric),
+            toPercentage));
   }
 
   /** Collects the cards a metric produced, dropping the ones with no data behind them. */
@@ -153,8 +177,11 @@ public class SummaryCardService {
   }
 
   private SummaryCard extremeHigh(
-      List<DayPeriodMetrics> data, Metric metric, DayPeriod period, String label) {
-    return extremeHigh(data, metric, period, label, CardKind.EXTREME_HIGH, AS_STORED);
+      List<DayPeriodMetrics> data,
+      DayPeriod period,
+      String label,
+      Function<DayPeriodMetrics, Double> valueGetter) {
+    return extremeHigh(data, period, label, CardKind.EXTREME_HIGH, valueGetter, AS_STORED);
   }
 
   /**
@@ -164,47 +191,50 @@ public class SummaryCardService {
    */
   private SummaryCard extremeHigh(
       List<DayPeriodMetrics> data,
-      Metric metric,
       DayPeriod period,
       String label,
       CardKind kind,
+      Function<DayPeriodMetrics, Double> valueGetter,
       DoubleUnaryOperator display) {
     Optional<DayPeriodMetrics> highest =
         rowsOf(data, period)
-            .filter(day -> day.getMaxByMetric(metric) != null)
-            .max(Comparator.comparing(day -> day.getMaxByMetric(metric)));
+            .filter(day -> valueGetter.apply(day) != null)
+            .max(Comparator.comparing(valueGetter));
 
     return highest
         .map(
             day ->
                 SummaryCard.onDate(
-                    kind, label, display.applyAsDouble(day.getMaxByMetric(metric)), day.getDate()))
+                    kind, label, display.applyAsDouble(valueGetter.apply(day)), day.getDate()))
         .orElse(null);
   }
 
   private SummaryCard extremeLow(
-      List<DayPeriodMetrics> data, Metric metric, DayPeriod period, String label) {
-    return extremeLow(data, metric, period, label, CardKind.EXTREME_LOW, AS_STORED);
+      List<DayPeriodMetrics> data,
+      DayPeriod period,
+      String label,
+      Function<DayPeriodMetrics, Double> valueGetter) {
+    return extremeLow(data, period, label, CardKind.EXTREME_LOW, valueGetter, AS_STORED);
   }
 
   /** The row holding the smallest stored minimum; {@code kind} and {@code display} as above. */
   private SummaryCard extremeLow(
       List<DayPeriodMetrics> data,
-      Metric metric,
       DayPeriod period,
       String label,
       CardKind kind,
+      Function<DayPeriodMetrics, Double> valueGetter,
       DoubleUnaryOperator display) {
     Optional<DayPeriodMetrics> lowest =
         rowsOf(data, period)
-            .filter(day -> day.getMinByMetric(metric) != null)
-            .min(Comparator.comparing(day -> day.getMinByMetric(metric)));
+            .filter(day -> valueGetter.apply(day) != null)
+            .min(Comparator.comparing(valueGetter));
 
     return lowest
         .map(
             day ->
                 SummaryCard.onDate(
-                    kind, label, display.applyAsDouble(day.getMinByMetric(metric)), day.getDate()))
+                    kind, label, display.applyAsDouble(valueGetter.apply(day)), day.getDate()))
         .orElse(null);
   }
 
