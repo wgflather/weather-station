@@ -124,12 +124,23 @@ const TRIPLE_COLLISION_WINDOW_MINUTES = 90;
 // stays loaded across the 20s polling cycle) so layouts don't flicker
 // as new data streams in near a threshold boundary
 const COLLISION_STATE = {
-    temperature: { triple: false, maxAbsorbed: false, minAbsorbed: false },
-    pressure:    { triple: false, maxAbsorbed: false, minAbsorbed: false },
-    humidity:    { triple: false, maxAbsorbed: false, minAbsorbed: false },
-    wind:        { triple: false, maxAbsorbed: false, minAbsorbed: false },
-    uvIndex:     { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    temperature:    { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    pressure:       { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    humidity:       { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    surfaceWetness: { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    wind:           { triple: false, maxAbsorbed: false, minAbsorbed: false },
+    uvIndex:        { triple: false, maxAbsorbed: false, minAbsorbed: false },
 };
+
+// Created on demand for a metric not listed above. The entry has to be *stored*,
+// not just defaulted: this state is the hysteresis that stops H/L/Now labels
+// flickering between renders, so a fresh object each pass would defeat it. A
+// missing entry used to throw on the first render of a newly charted metric —
+// three separate per-metric tables have to gain an entry (this one, METRIC_CONFIG
+// and COLOR_SCALES) and only the other two fail visibly.
+function collisionStateFor(metric) {
+    return (COLLISION_STATE[metric] ??= { triple: false, maxAbsorbed: false, minAbsorbed: false });
+}
 
 // Decide how today's High/Low pins relate to "Now": 'triple' (H and L both
 // collapse onto Now), 'maxAbsorbed' (H collapses onto Now, L stays put),
@@ -137,7 +148,7 @@ const COLLISION_STATE = {
 // to the pixel-geometry pass below)
 export function resolveCollisionScenario(metric, chartPoints, minIndex, maxIndex,
                                    latestIndex, validMinMax, resolutionMinutes, config) {
-    const state = COLLISION_STATE[metric];
+    const state = collisionStateFor(metric);
     if (!validMinMax) {
         state.triple = state.maxAbsorbed = state.minAbsorbed = false;
         return 'none';
