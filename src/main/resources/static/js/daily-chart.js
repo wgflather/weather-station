@@ -14,30 +14,30 @@ import { getTooltipEl, setTooltipContent } from './chart-tooltip.js';
 import { unitFor } from './metric-units.js';
 
 // ── Metric configuration ──────────────────────────────────────────────────────
+// Colour and unit only. There is deliberately no metric name here: the chart is
+// titled by the modal and its series are named by PERIOD_STYLE ("All day" /
+// "Daylight" / "Night"), so a name in this table would be a fifth copy that
+// nothing reads — which is exactly what it had become.
 const DAILY_CFG = {
     temperature: {
-        label:     'Temperature',
         unit:      unitFor('temperature'),
         lineColor: '#7dd3fc',
         highColor: '#fb923c',
         lowColor:  '#38bdf8',
     },
     pressure: {
-        label:     'Pressure',
         unit:      unitFor('pressure'),
         lineColor: '#a78bfa',
         highColor: '#c084fc',
         lowColor:  '#818cf8',
     },
     humidity: {
-        label:     'Humidity',
         unit:      unitFor('humidity'),
         lineColor: '#34d399',
         highColor: '#6ee7b7',
         lowColor:  '#059669',
     },
     surfaceWetness: {
-        label:     'Surface Wetness',
         unit:      unitFor('surfaceWetness'),
         lineColor: '#2dd4bf',
         highColor: '#5eead4',

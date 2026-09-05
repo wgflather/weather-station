@@ -1,13 +1,18 @@
 // summary-cards.js
 //
-// The stat cards above the history chart in multi-day views: "Warmest day 31°C
-// Aug 30", "Daylight trend +3°C Aug 28 → Sep 3".
+// The stat cards above the history chart in multi-day views: "Warmest day 24.6°C
+// Aug 30", "Coldest night 8.2°C Aug 31", "Daylight trend +3°C Aug 28 → Sep 3".
 //
-// The backend decides which cards a metric can answer and what each one is called;
-// this module owns only presentation. Values arrive as bare numbers and dates as
-// ISO strings, so units come from the same table the chart uses and dates render
-// in the viewer's locale — server-formatted text would disagree with the chart
-// tooltip sitting directly below it.
+// The backend decides which cards a metric can answer and what each one is called,
+// and the values it sends are period averages for some metrics and stored extremes
+// for others — this module renders whatever arrives and owns only presentation, so
+// a card whose question changes server-side needs nothing here. Values arrive as
+// bare numbers and dates as ISO strings, so units come from the same table the
+// chart uses and dates render in the viewer's locale — server-formatted text would
+// disagree with the chart tooltip sitting directly below it.
+//
+// One caption to be aware of: a "Coldest night" date is the morning the night
+// ended on, since a night runs from the previous evening's sunset.
 
 import { unitFor } from './metric-units.js';
 
