@@ -43,18 +43,18 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 
 - **`WeatherService`** — persists `WeatherRecord`, triggers validation via `DataQualityValidator`.
 - **`DataQualityValidator`** — detects spikes and anomalies using median-based statistical methods; reads recent readings from `SensorStateCache`.
-- **`AnalyticsService`** — time-series aggregation for 24-h charts (buckets of configurable resolution); also assembles the 24-h data-quality strip (`findLast24HoursQualityStrip`) — see below.
+- **`AnalyticsService`** — time-series aggregation for 24-h charts (buckets of configurable resolution); also assembles the 24-h data-quality strip (`findLast24HoursQualityStrip`) — see below. `getMetricChart` covers every sensor metric and is an *exhaustive* switch over `Metric` with no `default`, so a metric added without a chart query fails the build rather than throwing on first request. `toChartPoints` is shared with `WeatherHistoryService` — see "Chart tiers" below.
 - **`DashboardService`** — assembles the live dashboard DTO (metrics, system health, snapshots).
 - **`AstronomyEngine`** — wraps the cosinekitty astronomy lib; computes sun/moon altitude curves, rise/set/twilight times, moon phase.
 - **`AstronomySearch`** — binary-search horizon crossing finder used by `AstronomyEngine`.
 - **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists.
 - **`SeeingCalculator`** — Hufnagel-Valley HV 5/7 atmospheric turbulence model; inputs are jet-stream speed (200 hPa) and surface wind speed; outputs FWHM seeing in arc-seconds (Excellent / Good / Fair / Poor / Very Poor).
-- **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date. `getDayChart(date, metric)` is the only chart entry point: it resolves the date to midnight-to-midnight in the *station's* zone (not the caller's, which would straddle two station days and disagree with the per-period rows beside it) and routes on age — see `RAW_RETENTION_DAYS` below. It once delegated to a `getChart(metric, from, to)` behind a second `/chart` endpoint; nothing consumed the range form, so both are gone.
+- **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date. `getDayChart(date, metric)` is the only chart entry point: it resolves the date to midnight-to-midnight in the *station's* zone (not the caller's, which would straddle two station days and disagree with the per-period rows beside it) and routes on age — see `RAW_RETENTION_DAYS` below. `findHourlyDataPoints` is exhaustive over `Metric` for the same reason `getMetricChart` is. It once delegated to a `getChart(metric, from, to)` behind a second `/chart` endpoint; nothing consumed the range form, so both are gone.
 - **`SummaryCardService`** — builds the history modal's stat cards (warmest/coldest/trend) per metric. Which period a metric reads is a per-metric decision — see below.
 - **`WeatherRetentionService`** — scheduled hourly/daily rollups and raw cleanup, in a 02:00–02:10 window.
 - **`StationConfigurationService`** — CRUD for `StationConfiguration`; publishes `ConfigurationUpdatedEvent` on save.
 - **`DatabaseRawViewService`** — paged raw record queries for the admin view.
-- **`MeteoMath`** (util) — dew point, pressure trend classification, surface wetness status.
+- **`MeteoMath`** (util) — dew point, pressure trend classification, surface wetness status. `rawToWetnessPct` is the definition of record for the wetness ADC→% formula, but it is only *called* by the live dashboard card; the charts convert in SQL (see "Chart tiers"), so the formula lives in two places and a change to what the baselines mean has to land in both.
 
 ### External API (`client/`)
 
@@ -81,6 +81,8 @@ Cached by `CacheConfig` (Caffeine):
 **Entities:** `WeatherRecord`, `StationConfiguration`, `HourlyWeatherRecord`, `DayPeriodMetrics` (one row per date *per period* in `daily_weather_record`).
 
 **Enums:** `DataQuality`, `DataStatus`, `Metric`, `PressureTrend`, `DewPointRisk`, `SurfaceWetnessStatus`, `TrendDirection`, `CelestialBody`, `SolarCondition`, `DailyCurveResolution`.
+
+`domain/constant/` also holds `WindAggregation` — not an enum but the calm-speed and direction-consistency gates, shared by the hourly rollup and the raw wind-direction chart query so the two cannot drift apart.
 
 ### Database
 
@@ -141,6 +143,51 @@ the window is bucketed live from `weather_record`, one beyond it comes pre-rolle
 table). They must agree; if the reader's value is the larger, chart requests near the boundary route
 to raw rows that were already deleted and come back empty rather than falling back to the hourly
 table.
+
+### Chart tiers, and what each query must return
+
+Every sensor metric charts from **two** interchangeable sources: `WeatherReportRepository`'s
+`date_bin` queries over raw rows, and `HourlyWeatherRecordRepository`'s reads of the pre-rolled
+table. `getDayChart` picks one on the day's age and neither caller knows which answered, so **each
+pair of queries must return the same unit**. Conversions therefore live in the queries, not in Java:
+whatever a chart query emits is charted as-is.
+
+Both tiers finish through `AnalyticsService.toChartPoints(points)`, which only maps the timestamp
+into the station's zone and **drops null values**. It takes no `Metric` — deliberately, so it cannot
+become the place metric-specific rules accumulate. The null-dropping is load-bearing rather than
+tidiness: `ChartPointDto.hourlyValue` is a primitive `double`, a pre-rolled column is null for any
+hour with no valid reading, and wind direction is null routinely — so passing one on unboxes to an
+NPE. Dropping also matches the raw tier, whose `GROUP BY` simply yields no row for such a bucket; the
+frontend reads a missing point as a gap either way.
+
+Two metrics need real work in SQL:
+
+- **Wind direction** cannot use the `ROUND(AVG())` shape every other query uses — averaging bearings
+  numerically puts a bucket spent oscillating around north at 180°, due south. The raw query
+  (`findChartWindDirection`) mirrors `rollupHourly`: unit-vector mean via `atan2(AVG(sin), AVG(cos))`,
+  gated by `WindAggregation.CALM_THRESHOLD_MS` and `MIN_DIRECTION_CONSISTENCY` — shared constants
+  precisely so the two sides gate identically. **The modulo runs after the rounding**, and the order
+  matters: a mean wrapping through north lands on -1e-14, `+ 360` makes that 359.99999999999999, and
+  rounding *after* the modulo lifts it back to exactly 360.0 — outside the [0, 360) the expression
+  exists to enforce. Rounding first lets the modulo fold it to 0.
+- **Surface wetness** is stored as a raw ADC count in all three tables and is charted as a
+  percentage, converted inside *both* `findChartSurfaceWetness` queries with the baselines passed as
+  parameters. Both wrap the average — `pct(AVG(x))` — rather than converting per reading. Per-reading
+  conversion would be marginally better at the clamps, but the hourly tier stores an average of raw
+  it cannot unpick, so the tiers would then disagree either side of the retention boundary;
+  agreement is worth more. Note the transform is **decreasing**: a higher ADC count is a *drier*
+  surface.
+
+Known gap: `/daily` and `/daily/summary` still return wetness as raw ADC — `DayPeriodMetrics`
+holds the rollup's raw values and `PeriodMetricDto` copies them straight through. Converting those
+is not symmetric with the charts, because `min`/`max` **invert** under a decreasing transform: the
+stored minimum ADC is the *maximum* percentage, so anything converting stored extremes has to swap
+the pair. Converting before aggregating (i.e. in the rollup) would avoid the swap but bakes the
+baselines into rows whose raw is later deleted, and the baselines are editable from the admin panel.
+`SummaryCardService` has no wetness cards today, so nothing renders these yet.
+
+Frontend note: nothing charts the newer metrics yet. `index.html` offers only temperature, pressure
+and humidity tabs, and `metric-units.js` has no entry for them, so `unitFor` returns `''`.
 
 Reading side: `FullDaySummary` carries the three metric blocks plus `dayPeriod` / `nightPeriod`
 windows, recomputed on read rather than stored. The windows are populated only by
