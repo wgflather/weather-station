@@ -498,7 +498,9 @@ Chart.js and its date-fns adapter come from the CDN as globals — none of these
 - **The plugin reads `chart.$state`.** `computeChartState()` builds the state; `createChart()` and `updateChart()` stash it on the chart instance each pass so dataset callbacks and plugins read current analytics without the chart being destroyed and rebuilt. `resolveCollisionScenario()` fills in the `scenario` field the plugin dispatches on.
 - **`COLLISION_STATE` is per-metric hysteresis that persists across renders.** The module stays loaded across the 20 s polling cycle deliberately: entry and exit thresholds differ so layouts don't flicker as new data crosses a boundary. Resetting it per render would reintroduce the flicker.
 
-**Charting a metric for the first time means adding it to three separate per-metric tables**, and only two of them fail visibly: `METRIC_CONFIG` and `COLOR_SCALES` in `chart-metrics.js` both fall back to temperature (`?? METRIC_CONFIG.temperature`), so a missing entry renders the wrong colours rather than erroring — while a missing `COLLISION_STATE` entry used to throw `Cannot set properties of undefined` and leave the previous chart on the canvas, which reads as "the tab didn't switch". `collisionStateFor()` now creates the entry on demand, so the omission is no longer fatal; the entry must still be *stored* rather than defaulted, or the hysteresis above is defeated. The multi-day chart used to be a fourth table, `DAILY_CFG` in `daily-chart.js`, whose colours contradicted all three of these — daily humidity was emerald while the 24-h chart's is slate-to-blue, which also collapsed the teal-vs-blue separation wetness was given on purpose. It now imports `COLOR_SCALES` and `METRIC_CONFIG` and holds no hex values of its own, so these three tables are the whole set.
+**Charting a metric for the first time means adding it to three separate per-metric tables**, and only two of them fail visibly: `METRIC_CONFIG` and `COLOR_SCALES` in `chart-metrics.js` both fall back to temperature (`?? METRIC_CONFIG.temperature`), so a missing entry renders the wrong colours rather than erroring — while a missing `COLLISION_STATE` entry used to throw `Cannot set properties of undefined` and leave the previous chart on the canvas, which reads as "the tab didn't switch". `collisionStateFor()` now creates the entry on demand, so the omission is no longer fatal; the entry must still be *stored* rather than defaulted, or the hysteresis above is defeated. The multi-day chart used to be a fourth table, `DAILY_CFG` in `daily-chart.js`, whose colours contradicted all three of these — daily humidity was emerald while the 24-h chart's is slate-to-blue, which also collapsed the teal-vs-blue separation wetness was given on purpose. It now imports `COLOR_SCALES` and `METRIC_CONFIG` and holds no hex values of its own, so these three tables are the whole set of *required* ones.
+
+`AXIS_LIMITS` in the same file is a fourth, but an **opt-in** one where absence is the meaningful default: only metrics with a physical bound appear (humidity and surface wetness 0–100 %, wind and UV floored at 0, wind direction 0–360), and temperature and pressure are deliberately missing rather than given an invented range.
 
 ### The daily chart's band, and what it is allowed to annotate
 
@@ -564,6 +566,38 @@ a long time: it only looked hidden on the single-day view while it was still emp
 bug appeared only after a multi-day range had populated it — switching back to a single day
 then left its period switches on screen, offering to toggle series that view does not draw.
 **Any new flex or grid container toggled through `.hidden` needs its own rule.**
+
+### Why a padded y-axis needs a hard cap
+
+Both charts size their y-axis from the data plus padding, and hand the result to Chart.js
+as `suggestedMin`/`suggestedMax`. Its linear scale then rounds *outward* from those to a
+nice tick — which is how a wetness reading flat near zero all day padded to -2 and drew an
+axis starting at **-10 %**, and a humid night padded to 103 and drew one ending at
+**110 %**. Neither is a value the sensor can report.
+
+`clampAxisBounds()` is the fix, and the shape of it matters: it returns the suggested pair
+always, plus a **hard `min`/`max` only on the side a limit actually binds**. The hard bound
+is what does the work — `suggestedMin: 0` still lets the tick algorithm round below zero,
+which is the whole bug, and an ad-hoc `Math.max(0, …)` on the suggestion (which is what
+`getDynamicYBounds` used to do for wind and UV) could never have held for the same reason.
+Leaving the unconstrained side merely suggested keeps Chart.js free to pick nice ticks
+where nothing stops it, and the clamp values themselves — 0, 100, 360 — are already round,
+so the ticks stay clean.
+
+Two things it must not do, both guarded:
+
+- **It must not crop a real reading.** The data's own range is passed in separately from
+  the padded range, and a bound is only applied when the data stays inside it. A humidity
+  sensor reporting 100.4 % through rounding is still drawn in full; only empty padding is
+  trimmed.
+- **It must not leave a stale cap.** `weather-chart.js`'s `updateChart` repaints in place
+  on every 20 s poll, so it assigns `y.min`/`y.max` unconditionally, `undefined` included.
+  Setting them only when present would pin the axis to a cap after the data moved back
+  inside the padding, or after a switch to a metric with no limits at all.
+
+The daily chart meets this harder than the 24-hour one, because its min/max band widens the
+range the padding is a fraction of: a wetness month that is dry except for three dew nights
+pads roughly 7 % below zero.
 
 **Tooltip ownership.** `chart-tooltip.js` owns the single floating element and is the only writer of its structure, via `setTooltipContent(el, titles, bodies)`. Both the 24-h chart (`chart-interaction.js`) and the history modal's daily chart (`daily-chart.js`) render through it. They previously each created the element with different internals — one replacing `innerHTML` wholesale, the other seeding `.title`/`.body` children and querying them — so whichever drew first won and the other read into markup it had not built. Placement stays per-chart: the 24-h chart flips against the plot area and pins to the card on touch, the daily chart clamps to the viewport.
 

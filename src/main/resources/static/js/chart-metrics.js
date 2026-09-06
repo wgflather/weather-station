@@ -184,6 +184,56 @@ export const METRIC_CONFIG = {
 
 
 /* =========================================================
+   PHYSICAL AXIS LIMITS
+   Values a metric cannot take, whatever the padding says.
+========================================================= */
+/**
+ * Only metrics with a *physical* bound appear here. Temperature and pressure have none
+ * worth enforcing, so they are absent rather than given an invented range.
+ *
+ * These exist because padding alone is not the whole story: the y bounds are handed to
+ * Chart.js as `suggestedMin`/`suggestedMax`, and its linear scale then rounds *outward*
+ * to a nice tick. A wetness reading flat near 0 all day pads to -2 and rounds to -10, and
+ * a humid night pads to 103 and rounds to 110 — neither is a value the sensor can report.
+ */
+export const AXIS_LIMITS = {
+    humidity:       { min: 0, max: 100 },
+    surfaceWetness: { min: 0, max: 100 },
+    wind:           { min: 0 },
+    uvIndex:        { min: 0 },
+    windDirection:  { min: 0, max: 360 },
+};
+
+/**
+ * Padded y bounds for `metric`, clamped where they would leave the possible range.
+ *
+ * Returns `suggestedMin`/`suggestedMax` always, plus a hard `min`/`max` *only* on the side
+ * where the clamp actually bites. The hard bound is what does the work: `suggestedMin: 0`
+ * still lets the tick algorithm round below zero, which is the whole bug. Leaving the other
+ * side suggested keeps Chart.js free to pick nice ticks where nothing constrains it, and
+ * the clamped values themselves (0, 100, 360) are already round, so the ticks stay clean.
+ *
+ * The data's own range is passed separately from the padded range so a clamp can never
+ * crop a real reading: a sensor that reports 100.4 % through rounding is still drawn, and
+ * only the empty padding above it is trimmed.
+ */
+export function clampAxisBounds(metric, dataMin, dataMax, paddedMin, paddedMax) {
+    const bounds = { suggestedMin: paddedMin, suggestedMax: paddedMax };
+    const limit  = AXIS_LIMITS[metric];
+    if (!limit) return bounds;
+
+    if (limit.min != null && paddedMin < limit.min && dataMin >= limit.min) {
+        bounds.suggestedMin = limit.min;
+        bounds.min = limit.min;
+    }
+    if (limit.max != null && paddedMax > limit.max && dataMax <= limit.max) {
+        bounds.suggestedMax = limit.max;
+        bounds.max = limit.max;
+    }
+    return bounds;
+}
+
+/* =========================================================
    VALUE-BASED LINE GRADIENT
    Maps the visible y-axis range onto the metric's color scale,
    so the line color tracks the reading's value at every height.

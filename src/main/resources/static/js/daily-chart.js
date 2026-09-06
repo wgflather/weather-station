@@ -26,7 +26,9 @@
 
 import { getTooltipEl, setTooltipContent } from './chart-tooltip.js';
 import { unitFor } from './metric-units.js';
-import { COLOR_SCALES, METRIC_CONFIG, scaleToRgbString, createDynamicGradient } from './chart-metrics.js';
+import {
+    COLOR_SCALES, METRIC_CONFIG, scaleToRgbString, createDynamicGradient, clampAxisBounds,
+} from './chart-metrics.js';
 
 // ── Per-metric identity colour ────────────────────────────────────────────────
 // Where METRIC_CONFIG.lineColor is set (pressure, humidity) the 24-hour chart already
@@ -397,6 +399,11 @@ export function renderDailyChart(summaries, metric, canvasId, fromStr, toStr,
     // 20 % on top of it would squash the lines into the middle third of the plot.
     const pad = Math.max((dataMax - dataMin) * (hasBand ? 0.10 : 0.20), 1);
 
+    // The band makes this worse than on the 24-hour chart: it widens the range the padding
+    // is a fraction of, so a wetness month that is dry except for three dew nights pads far
+    // below zero and the axis rounds out to -10 %.
+    const yBounds = clampAxisBounds(metric, dataMin, dataMax, dataMin - pad, dataMax + pad);
+
     // ── X-axis bounds — full requested range, ±12 h padding ──
     const HALF_DAY = 12 * 60 * 60 * 1000;
     const xMin = new Date(new Date(fromStr + 'T00:00:00').getTime() - HALF_DAY);
@@ -466,8 +473,7 @@ export function renderDailyChart(summaries, metric, canvasId, fromStr, toStr,
                     border: { display: false },
                 },
                 y: {
-                    suggestedMin: dataMin - pad,
-                    suggestedMax: dataMax + pad,
+                    ...yBounds,
                     ticks: {
                         color:    'rgba(148, 163, 184, 0.6)',
                         font:     { size: isMobile ? 9 : 11 },

@@ -276,6 +276,11 @@ function createChart(canvasElement, state) {
                 y: {
                     suggestedMin: state.yBounds.suggestedMin,
                     suggestedMax: state.yBounds.suggestedMax,
+                    // Present only where a physical limit binds — a percentage padded past
+                    // 100, say. Suggested bounds alone cannot stop it: the tick algorithm
+                    // rounds outward from them and puts 110 % on the axis.
+                    min: state.yBounds.min,
+                    max: state.yBounds.max,
                     ticks: {
                         stepSize: state.config.yStep,
                         callback: (val) => `${val}${state.config.yAxisSuffix}`,
@@ -521,6 +526,12 @@ function updateChart(chart, state) {
     const y = chart.options.scales.y;
     y.suggestedMin = state.yBounds.suggestedMin;
     y.suggestedMax = state.yBounds.suggestedMax;
+    // Assigned unconditionally, undefined included: the hard bounds are only present on
+    // the side a limit binds, so a poll that moves the data back inside the padding — or
+    // a switch to a metric with no limits at all — has to clear the previous cap rather
+    // than leave the axis pinned to it.
+    y.min = state.yBounds.min;
+    y.max = state.yBounds.max;
 
     const x = chart.options.scales.x;
     x.min = state.startRange;
