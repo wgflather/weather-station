@@ -1484,6 +1484,12 @@ span.flatpickr-weekday {
     gap: 8px;
 }
 
+/* Our display:flex overrides the browser's [hidden]{display:none} — restore it. The date
+   and month pickers swap by `hidden`, so without this the month view shows both at once. */
+.history-picker-group[hidden] {
+    display: none;
+}
+
 .history-period-tabs {
     display: flex;
     gap: 4px;
@@ -1842,6 +1848,37 @@ button.hist-summary-card:hover .hist-summary-context {
 }
 
 /* Legend doubles as the series toggle for the daily chart. */
+/* The month picker sits where the date picker does and swaps with it, so it inherits
+   .db-date-input's box and only adds what a <select> needs: the native chrome removed and
+   the same chevron .db-select draws, plus room for it. Sized wider than the date input
+   because a localised "September 2026" is longer than "2026-09-05". */
+.history-month-select {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 165px;
+    padding-right: 28px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a3adbb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+}
+
+.history-month-select:hover:not(:disabled) {
+    border-color: rgba(148, 163, 184, 0.34);
+}
+
+.history-month-select:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* Native option lists are drawn by the OS, so they ignore the page's dark tokens and can
+   come out black-on-black. Set both explicitly. */
+.history-month-select option {
+    background-color: #16233c;
+    color: var(--text-secondary);
+}
+
 .hist-legend {
     display: flex;
     flex-wrap: wrap;

@@ -16,7 +16,10 @@ import { enterModal, exitModal } from './modal-shell.js';
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentDate   = null;
 let currentMetric = 'temperature';
+// A number of days ending yesterday, or the string 'month' for a calendar month.
+// Kept as one value because every caller only ever asks "which view am I in".
 let currentPeriod = 1;
+let currentMonth  = null; // 'YYYY-MM', only meaningful while currentPeriod === 'month'
 let initialized   = false;
 let datePicker    = null;
 
@@ -55,6 +58,11 @@ export const PERIODS = ['fullDay', 'day', 'night'];
 // with one Set the first metric visited would dictate the rest. Keyed by metric, a choice
 // made on temperature sticks for temperature without leaking onto pressure.
 const shownByMetric = new Map();
+
+// Metrics whose reader has explicitly switched All day *off*. A range that mixes dates with
+// and without the day/night split turns All day back on by itself (see loadMultiDay), and
+// without this it would keep turning back on after every deliberate dismissal.
+const allDayDismissed = new Set();
 
 function shownPeriodsFor(metric) {
     if (!shownByMetric.has(metric)) {
@@ -169,7 +177,15 @@ function setAvailability(period, available) {
 /** Periods currently drawn: wanted by the reader and actually carrying data. */
 function activePeriods() {
     const shown = shownPeriodsFor(currentMetric);
-    return PERIODS.filter(p => shown.has(p) && availablePeriods.has(p));
+    const wanted = PERIODS.filter(p => shown.has(p) && availablePeriods.has(p));
+    if (wanted.length) return wanted;
+
+    // Nothing the reader asked for exists in this range. Month view makes that reachable:
+    // temperature and humidity open on Daylight + Night, and any month before the day/night
+    // split has All day rows alone — so the intersection is empty and renderDailyChart would
+    // return without drawing, leaving a stale or blank canvas that reads as a broken tab.
+    // Falling back to whatever the range does have shows the data instead of hiding it.
+    return PERIODS.filter(p => availablePeriods.has(p));
 }
 
 // ── Chart legend (multi-day only) ─────────────────────────────────────────────
@@ -221,11 +237,67 @@ document.getElementById('hist-legend')?.addEventListener('click', (e) => {
     shown.has(period) ? shown.delete(period) : shown.add(period);
     item.setAttribute('aria-pressed', String(shown.has(period)));
 
+    if (period === 'fullDay') {
+        shown.has(period)
+            ? allDayDismissed.delete(currentMetric)
+            : allDayDismissed.add(currentMetric);
+    }
+
     if (lastSummaries && lastRange) {
         renderDailyChart(lastSummaries, currentMetric, 'hist-modal-chart',
                          lastRange.from, lastRange.to, activePeriods());
     }
 });
+
+// ── Month selector ────────────────────────────────────────────────────────────
+// Populated once from the months that actually hold data, so the control cannot offer a
+// month that would draw an empty chart. Deliberately a plain <select> rather than a second
+// flatpickr: the choice is one of a short, known list, and flatpickr's month mode would
+// need a plugin the page does not load.
+
+/** "September 2026" in the viewer's locale, from a 'YYYY-MM' key. */
+function monthLabel(key) {
+    const [year, month] = key.split('-').map(Number);
+    return new Date(year, month - 1, 1)
+        .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+/** First and last day of `key`, the last clamped to yesterday for the current month. */
+function monthBounds(key) {
+    const [year, month] = key.split('-').map(Number);
+    const from = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastOfMonth = isoDateKey(new Date(year, month, 0));
+    // The rollup only writes a date once it is over, so today has no row and asking for it
+    // would stretch the axis across a day that can never fill in.
+    const to = lastOfMonth > yesterday() ? yesterday() : lastOfMonth;
+    return { from, to };
+}
+
+async function initMonthSelect() {
+    const select = document.getElementById('hist-month-select');
+    if (!select) return;
+
+    const months = await availableDates.loadAvailableMonths();
+    select.replaceChildren();
+
+    for (const key of months) {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = monthLabel(key);
+        select.append(option);
+    }
+
+    // Newest month first is what a reader wants by default, but the list stays chronological
+    // — a dropdown that runs backwards is harder to scan than one that starts at the end.
+    currentMonth = months.length ? months[months.length - 1] : null;
+    if (currentMonth) select.value = currentMonth;
+    select.disabled = months.length === 0;
+
+    select.addEventListener('change', () => {
+        currentMonth = select.value;
+        loadRange('month');
+    });
+}
 
 // ── Date picker ───────────────────────────────────────────────────────────────
 async function initDatePicker() {
@@ -328,7 +400,7 @@ function hideChartChrome() {
 }
 
 // ── Multi-day: single fetch drives both the legend and the daily chart ────────
-async function loadMultiDay(fromStr, toStr, days, metric) {
+async function loadMultiDay(fromStr, toStr, metric) {
     const emptyEl = document.getElementById('hist-chart-empty');
     const canvas  = document.getElementById('hist-modal-chart');
 
@@ -354,6 +426,25 @@ async function loadMultiDay(fromStr, toStr, days, metric) {
         for (const period of PERIODS) {
             setAvailability(period, rangeStats(summaries, period, metric) != null);
         }
+
+        // A range can straddle the day/night split — every month before it has All day rows
+        // alone, every month after has all three. Availability is per *range*, so one such
+        // date is enough to mark Daylight and Night "available" and the presets that open on
+        // them draw lines over only part of the chart, with the band stretching across the
+        // rest and nothing inside it. Turning All day on covers the whole range, so the
+        // earlier dates get a line instead of an empty band.
+        //
+        // Counted per day rather than taken from availability, which cannot tell "present
+        // throughout" from "present once". Unless the reader has dismissed it, in which case
+        // their choice stands.
+        const daysWithFull = summaries.filter(d => statsFor(d.fullDay, metric)).length;
+        const daysWithSplit = summaries.filter(
+            d => statsFor(d.day, metric) || statsFor(d.night, metric)).length;
+
+        if (daysWithSplit > 0 && daysWithSplit < daysWithFull && !allDayDismissed.has(metric)) {
+            shownPeriodsFor(metric).add('fullDay');
+        }
+
         renderLegend(metric);
 
         lastSummaries = summaries;
@@ -437,7 +528,8 @@ document.getElementById('hist-period-tabs')?.addEventListener('click', (e) => {
     if (!btn || btn.classList.contains('active')) return;
     document.querySelectorAll('#hist-period-tabs .history-period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentPeriod = Number(btn.dataset.days);
+    const days = btn.dataset.days;
+    currentPeriod = days === 'month' ? 'month' : Number(days);
     if (currentDate) loadRange(currentPeriod);
 });
 
@@ -454,10 +546,15 @@ async function loadRange(days) {
     lastSummaries = null;
     lastRange     = null;
 
+    const monthView = days === 'month';
     const singleDay = days === 1;
-    // Disable the date picker in multi-day views — it only applies to single day.
+
+    // Each view owns one control: a date for the single day, a month for the month, and
+    // neither for the rolling ranges, whose window is fixed relative to yesterday.
+    pickerWrapper.hidden = monthView;
     pickerWrapper.classList.toggle('hist-picker-disabled', !singleDay);
     dateInput.disabled = !singleDay;
+    document.getElementById('hist-month-wrapper').hidden = !monthView;
 
     // The two views answer different questions and swap their whole summary area: one date
     // gets the per-period breakdown with its sunrise/sunset windows, a range gets the stat
@@ -476,11 +573,20 @@ async function loadRange(days) {
             loadDaySummaryStats(currentDate, currentMetric),
             loadDayChart(currentDate, currentMetric),
         ]);
+    } else if (monthView) {
+        if (!currentMonth) {
+            hideChartChrome();
+            clearSummaryCards(document.getElementById('hist-summary-cards'));
+            return;
+        }
+        const { from, to } = monthBounds(currentMonth);
+        chartTitle.textContent = monthLabel(currentMonth);
+        await loadMultiDay(from, to, currentMetric);
     } else {
         chartTitle.textContent = 'Daily';
         const toDate   = yesterday();
         const fromDate = subtractDays(toDate, days - 1);
-        await loadMultiDay(fromDate, toDate, days, currentMetric);
+        await loadMultiDay(fromDate, toDate, currentMetric);
     }
 }
 
@@ -489,7 +595,7 @@ async function initModal() {
     if (initialized) return;
     initialized = true;
     currentDate = yesterday();
-    await initDatePicker();
+    await Promise.all([initDatePicker(), initMonthSelect()]);
     await loadRange(currentPeriod);
 }
 

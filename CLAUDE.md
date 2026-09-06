@@ -138,6 +138,25 @@ next pass instead of needing a backfill — and it means changing a window defin
 existing rows within a day. It also makes ordering load-bearing: `deleteRawOlderThan` runs *after*
 the loop, because the oldest date's night reaches into the previous date's evening.
 
+**There is no backfill path, and raw rows imported outside the window erase themselves.** The
+rollup is built for a live stream: `rollupHourly` starts at `today - RAW_RETENTION_DAYS`, the
+`rollupDay` loop covers those same 29 dates, and `deleteRawOlderThan` then removes everything older.
+So importing historical `weather_records` does nothing useful and does not survive — the rows are
+never aggregated into `hourly_weather_record` or `daily_weather_record`, and the next 02:00 run
+deletes them. Anything older than the window has to be written **directly** into the two rollup
+tables, and a `DAY`/`NIGHT` row additionally needs its window resolved through
+`AstronomySearch.getDayPeriodIntervalByDate`; skip that and the date lands `FULL`-only.
+
+That is also why this station's own June–early-August dates carry `FULL` rows alone: the day/night
+split shipped after those dates had left the retention window, so their raw was already gone and
+nothing could re-form them. The gap is permanent for those dates and fills in only from the right,
+one day per day. The same seam will appear at the 29-day boundary after **any** future change to
+what a period means.
+
+Both rollup queries already take explicit bounds, so the capability is there — it is only the
+scheduler's hardcoded window that assumes "recent". A backfill entry point would drive the same two
+queries over an arbitrary date range.
+
 `RAW_RETENTION_DAYS` is declared in both `WeatherRetentionService` (what gets deleted) and
 `WeatherHistoryService` (raw-vs-hourly chart routing, now read only by `getDayChart` — a day inside
 the window is bucketed live from `weather_record`, one beyond it comes pre-rolled from the hourly
@@ -432,10 +451,10 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 
 | File | Role |
 |---|---|
-| `history-modal.js` | History chart modal (date picker + range tabs, period breakdown, legend toggles) |
+| `history-modal.js` | History chart modal. Three views behind one row of tabs: a single day (date picker), a rolling range ending yesterday (7 / 14 / 30), and one calendar month (month picker) |
 | `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block. Picks a caption from which context fields arrived (date / date range / time window / date + hour), not from `kind`, and takes a card's unit from `unitMetric` when it differs from the tab's. A card naming a single date renders as a `<button>` carrying `data-date`; the modal opens that day from it |
 | `metric-units.js` | The one place a metric's display unit is written down; used by the modal, its cards and the daily chart |
-| `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js` |
+| `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js`. Also serves `loadAvailableMonths()`, which the history modal's month picker is built from |
 | `database-view.js` / `config.js` | Admin pages only, not loaded by the dashboard |
 
 Both modals go through `modal-shell.js` for scroll locking and focus containment; neither may lock `<body>` itself. The lock is counted by modal depth, so only the outermost open and close touch `<body>` — locking per-modal meant the second modal read `window.scrollY` while the body was already fixed, saved 0, clobbered the first modal's offset, and unlocked the background on the first close, leaving a modal open over a scrollable page.
@@ -558,6 +577,45 @@ Consequences worth knowing:
   `loadRange` switches them on before the fetch resolves, so a range that comes back empty
   has to undo that.
 
+**The month view is a third range shape, not a wider rolling range.** `currentPeriod` holds
+either a number of days ending yesterday or the string `'month'`, and `loadRange` branches on
+which. The month's end is **clamped to yesterday** — the rollup only writes a date once it is
+over, so asking for the whole of the current month would stretch the axis across days that
+cannot fill in.
+
+Its options come from `loadAvailableMonths()`, one request over a deliberately wide window
+rather than probing month by month, which would stop at the first gap. The dates it returns are
+folded into the same cache `loadMonth` fills, so the day picker opens already warm instead of
+painting every cell disabled on first open. A plain `<select>` rather than a second flatpickr:
+the choice is one of a short known list, and flatpickr's month mode needs a plugin the page does
+not load.
+
+**All day switches itself on for a range that straddles the split.** A range can mix dates
+that have the day/night rows with dates that only ever got All day — every month before the
+split is the second kind, and the boundary itself falls inside a month. Availability is
+computed per *range*, so a single split date is enough to mark Daylight and Night
+"available", and the presets that open on them then draw lines across only part of the chart
+while the band stretches across all of it with nothing inside. `loadMultiDay` counts the days
+each way and, when it sees both, adds All day to the shown set so the earlier dates get a line
+too.
+
+The count is per day rather than taken from `availablePeriods`, which cannot distinguish
+"present throughout" from "present once" — the distinction the whole rule turns on.
+
+It also has to not fight the reader: `allDayDismissed` records metrics where All day was
+switched off deliberately, and the auto-enable skips those. The set is keyed by metric, so
+dismissing it on temperature leaves humidity alone, and switching it back on resumes the
+automatic behaviour.
+
+**`activePeriods()` falls back rather than drawing nothing.** Temperature and humidity open on
+Daylight + Night, and any month before the day/night split has All day rows alone — so the
+intersection of "wanted" and "available" is empty, and `renderDailyChart` returns early. That
+early return happens *before* `Chart.getChart(canvas)?.destroy()`, so the canvas would keep the
+**previous** month's chart under the new month's title, which reads as the tab not having
+switched. When nothing the reader asked for exists, the fallback draws whatever the range does
+have. Rolling ranges never reached this because they always end yesterday, where every period
+exists; the month picker is what makes older windows selectable.
+
 **Cards drill down into the day they name.** A card with a `date` renders as a `<button>`
 with `data-date`, and `history-modal.js` delegates a click on it to `goToDay()`, which
 switches to the single-day view for that date. The trend and diurnal-stretch cards stay
@@ -590,12 +648,16 @@ the range tabs.
 browser's `[hidden] { display: none }` comes from the *UA* stylesheet, so any author rule
 setting `display` on the same element beats it and the `hidden` attribute silently does
 nothing. `pages.css` carries explicit `[hidden]` restorations for `.provider-dew-warn`,
-`.db-range-inputs`, the history canvas, and now `.hist-legend` / `.hist-chart-note` /
-`.hist-summary-cards`. The legend case is worth remembering because it hid *by accident* for
+`.db-range-inputs`, the history canvas, `.hist-legend` / `.hist-chart-note` /
+`.hist-summary-cards`, and `.history-picker-group`. The legend case is worth remembering because it hid *by accident* for
 a long time: it only looked hidden on the single-day view while it was still empty, and the
 bug appeared only after a multi-day range had populated it — switching back to a single day
 then left its period switches on screen, offering to toggle series that view does not draw.
-**Any new flex or grid container toggled through `.hidden` needs its own rule.**
+**Any new flex or grid container toggled through `.hidden` needs its own rule.** The month
+picker walked into it again immediately: the date and month pickers swap by `hidden` and both
+are `.history-picker-group`, so the month view showed both controls at once while the DOM
+reported one of them hidden. It is not a trap you spot by reading the JavaScript, which is
+why it is worth looking at the rendered result before believing a swap works.
 
 ### Why a padded y-axis needs a hard cap
 

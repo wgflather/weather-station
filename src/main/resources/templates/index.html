@@ -386,11 +386,16 @@
                 <span class="history-picker-label">Date</span>
                 <input type="text" id="hist-date-input" class="db-date-input" placeholder="Select a date" readonly>
             </div>
+            <div id="hist-month-wrapper" class="history-picker-group" hidden>
+                <span class="history-picker-label">Month</span>
+                <select id="hist-month-select" class="db-date-input history-month-select"></select>
+            </div>
             <div class="history-period-tabs" id="hist-period-tabs">
                 <button class="history-period-btn active" data-days="1">Day</button>
                 <button class="history-period-btn" data-days="7">7D</button>
                 <button class="history-period-btn" data-days="14">14D</button>
                 <button class="history-period-btn" data-days="30">30D</button>
+                <button class="history-period-btn" data-days="month">Month</button>
             </div>
         </div>
         <div class="hist-modal-body">
