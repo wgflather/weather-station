@@ -188,14 +188,21 @@ export const METRIC_CONFIG = {
    Maps the visible y-axis range onto the metric's color scale,
    so the line color tracks the reading's value at every height.
 ========================================================= */
-export function createDynamicGradient(ctx, chartArea, yAxis, scale) {
+/**
+ * `alpha` below 1 is what the daily chart's min/max band uses: the same value->colour
+ * mapping as the line, but translucent enough to sit behind it. Keep it well above ~0.15
+ * for a fill — under that every stop desaturates toward the page background and the whole
+ * gradient collapses into one muddy colour, which reads as decoration rather than as the
+ * value scale it is.
+ */
+export function createDynamicGradient(ctx, chartArea, yAxis, scale, alpha = 1) {
     const grad = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
     const maxV = yAxis.max;
     const minV = yAxis.min;
     for (let i = 0; i <= 10; i++) {
         const pos   = i / 10;
         const value = maxV - (pos * (maxV - minV));
-        grad.addColorStop(pos, scaleToRgbString(scale, value));
+        grad.addColorStop(pos, scaleToRgbString(scale, value, alpha));
     }
     return grad;
 }

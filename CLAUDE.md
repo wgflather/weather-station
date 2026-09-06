@@ -50,11 +50,11 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 - **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists.
 - **`SeeingCalculator`** — Hufnagel-Valley HV 5/7 atmospheric turbulence model; inputs are jet-stream speed (200 hPa) and surface wind speed; outputs FWHM seeing in arc-seconds (Excellent / Good / Fair / Poor / Very Poor).
 - **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date. `getDayChart(date, metric)` is the only chart entry point: it resolves the date to midnight-to-midnight in the *station's* zone (not the caller's, which would straddle two station days and disagree with the per-period rows beside it) and routes on age — see `RAW_RETENTION_DAYS` below. `findHourlyDataPoints` is exhaustive over `Metric` for the same reason `getMetricChart` is. It once delegated to a `getChart(metric, from, to)` behind a second `/chart` endpoint; nothing consumed the range form, so both are gone.
-- **`SummaryCardService`** — builds the history modal's stat cards (warmest/coldest/trend) per metric. Which period a metric reads, and whether it answers with a date or an hour of the day, are per-metric decisions — see below. Humidity's builder is the only one that queries; the rest work from the rows the caller passes in.
+- **`SummaryCardService`** — builds the history modal's stat cards per metric. Which period a metric reads, whether it answers with a date or an hour of the day, and whether it has a trend at all are per-metric decisions — see below. Humidity's builder is the only one that queries (twice), and the only one whose cards read nothing from the daily rows.
 - **`WeatherRetentionService`** — scheduled hourly/daily rollups and raw cleanup, in a 02:00–02:10 window.
 - **`StationConfigurationService`** — CRUD for `StationConfiguration`; publishes `ConfigurationUpdatedEvent` on save.
 - **`DatabaseRawViewService`** — paged raw record queries for the admin view.
-- **`MeteoMath`** (util) — dew point, pressure trend classification, surface wetness status. `rawToWetnessPct` is the definition of record for the wetness ADC→% formula, but it is only *called* by the live dashboard card; the charts convert in SQL (see "Chart tiers"), so the formula lives in two places and a change to what the baselines mean has to land in both.
+- **`MeteoMath`** (util) — dew point, pressure trend classification, surface wetness status. `rawToWetnessPct` is the definition of record for the wetness ADC→% formula, but it is only *called* by the live dashboard card; the charts convert in SQL (see "Chart tiers"), so the formula lives in two places and a change to what the baselines mean has to land in both. The dew point avoids that trap: `calculateDewPoint` also has a SQL counterpart, but the two share `DEW_POINT_A`/`_B`, which the query takes as parameters.
 
 ### External API (`client/`)
 
@@ -152,10 +152,22 @@ table. `getDayChart` picks one on the day's age and neither caller knows which a
 pair of queries must return the same unit**. Conversions therefore live in the queries, not in Java:
 whatever a chart query emits is charted as-is.
 
-Not everything in `HourlyWeatherRecordRepository` is a chart tier, though: `findHumidityByHourOfDay`
-aggregates by hour *of the day* for the summary cards, has no raw twin and is under none of the
-contracts below. It is also the only query in there that takes the station's zone, because bucketing
-a `TIMESTAMPTZ` by clock hour is the one thing that cannot be done in UTC and corrected later.
+Not everything in `HourlyWeatherRecordRepository` is a chart tier, though. Two queries there serve
+the summary cards, have no raw twin and are under none of the contracts below:
+`findHumidityByHourOfDay` aggregates by hour *of the day*, and `findLowestDewPointGap` returns the
+single hour of a range that came nearest to condensation. The first is also the only query in the
+file that takes the station's zone, because bucketing a `TIMESTAMPTZ` by clock hour is the one thing
+that cannot be done in UTC and corrected later.
+
+`findLowestDewPointGap` computes the Magnus formula in SQL, with the coefficients passed in from
+`MeteoMath.DEW_POINT_A`/`_B` so it cannot drift from `MeteoMath.calculateDewPoint`, which the live
+dashboard card uses. Several published coefficient pairs exist and they differ by only ~0.02 °C —
+which is exactly why a second hardcoded copy would go unnoticed rather than looking wrong. **It is
+also one bad row from a 500:** `LN` is undefined at zero and Postgres *raises* there rather than
+returning an infinity, so a single stored humidity of 0 % fails the query and, because the cards
+travel with the chart data, takes the whole `/daily` response down. No such row exists today and 0 %
+is a fault signature rather than a reading, so the floor belongs in validation — it is not there
+yet.
 
 Both tiers finish through `AnalyticsService.toChartPoints(points)`, which only maps the timestamp
 into the station's zone and **drops null values**. It takes no `Metric` — deliberately, so it cannot
@@ -214,8 +226,9 @@ least-squares fit over daily averages means something; wetness is close to bimod
 range rather than a direction the weather took.
 
 Frontend: surface wetness is wired through — a `Wetness` tab in `index.html`, a `surfaceWetness`
-entry in `metric-units.js`, a `COLOR_SCALES`/`METRIC_CONFIG` pair in `chart-metrics.js` and a
-`DAILY_CFG` entry in `daily-chart.js`. Its colour ramp puts its stops on `SurfaceWetnessStatus`'s own
+entry in `metric-units.js`, a `COLOR_SCALES`/`METRIC_CONFIG` pair in `chart-metrics.js`, and
+`DEFAULT_PERIODS` + `IDENTITY_STOP` entries in `daily-chart.js` (the latter only because its
+`METRIC_CONFIG.lineColor` is null). Its colour ramp puts its stops on `SurfaceWetnessStatus`'s own
 boundaries (10 / 40 / 70), so the line changes colour where the status label would, and it is
 teal-led rather than blue so a 0-100 % wetness chart is not mistaken for humidity. Nothing else
 charts the remaining metrics: wind, wind direction and UV have backend queries but no tab, no unit
@@ -240,13 +253,24 @@ caller already loaded. Humidity's two extremes name an *hour of the day* instead
 stretch 94 %, 23:00–02:00" — because its cycle is strong, inverted against temperature and repeats
 nightly, so "which day was most humid" mostly reports which airmass happened to sit over the station,
 while "which hours are reliably the most humid" describes the site itself. It is also the one thing
-the chart beside the cards cannot show, since that carries one point per day. This is the only
-builder that goes back to the database, reading
-`HourlyWeatherRecordRepository.findHumidityByHourOfDay`, so only the humidity tab pays for the extra
-round trip — and the modal reloads the range on *every* metric tab, so that is per click, not per
-open. The fetch sits in the builder rather than in `WeatherHistoryService` precisely so the choice
-stays next to the reasoning for it; hoisting it into the caller would put "humidity needs hourly
-rows" in a class that otherwise knows nothing about which metric wants what.
+the chart beside the cards cannot show, since that carries one point per day. Its third card names a
+single *date and hour* — the closest approach to dew — because at that resolution the hour is half
+the answer: the same spread at 03:00 is an ordinary clear night and at 14:00 is fog.
+
+Humidity is therefore the only builder that goes back to the database, and it makes **two** queries:
+`findHumidityByHourOfDay` for the diurnal buckets and `findLowestDewPointGap` for the dew card. Only
+the humidity tab pays for them, and the modal reloads the range on *every* metric tab, so that is
+per click rather than per open. The fetches sit in the builder rather than in `WeatherHistoryService`
+precisely so the choice stays next to the reasoning for it; hoisting them into the caller would put
+"humidity needs hourly rows" in a class that otherwise knows nothing about which metric wants what.
+
+The dew card is the one place a card's number is **not in its tab's unit** — it is a temperature
+spread in °C on a tab measured in percent. It says so with `unitMetric`, which carries a metric's
+request key rather than a unit string, so `metric-units.js` stays the only place a unit is written
+down. Without it the frontend appends the tab's unit and renders "1.7 %". It also reports the
+*spread* rather than the dew point itself, because a dew point alone says nothing about
+condensation — 12 °C is unremarkable at 20 °C air and means water on every surface at 13 °C — and the
+gap is what `DewPointRisk` classifies.
 
 **Which period.** Temperature takes *one card from each side of the split* — "Warmest day" from
 `DAY`, "Coldest night" from `NIGHT` — because that is the pair of questions the day/night rows exist
@@ -265,12 +289,16 @@ by whichever minute the sun was on the enclosure, and not comparable between day
 extreme because the deepest low *is* the storm, and wetness because its peak answers "did it get wet
 at all" while its mean is near zero for days.
 
-**Whether there is a trend at all.** Wetness has none — a least-squares fit over a bimodal,
-event-driven signal reports where the wet days fell in the range, not a direction. Humidity keeps
-one, and it is now the only humidity card that reads daily rows and names dates. Thresholds are
-likewise per-metric: 0.5 °C is a real shift, 0.5 hPa is noise.
+**Whether there is a trend at all.** Only temperature and pressure have one. Wetness never did — a
+least-squares fit over a bimodal, event-driven signal reports where the wet days fell in the range,
+not a direction. Humidity's went when its cards moved to hours of the day: over a week a humidity
+slope mostly reports which airmass sat over the station, and over a month it reports seasonal drift
+already legible on the chart, so it was low-information rather than wrong. A consequence worth
+knowing: humidity now reads **nothing** from the daily rows, and `buildSummary` still receives them
+only for the other three metrics. Thresholds are likewise per-metric: 0.5 °C is a real shift, 0.5 hPa
+is noise.
 
-The diurnal cards rank **three-hour windows**, not single hours. The width is fixed rather than
+The two diurnal cards rank **three-hour windows**, not single hours. The width is fixed rather than
 chosen per range, and deliberately not a "best of 2 or 3": a narrower window can always drop its
 worst hour and so scores more extreme in *both* directions, which means letting the width vary would
 simply return the narrowest one every time. Three is wide enough that the winner shifts smoothly —
@@ -293,13 +321,26 @@ Three things the scan has to get right, each with a test naming it:
   exactly this. If no window survives, the cards are omitted like any other card with nothing behind
   it.
 
-`SummaryCard` therefore carries one of three context shapes, with the other two null: a `date`, a
-`rangeStart`/`rangeEnd` pair of days, or a `windowStart`/`windowEnd` pair of `LocalTime`. Those times
-are **wall-clock at the station**, not instants, and `summary-cards.js` renders them verbatim rather
-than through `toLocaleTimeString` — a viewer in another zone must read the hour the station
-experienced, or the caption disagrees with the chart below it, which resolves its own days in the
-station's zone too. The frontend branches on *which fields arrived*, not on `kind`, so a second
-diurnal metric would need no frontend change at all.
+`SummaryCard` therefore carries one of **four** context shapes, with the unused fields null:
+
+| Shape | Fields | Renders as | Used by |
+|---|---|---|---|
+| A day | `date` | "Aug 30" | the day extremes |
+| A span of days | `rangeStart` + `rangeEnd` | "Aug 30 → Sep 5" | the trends |
+| A recurring stretch | `windowStart` + `windowEnd` | "23:00–02:00" | the diurnal extremes |
+| One reading at one hour | `date` + `windowStart` | "Sep 5, 20:00" | the dew point card |
+
+The last two reuse `windowStart` for different things — a window opening, and the hour a single
+reading landed on — which is why the two are told apart by whether `windowEnd` arrived. Both are
+**wall-clock at the station**, not instants, and `summary-cards.js` renders them verbatim rather than
+through `toLocaleTimeString`: a viewer in another zone must read the hour the station experienced, or
+the caption disagrees with the chart below it, which resolves its own days in the station's zone too.
+
+The frontend picks its caption from *which fields arrived*, never from `kind`. That is what let the
+last two shapes be added server-side with one branch each, and it is why a card's question belongs in
+its `label` rather than in a new `CardKind` — kinds say how to read the number (a high, a low, a
+signed change), which is what the styling keys on. "Closest to dew point" is an `EXTREME_LOW`
+carrying its own label, not a kind of its own.
 
 `extremeHigh`/`extremeLow` take a `Function<DayPeriodMetrics, Double>` that supplies **the value the
 card displays**, and rank on that same function — selection and display must not come from different
@@ -381,7 +422,7 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 | `chart-labels.js` | H / L / Now label geometry, the collision engine, and the `minMaxLabels` Chart.js plugin |
 | `chart-interaction.js` | The 24-h chart's external tooltip handler, its placement, and touch suppression |
 | `chart-tooltip.js` | The single floating tooltip element, shared with `daily-chart.js` |
-| `daily-chart.js` | Multi-day chart used by the history modal; one avg line per visible period. Exports `periodColor()` so the legend swatches match the lines |
+| `daily-chart.js` | Multi-day chart used by the history modal: a value-coloured min/max band per day, plus one average line per visible period. Owns `DEFAULT_PERIODS` (which periods each metric opens with) and exports `periodColor()` so the legend swatches match the lines |
 | `FetchScheduler.js` | Incremental chart data fetcher (fetches only new buckets) |
 | `quality-strip.js` | 24-h data-quality strip inside metric status-circle popovers; owns the shared `/api/weather/quality` fetch cache |
 
@@ -390,7 +431,7 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 | File | Role |
 |---|---|
 | `history-modal.js` | History chart modal (date picker + range tabs, period breakdown, legend toggles) |
-| `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block. Picks a caption from which context fields arrived (date / date range / time window), not from `kind` |
+| `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block. Picks a caption from which context fields arrived (date / date range / time window / date + hour), not from `kind`, and takes a card's unit from `unitMetric` when it differs from the tab's |
 | `metric-units.js` | The one place a metric's display unit is written down; used by the modal, its cards and the daily chart |
 | `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js` |
 | `database-view.js` / `config.js` | Admin pages only, not loaded by the dashboard |
@@ -457,7 +498,72 @@ Chart.js and its date-fns adapter come from the CDN as globals — none of these
 - **The plugin reads `chart.$state`.** `computeChartState()` builds the state; `createChart()` and `updateChart()` stash it on the chart instance each pass so dataset callbacks and plugins read current analytics without the chart being destroyed and rebuilt. `resolveCollisionScenario()` fills in the `scenario` field the plugin dispatches on.
 - **`COLLISION_STATE` is per-metric hysteresis that persists across renders.** The module stays loaded across the 20 s polling cycle deliberately: entry and exit thresholds differ so layouts don't flicker as new data crosses a boundary. Resetting it per render would reintroduce the flicker.
 
-**Charting a metric for the first time means adding it to three separate per-metric tables**, and only two of them fail visibly: `METRIC_CONFIG` and `COLOR_SCALES` in `chart-metrics.js` both fall back to temperature (`?? METRIC_CONFIG.temperature`), so a missing entry renders the wrong colours rather than erroring — while a missing `COLLISION_STATE` entry used to throw `Cannot set properties of undefined` and leave the previous chart on the canvas, which reads as "the tab didn't switch". `collisionStateFor()` now creates the entry on demand, so the omission is no longer fatal; the entry must still be *stored* rather than defaulted, or the hysteresis above is defeated. The multi-day chart has a fourth table, `DAILY_CFG` in `daily-chart.js`.
+**Charting a metric for the first time means adding it to three separate per-metric tables**, and only two of them fail visibly: `METRIC_CONFIG` and `COLOR_SCALES` in `chart-metrics.js` both fall back to temperature (`?? METRIC_CONFIG.temperature`), so a missing entry renders the wrong colours rather than erroring — while a missing `COLLISION_STATE` entry used to throw `Cannot set properties of undefined` and leave the previous chart on the canvas, which reads as "the tab didn't switch". `collisionStateFor()` now creates the entry on demand, so the omission is no longer fatal; the entry must still be *stored* rather than defaulted, or the hysteresis above is defeated. The multi-day chart used to be a fourth table, `DAILY_CFG` in `daily-chart.js`, whose colours contradicted all three of these — daily humidity was emerald while the 24-h chart's is slate-to-blue, which also collapsed the teal-vs-blue separation wetness was given on purpose. It now imports `COLOR_SCALES` and `METRIC_CONFIG` and holds no hex values of its own, so these three tables are the whole set.
+
+### The daily chart's band, and what it is allowed to annotate
+
+`daily-chart.js` draws a **shaded band between each day's recorded min and max**, with one
+average line per visible period on top. The band is the FULL day's envelope and is
+deliberately independent of whether the All day *line* is drawn — under the default period
+sets that line is usually hidden, and the band is what represents the whole day.
+
+It is filled with `createDynamicGradient` at low alpha, so a height on this chart carries
+the same colour it does on the 24-h chart: red at 40 °C, pale at 7 °C. A flat tint cannot
+say that, and a band spanning half the axis in one colour reads as decoration. The alpha
+matters more than it looks — below ~0.15 every stop desaturates toward the page background
+and the whole ramp collapses into one muddy colour. Its edges carry a thin stroke for a
+related reason: at `borderWidth: 0` the min and max are the boundary of a shape rather than
+data, and nothing on screen says they are series at all.
+
+**The only annotation is the highest and lowest value recorded in the range**, marked on
+the band edge it belongs to. There are deliberately no H / L markers on the average lines
+any more. They marked a weaker fact — the day with the highest daily *mean* — in a louder
+visual form, while the band above them visibly reached higher: two "highests" in two
+languages, the louder one the smaller number. The summary cards above the chart already
+name the warmest day with a value and a date, which the marker never could.
+
+`DEFAULT_PERIODS` decides which periods a metric opens with, and it is measured rather than
+assumed. Comparing the mean |day − night| gap against the day-to-day movement of the
+whole-day mean over 30 days of this station's rows: temperature 2.63x, humidity 3.35x,
+surfaceWetness 1.00x, pressure 0.36x. Pressure therefore shows **All day alone** — its two
+period lines sit on top of each other and add nothing. Wetness looks borderline on that
+ratio and is not: it is flat for 27 days a month and then one night runs 10–25 pp wetter
+than its day, which is dew and is the entire reason the sensor exists, so it keeps the
+split. A mean is the wrong summary of a signal that bimodal.
+
+Consequences worth knowing:
+
+- **All day is neutral, not the metric's colour.** Daylight and Night are anchored to the
+  dashboard's amber and indigo sun/moon accents, so a metric-derived All day collides —
+  orange against amber on temperature, and the old violet was nearly indistinguishable from
+  Night's indigo on pressure. The band behind it carries the metric identity instead.
+- **Where `METRIC_CONFIG.lineColor` is null** (temperature, wetness — the metrics the 24-h
+  chart draws with a gradient) there is no flat colour to borrow, so `IDENTITY_STOP` pins
+  one to a stop on that metric's own scale. It must not be derived from the range average:
+  wetness averages ~1.5 %, whose stop is near-white, so a mean-derived colour turns the
+  wetness chart white.
+- **The glow only fires when a single dominant line is drawn.** With Daylight and Night
+  both up there is no primary, and glowing both fogs the plot.
+- **`history-modal.js` remembers shown periods per metric.** It was one shared Set, so that
+  hiding Night survived a metric switch. That still holds within a metric, but one Set
+  cannot also carry per-metric defaults — the first metric visited would dictate the rest.
+- A caption under the legend states the encoding ("Line — period average", "Band — that
+  day's recorded high and low"). Without it a shaded band reads as a confidence interval, a
+  forecast, or decoration. Both it and the legend belong to the multi-day chart only, and
+  `hideChartChrome()` takes them down with the canvas on the empty and error paths —
+  `loadRange` switches them on before the fetch resolves, so a range that comes back empty
+  has to undo that.
+
+**A trap this file has now hit four times: `[hidden]` loses to `display: flex`.** The
+browser's `[hidden] { display: none }` comes from the *UA* stylesheet, so any author rule
+setting `display` on the same element beats it and the `hidden` attribute silently does
+nothing. `pages.css` carries explicit `[hidden]` restorations for `.provider-dew-warn`,
+`.db-range-inputs`, the history canvas, and now `.hist-legend` / `.hist-chart-note` /
+`.hist-summary-cards`. The legend case is worth remembering because it hid *by accident* for
+a long time: it only looked hidden on the single-day view while it was still empty, and the
+bug appeared only after a multi-day range had populated it — switching back to a single day
+then left its period switches on screen, offering to toggle series that view does not draw.
+**Any new flex or grid container toggled through `.hidden` needs its own rule.**
 
 **Tooltip ownership.** `chart-tooltip.js` owns the single floating element and is the only writer of its structure, via `setTooltipContent(el, titles, bodies)`. Both the 24-h chart (`chart-interaction.js`) and the history modal's daily chart (`daily-chart.js`) render through it. They previously each created the element with different internals — one replacing `innerHTML` wholesale, the other seeding `.title`/`.body` children and querying them — so whichever drew first won and the other read into markup it had not built. Placement stays per-chart: the 24-h chart flips against the plot area and pins to the card on touch, the daily chart clamps to the viewport.
 

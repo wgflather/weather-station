@@ -1,5 +1,5 @@
 import { renderWeatherChart } from './weather-chart.js';
-import { renderDailyChart, periodColor } from './daily-chart.js';
+import { renderDailyChart, periodColor, DEFAULT_PERIODS } from './daily-chart.js';
 import { createAvailableDates, isoDateKey } from './available-dates.js';
 import { formatTimeOfDay } from './time-format.js';
 import { formatMetricValue } from './metric-units.js';
@@ -45,9 +45,22 @@ function formatDateRange(fromStr, toStr) {
 // Keys match the /daily and /daily/summary payload: { date, fullDay, day, night }.
 export const PERIODS = ['fullDay', 'day', 'night'];
 
-// Which periods the reader wants drawn. Module-level so hiding Night once survives
-// switching metric or range — re-hiding it on every tab would make the toggle useless.
-const shownPeriods = new Set(PERIODS);
+// Which periods the reader wants drawn, remembered PER METRIC.
+//
+// It was one shared Set, so that hiding Night survived switching metric or range —
+// re-applying a default on every tab would make the toggle useless. That still holds
+// within a metric, but a single Set cannot also carry per-metric defaults: pressure opens
+// on All day alone while temperature opens on Daylight + Night (see DEFAULT_PERIODS), and
+// with one Set the first metric visited would dictate the rest. Keyed by metric, a choice
+// made on temperature sticks for temperature without leaking onto pressure.
+const shownByMetric = new Map();
+
+function shownPeriodsFor(metric) {
+    if (!shownByMetric.has(metric)) {
+        shownByMetric.set(metric, new Set(DEFAULT_PERIODS[metric] ?? ['fullDay']));
+    }
+    return shownByMetric.get(metric);
+}
 
 // Which periods have data in the range currently loaded. Tracked separately from
 // shownPeriods because "hidden by choice" and "nothing to show" need different
@@ -110,7 +123,7 @@ function renderPeriods(byPeriod, metric, windows = null) {
 
         // The swatch is the chart's legend key, so it tracks the line colour —
         // which for All day follows the selected metric.
-        row.style.setProperty('--period-color', periodColor(period, metric));
+        row.style.setProperty('--period-color', periodColor(period));
 
         const stats = byPeriod[period];
         setAvailability(period, !!stats);
@@ -154,7 +167,8 @@ function setAvailability(period, available) {
 
 /** Periods currently drawn: wanted by the reader and actually carrying data. */
 function activePeriods() {
-    return PERIODS.filter(p => shownPeriods.has(p) && availablePeriods.has(p));
+    const shown = shownPeriodsFor(currentMetric);
+    return PERIODS.filter(p => shown.has(p) && availablePeriods.has(p));
 }
 
 // ── Chart legend (multi-day only) ─────────────────────────────────────────────
@@ -172,13 +186,16 @@ function renderLegend(metric) {
     const drawable = PERIODS.filter(p => availablePeriods.has(p));
     legend.hidden = drawable.length === 0;
 
+    const note = document.getElementById('hist-chart-note');
+    if (note) note.hidden = legend.hidden;
+
     for (const period of drawable) {
         const item = document.createElement('button');
         item.type = 'button';
         item.className = 'hist-legend-item';
         item.dataset.period = period;
-        item.setAttribute('aria-pressed', String(shownPeriods.has(period)));
-        item.style.setProperty('--period-color', periodColor(period, metric));
+        item.setAttribute('aria-pressed', String(shownPeriodsFor(metric).has(period)));
+        item.style.setProperty('--period-color', periodColor(period));
 
         const swatch = document.createElement('i');
         swatch.className = 'hist-legend-swatch';
@@ -197,10 +214,11 @@ document.getElementById('hist-legend')?.addEventListener('click', (e) => {
     const period = item.dataset.period;
     // Hiding the last visible series would leave an empty chart, and the only way
     // back in is the control being switched off.
-    if (shownPeriods.has(period) && activePeriods().length === 1) return;
+    const shown = shownPeriodsFor(currentMetric);
+    if (shown.has(period) && activePeriods().length === 1) return;
 
-    shownPeriods.has(period) ? shownPeriods.delete(period) : shownPeriods.add(period);
-    item.setAttribute('aria-pressed', String(shownPeriods.has(period)));
+    shown.has(period) ? shown.delete(period) : shown.add(period);
+    item.setAttribute('aria-pressed', String(shown.has(period)));
 
     if (lastSummaries && lastRange) {
         renderDailyChart(lastSummaries, currentMetric, 'hist-modal-chart',
@@ -295,6 +313,19 @@ async function loadDayChart(dateStr, metric) {
     }
 }
 
+/**
+ * Put the chart area into its "nothing to show" state: no canvas, no legend, no key,
+ * just the empty message. The legend and the caption describe a chart, so they cannot
+ * outlive one — `loadRange` switches them on for a multi-day view before the fetch has
+ * resolved, and a range that comes back empty must undo that.
+ */
+function hideChartChrome() {
+    document.getElementById('hist-modal-chart').hidden = true;
+    document.getElementById('hist-chart-empty').hidden = false;
+    document.getElementById('hist-legend').hidden      = true;
+    document.getElementById('hist-chart-note').hidden  = true;
+}
+
 // ── Multi-day: single fetch drives both the legend and the daily chart ────────
 async function loadMultiDay(fromStr, toStr, days, metric) {
     const emptyEl = document.getElementById('hist-chart-empty');
@@ -313,8 +344,7 @@ async function loadMultiDay(fromStr, toStr, days, metric) {
         const summaries = payload.days ?? [];
 
         if (!summaries.length) {
-            canvas.hidden  = true;
-            emptyEl.hidden = false;
+            hideChartChrome();
             clearSummaryCards(document.getElementById('hist-summary-cards'));
             return;
         }
@@ -335,8 +365,7 @@ async function loadMultiDay(fromStr, toStr, days, metric) {
         renderSummaryCards(document.getElementById('hist-summary-cards'), payload.summary, metric);
 
     } catch {
-        if (canvas) canvas.hidden = true;
-        emptyEl.hidden = false;
+        hideChartChrome();
         clearSummaryCards(document.getElementById('hist-summary-cards'));
     }
 }
@@ -390,6 +419,8 @@ async function loadRange(days) {
     document.getElementById('hist-periods').hidden = !singleDay;
     document.getElementById('hist-summary-cards').hidden = singleDay;
     document.getElementById('hist-legend').hidden = singleDay;
+    // The band only exists on the multi-day chart, so its caption goes with it.
+    document.getElementById('hist-chart-note').hidden = singleDay;
     if (singleDay) clearSummaryCards(document.getElementById('hist-summary-cards'));
 
     if (singleDay) {

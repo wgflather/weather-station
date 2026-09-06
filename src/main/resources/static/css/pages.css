@@ -1813,6 +1813,64 @@ span.flatpickr-weekday {
     padding: 12px 0 2px;
 }
 
+/* Our display:flex overrides the browser's [hidden]{display:none} — restore it.
+   Without this the legend only *looked* hidden on the single-day view because it was
+   still empty; once a multi-day range had populated it, switching back to a single day
+   left its period switches on screen, offering to toggle series that view does not draw. */
+.hist-legend[hidden],
+.hist-chart-note[hidden],
+.hist-summary-cards[hidden] {
+    display: none;
+}
+
+/* The band carries a different quantity from the lines, and nothing else on screen
+   says so — without this it reads as a confidence interval, a forecast, or decoration.
+   Quieter than the legend beside it: the legend is interactive, this is only a key. */
+.hist-chart-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 6px 0 0;
+    font-size: 0.68rem;
+    color: rgba(148, 163, 184, 0.72);
+}
+
+.hist-chart-note span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hist-chart-note i {
+    display: inline-block;
+    width: 14px;
+    flex: none;
+}
+
+.hist-note-line {
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(226, 232, 240, 0.75);
+}
+
+/* A neutral stand-in for the value ramp the real band is filled with — the swatch
+   cannot show the metric's colours without being redrawn per tab. */
+.hist-note-band {
+    height: 9px;
+    border-radius: 2px;
+    background: linear-gradient(
+        to bottom,
+        rgba(226, 232, 240, 0.28),
+        rgba(226, 232, 240, 0.08)
+    );
+    border-top: 1px solid rgba(226, 232, 240, 0.38);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.38);
+}
+
+@media (max-width: 480px) {
+    .hist-chart-note { font-size: 0.63rem; gap: 4px 12px; }
+}
+
 .hist-legend-item {
     display: flex;
     align-items: center;
