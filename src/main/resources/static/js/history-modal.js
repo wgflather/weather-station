@@ -18,6 +18,7 @@ let currentDate   = null;
 let currentMetric = 'temperature';
 let currentPeriod = 1;
 let initialized   = false;
+let datePicker    = null;
 
 const availableDates = createAvailableDates('/api/weather/history/available-dates');
 
@@ -231,7 +232,7 @@ async function initDatePicker() {
     const [y, m] = currentDate.split('-').map(Number);
     await availableDates.loadMonth(y, m - 1);
 
-    flatpickr(document.getElementById('hist-date-input'), availableDates.pickerOptions({
+    datePicker = flatpickr(document.getElementById('hist-date-input'), availableDates.pickerOptions({
         defaultDate: currentDate,
         // Append inside the modal so flatpickr's position math runs within the
         // fixed stacking context, avoiding the viewport jump on first open.
@@ -369,6 +370,52 @@ async function loadMultiDay(fromStr, toStr, days, metric) {
         clearSummaryCards(document.getElementById('hist-summary-cards'));
     }
 }
+
+// ── Drill-down: a summary card opens the day it names ────────────────────────
+/**
+ * Switch to the single-day view for `dateStr`, as though the reader had picked that
+ * date and the Day tab themselves.
+ *
+ * Both other controls have to be brought along or the modal contradicts itself: the
+ * period tabs own their `.active` class inside their own click handler, so without this
+ * the view shows one day while "7D" stays lit; and the flatpickr input keeps whatever it
+ * was last set to, so the picker would name a different date than the chart below it.
+ *
+ * Note what a "Coldest night" card opens. A NIGHT row for date D covers D-1's sunset to
+ * D's sunrise, so the day this lands on holds only the second half of that night — the
+ * evening that began it is on the previous day's chart. The coldest hour is normally just
+ * before dawn and so is in view, but this is deliberately the date the card names rather
+ * than the one containing most of its window: opening Aug 30 from a card captioned Aug 31
+ * would be the more surprising rule.
+ */
+function goToDay(dateStr) {
+    currentDate   = dateStr;
+    currentPeriod = 1;
+
+    document.querySelectorAll('#hist-period-tabs .history-period-btn')
+        .forEach(b => b.classList.toggle('active', b.dataset.days === '1'));
+
+    // Second argument false: setting the date must not fire onChange, which would call
+    // loadRange again and race the one below.
+    datePicker?.setDate(dateStr, false);
+
+    // isDateEnabled() answers from cache only, and initDatePicker loads just the month it
+    // opened on. A 30-day range reaches into the previous month, so a card can send the
+    // picker to a month it has never fetched — where every cell reads as disabled until
+    // something triggers a load. Not awaited: it only affects what the picker shows if the
+    // reader opens it later, and the chart below should not wait on it.
+    const [year, month] = dateStr.split('-').map(Number);
+    availableDates.loadMonth(year, month - 1);
+
+    loadRange(1);
+}
+
+// Delegated, because the cards are rebuilt on every load. Only cards that named a single
+// date are buttons carrying data-date; the trend and diurnal cards match nothing here.
+document.getElementById('hist-summary-cards')?.addEventListener('click', (e) => {
+    const card = e.target.closest('.hist-summary-card[data-date]');
+    if (card) goToDay(card.dataset.date);
+});
 
 // ── Metric tabs ───────────────────────────────────────────────────────────────
 // The wiring from here down is optional-chained: this module owns the

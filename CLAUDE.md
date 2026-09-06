@@ -431,7 +431,7 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 | File | Role |
 |---|---|
 | `history-modal.js` | History chart modal (date picker + range tabs, period breakdown, legend toggles) |
-| `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block. Picks a caption from which context fields arrived (date / date range / time window / date + hour), not from `kind`, and takes a card's unit from `unitMetric` when it differs from the tab's |
+| `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block. Picks a caption from which context fields arrived (date / date range / time window / date + hour), not from `kind`, and takes a card's unit from `unitMetric` when it differs from the tab's. A card naming a single date renders as a `<button>` carrying `data-date`; the modal opens that day from it |
 | `metric-units.js` | The one place a metric's display unit is written down; used by the modal, its cards and the daily chart |
 | `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js` |
 | `database-view.js` / `config.js` | Admin pages only, not loaded by the dashboard |
@@ -555,6 +555,34 @@ Consequences worth knowing:
   `hideChartChrome()` takes them down with the canvas on the empty and error paths —
   `loadRange` switches them on before the fetch resolves, so a range that comes back empty
   has to undo that.
+
+**Cards drill down into the day they name.** A card with a `date` renders as a `<button>`
+with `data-date`, and `history-modal.js` delegates a click on it to `goToDay()`, which
+switches to the single-day view for that date. The trend and diurnal-stretch cards stay
+plain `div`s: a trend spans days and a stretch names none, so neither has a single day to
+open, and making the whole row look clickable would leave two of humidity's three cards
+reading as broken rather than as a different kind of card. The rule is the same one the
+caption uses — which fields arrived — so `summary-cards.js` still needs to know nothing
+about metrics or kinds, and the click itself stays in the modal.
+
+`goToDay()` has to bring two other controls along or the modal contradicts itself: the
+period tabs own their `.active` class inside their own click handler, and the flatpickr
+instance — previously discarded at construction, now kept in a module variable — would
+otherwise go on naming the old date under a chart showing a new one. It also warms
+`loadMonth` for the target month, because `isDateEnabled()` answers from cache only and a
+30-day range reaches into a month the picker never fetched, where every cell would read as
+disabled.
+
+One thing to know about what a **"Coldest night" card opens**: a `NIGHT` row for date D
+covers D-1's sunset to D's sunrise, so the day it lands on holds only the second half of
+that night — the evening that began it is on the previous day's chart. The coldest hour is
+normally just before dawn and so is in view. Landing on the date the card names is the
+deliberate choice; opening Aug 30 from a card captioned Aug 31 would be the more surprising
+rule.
+
+Consequence to expect: the single-day view hides the card row, so clicking a card makes the
+whole row — including the card just clicked — disappear. There is no back affordance beyond
+the range tabs.
 
 **A trap this file has now hit four times: `[hidden]` loses to `display: flex`.** The
 browser's `[hidden] { display: none }` comes from the *UA* stylesheet, so any author rule

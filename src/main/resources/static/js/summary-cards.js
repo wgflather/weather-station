@@ -82,6 +82,17 @@ function formatContext(card) {
  * Renders however many cards arrive rather than a fixed three — a one-day range
  * has no trend, and a metric may not support one at all. An empty list hides the
  * row entirely instead of leaving placeholder frames.
+ *
+ * A card that names a single date is rendered as a <button> carrying that date in
+ * `data-date`, so the modal can open that day's hourly chart from it. Which cards
+ * those are is decided by the same rule the caption uses — which fields arrived —
+ * so nothing here needs to know the metric or the kind. The rest stay plain divs:
+ * a trend spans days and a diurnal stretch names no date at all, so there is no
+ * single day for either to open, and making the whole row look clickable would
+ * leave two of humidity's three cards reading as broken rather than as different.
+ *
+ * The click itself belongs to the modal. This module owns presentation only, so it
+ * marks the card navigable and stops there.
  */
 export function renderSummaryCards(container, summary, metric) {
     if (!container) return;
@@ -91,7 +102,8 @@ export function renderSummaryCards(container, summary, metric) {
     container.hidden = cards.length === 0;
 
     for (const card of cards) {
-        const el = document.createElement('div');
+        const navigable = !!card.date;
+        const el = document.createElement(navigable ? 'button' : 'div');
         el.className = 'hist-summary-card';
         el.dataset.kind = card.kind;
 
@@ -106,6 +118,21 @@ export function renderSummaryCards(container, summary, metric) {
         const context = document.createElement('span');
         context.className = 'hist-summary-context';
         context.textContent = formatContext(card);
+
+        if (navigable) {
+            el.type = 'button';
+            el.dataset.date = card.date;
+            // The visible text is three separate spans, which a screen reader would
+            // read as a heading, a number and a date with no statement of what
+            // activating the control does.
+            el.setAttribute(
+                'aria-label',
+                `${card.label}, ${value.textContent} on `
+                // Some locales abbreviate the month with a trailing period, which would
+                // read as a double stop before the sentence that follows.
+                + `${context.textContent.replace(/[.\s]+$/, '')}. `
+                + `Open this day's hourly chart.`);
+        }
 
         el.append(label, value, context);
         container.append(el);
