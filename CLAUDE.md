@@ -50,7 +50,8 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 - **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists.
 - **`SeeingCalculator`** — Hufnagel-Valley HV 5/7 atmospheric turbulence model; inputs are jet-stream speed (200 hPa) and surface wind speed; outputs FWHM seeing in arc-seconds (Excellent / Good / Fair / Poor / Very Poor).
 - **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date. `getDayChart(date, metric)` is the only chart entry point: it resolves the date to midnight-to-midnight in the *station's* zone (not the caller's, which would straddle two station days and disagree with the per-period rows beside it) and routes on age — see `RAW_RETENTION_DAYS` below. `findHourlyDataPoints` is exhaustive over `Metric` for the same reason `getMetricChart` is. It once delegated to a `getChart(metric, from, to)` behind a second `/chart` endpoint; nothing consumed the range form, so both are gone.
-- **`SummaryCardService`** — builds the history modal's stat cards per metric. Which period a metric reads, whether it answers with a date or an hour of the day, and whether it has a trend at all are per-metric decisions — see below. Humidity's builder is the only one that queries (twice), and the only one whose cards read nothing from the daily rows.
+- **`SummaryCardService`** — decides which stat cards the history modal shows for a metric, and nothing else. Which period a metric reads, whether it answers with a date or an hour of the day, and whether it has a trend at all are per-metric decisions — see below. Each builder reads as a list of the questions its metric answers; the only arithmetic left here is surface wetness's ADC→% conversion, which is a property of the metric rather than of any selection rule.
+- **`SummaryAnalytics`** — how a card's number is found: ranking daily rows, scanning diurnal windows, fitting a trend, and the two hourly queries humidity needs. Metric-blind by design — `extremeHigh` takes an accessor rather than a `Metric`, which is what lets surface wetness rank on the smallest stored count and still report an `EXTREME_HIGH`. Splitting it out means a new card is usually a line in the builder rather than new arithmetic.
 - **`WeatherRetentionService`** — scheduled hourly/daily rollups and raw cleanup, in a 02:00–02:10 window.
 - **`StationConfigurationService`** — CRUD for `StationConfiguration`; publishes `ConfigurationUpdatedEvent` on save.
 - **`DatabaseRawViewService`** — paged raw record queries for the admin view.
@@ -216,7 +217,7 @@ leave older history on the old numbers. Read-time conversion keeps recalibration
 `SummaryCardService` reads `DayPeriodMetrics` directly, so its wetness cards carry the inversion
 too, but as a *selection* swap rather than a value swap: "Wettest day" is built by `extremeLow` —
 the smallest stored count — and reported as an `EXTREME_HIGH`, because converted it is the largest
-percentage on screen. `extremeHigh`/`extremeLow` therefore take the `CardKind` and a display
+percentage on screen. `SummaryAnalytics.extremeHigh`/`extremeLow` therefore take the `CardKind` and a display
 transform separately from the row selection; the four-argument overloads pass `AS_STORED` and the
 matching kind, so the other metrics read exactly as before.
 
@@ -260,9 +261,10 @@ the answer: the same spread at 03:00 is an ordinary clear night and at 14:00 is 
 Humidity is therefore the only builder that goes back to the database, and it makes **two** queries:
 `findHumidityByHourOfDay` for the diurnal buckets and `findLowestDewPointGap` for the dew card. Only
 the humidity tab pays for them, and the modal reloads the range on *every* metric tab, so that is
-per click rather than per open. The fetches sit in the builder rather than in `WeatherHistoryService`
-precisely so the choice stays next to the reasoning for it; hoisting them into the caller would put
-"humidity needs hourly rows" in a class that otherwise knows nothing about which metric wants what.
+per click rather than per open. The queries live in `SummaryAnalytics` with the rest of the
+arithmetic, while the *decision* to want them stays in humidity's builder — so `WeatherHistoryService`
+never learns that one metric needs hourly rows, and the builder still reads as a list of questions
+rather than a list of fetches.
 
 The dew card is the one place a card's number is **not in its tab's unit** — it is a temperature
 spread in °C on a tab measured in percent. It says so with `unitMetric`, which carries a metric's
@@ -342,7 +344,7 @@ its `label` rather than in a new `CardKind` — kinds say how to read the number
 signed change), which is what the styling keys on. "Closest to dew point" is an `EXTREME_LOW`
 carrying its own label, not a kind of its own.
 
-`extremeHigh`/`extremeLow` take a `Function<DayPeriodMetrics, Double>` that supplies **the value the
+`SummaryAnalytics.extremeHigh`/`extremeLow` take a `Function<DayPeriodMetrics, Double>` supplying **the value the
 card displays**, and rank on that same function — selection and display must not come from different
 columns, or a card picks its day by one quantity and prints another. The accessor is also what the
 null filter runs on, so a period row whose metric is null (a night the sensor missed,

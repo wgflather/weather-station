@@ -32,7 +32,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -53,7 +52,13 @@ class SummaryCardServiceTest {
 
   @Mock ConfigurationCache configurationCache;
   @Mock HourlyWeatherRecordRepository hourlyWeatherRecordRepository;
-  @InjectMocks SummaryCardService service;
+
+  // SummaryAnalytics is built for real rather than mocked, and the seam is deliberate: these
+  // tests assert what a card ends up saying — which day won, which stretch, in what unit — and
+  // every one of those answers comes out of the analytics. Mocking it would leave the suite
+  // checking only that the builders call the methods, which is the half that cannot be wrong.
+  // Only the two edges the analytics itself depends on are stubbed.
+  SummaryCardService service;
 
   @BeforeEach
   void setup() {
@@ -65,6 +70,11 @@ class SummaryCardServiceTest {
             new WeatherValidationConfig(
                 -50, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 150, 3230, 0.0, 60.0, 15.0, 0.0, 15.0,
                 5.0));
+
+    service =
+        new SummaryCardService(
+            configurationCache,
+            new SummaryAnalytics(configurationCache, hourlyWeatherRecordRepository));
   }
 
   /** The cards for a metric over the fixed {@link #START}–{@link #END} range. */
