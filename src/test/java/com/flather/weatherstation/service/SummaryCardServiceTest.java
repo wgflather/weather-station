@@ -3,6 +3,7 @@ package com.flather.weatherstation.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
@@ -17,6 +18,7 @@ import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.DayPeriodMetrics;
 import com.flather.weatherstation.dto.analytics.MetricSummary;
 import com.flather.weatherstation.dto.analytics.SummaryCard;
+import com.flather.weatherstation.dto.projection.DataPoint;
 import com.flather.weatherstation.dto.projection.HourOfDayAverage;
 import com.flather.weatherstation.repository.HourlyWeatherRecordRepository;
 import java.time.Instant;
@@ -105,6 +107,14 @@ class SummaryCardServiceTest {
 
   private static SummaryCard cardOfKind(MetricSummary summary, CardKind kind) {
     return summary.cards().stream().filter(c -> c.kind() == kind).findFirst().orElse(null);
+  }
+
+  /** Humidity carries two EXTREME_LOW cards, so its cards are told apart by label as well. */
+  private static SummaryCard cardOfKind(MetricSummary summary, CardKind kind, String label) {
+    return summary.cards().stream()
+        .filter(c -> c.kind() == kind && c.label().equals(label))
+        .findFirst()
+        .orElse(null);
   }
 
   /**
@@ -269,36 +279,102 @@ class SummaryCardServiceTest {
 
   // ---- humidity ----
 
-  private static DayPeriodMetrics humidityRow(
-      LocalDate date, DayPeriod period, double min, double max, double avg) {
+  /** Humidity's three cards now come entirely from the hourly table; no daily row feeds any. */
+  @Test
+  void humidityCards_readNothingFromTheDailyRows() {
+    givenHumidityByHourOfDay(flatHours(60.0));
+    givenClosestToDewPoint(Instant.parse("2026-09-01T20:00:00Z"), 1.7);
+
+    MetricSummary fromRows =
+        summaryOf(
+            List.of(
+                dailyHumidity(START, 60.0),
+                dailyHumidity(START.plusDays(1), 70.0),
+                dailyHumidity(START.plusDays(2), 80.0)),
+            Metric.HUMIDITY);
+
+    // A rising run of daily averages used to produce a trend card. It no longer does, and the
+    // cards are identical to the ones an empty daily list yields.
+    assertThat(cardOfKind(fromRows, CardKind.TREND)).isNull();
+    assertThat(fromRows.cards())
+        .containsExactlyElementsOf(summaryOf(List.of(), Metric.HUMIDITY).cards());
+  }
+
+  private static DayPeriodMetrics dailyHumidity(LocalDate date, double avg) {
     DayPeriodMetrics row = new DayPeriodMetrics();
     row.setDate(date);
-    row.setPeriod(period);
-    row.setHumidityMin(min);
-    row.setHumidityMax(max);
+    row.setPeriod(DayPeriod.FULL);
     row.setHumidityAvg(avg);
     return row;
   }
 
+  private void givenClosestToDewPoint(Instant hour, double spread) {
+    given(
+            hourlyWeatherRecordRepository.findLowestDewPointGap(
+                any(), any(), anyDouble(), anyDouble()))
+        .willReturn(new DataPoint(hour, spread));
+  }
+
   /**
-   * The two extremes moved to hours of the day, but the trend still reads the daily FULL rows and
-   * still describes the range as a span of dates. It is the one humidity card the diurnal pair did
-   * not replace.
+   * The dew point card reports a temperature spread while sitting on the humidity tab, so it has to
+   * say which unit its number is in. Without that the frontend appends the tab's unit and prints
+   * "1.7 %" for a quantity measured in °C.
    */
   @Test
-  void humidityTrend_stillReadsTheDailyFullRows() {
-    List<DayPeriodMetrics> data =
-        List.of(
-            humidityRow(START, DayPeriod.FULL, 38.0, 97.0, 60.0),
-            humidityRow(START.plusDays(1), DayPeriod.FULL, 45.0, 98.0, 70.0),
-            humidityRow(START.plusDays(2), DayPeriod.FULL, 55.0, 99.0, 80.0));
+  void closestToDewPoint_declaresTemperatureAsItsUnit() {
+    givenHumidityByHourOfDay(flatHours(60.0));
+    givenClosestToDewPoint(Instant.parse("2026-09-01T20:00:00Z"), 1.717);
 
-    SummaryCard trend = cardOfKind(summaryOf(data, Metric.HUMIDITY), CardKind.TREND);
+    SummaryCard card =
+        cardOfKind(
+            summaryOf(List.of(), Metric.HUMIDITY), CardKind.EXTREME_LOW, "Closest to dew point");
 
-    assertThat(trend.value()).isEqualTo(20.0);
-    assertThat(trend.rangeStart()).isEqualTo(START);
-    assertThat(trend.rangeEnd()).isEqualTo(START.plusDays(2));
-    assertThat(trend.windowStart()).isNull();
+    assertThat(card.unitMetric()).isEqualTo("temperature");
+    assertThat(card.value()).isEqualTo(1.717);
+    // The stretch cards on the same tab stay in the tab's own unit.
+    assertThat(
+            cardOfKind(summaryOf(List.of(), Metric.HUMIDITY), CardKind.EXTREME_HIGH).unitMetric())
+        .isNull();
+  }
+
+  /**
+   * The hour is half the card: the same spread at 03:00 is an ordinary clear night and at 14:00 is
+   * fog. Date and hour both come from resolving the one returned instant in the station's zone, so
+   * a card can never name an evening it did not measure.
+   */
+  @Test
+  void closestToDewPoint_carriesTheHourItHappenedAt_inTheStationsZone() {
+    givenHumidityByHourOfDay(flatHours(60.0));
+    // 22:30 UTC on the 5th is 00:30 on the 6th in Berlin — the date has to move with the hour.
+    givenClosestToDewPoint(Instant.parse("2026-09-05T22:30:00Z"), 1.2);
+    given(configurationCache.getLocationContext())
+        .willReturn(new LocationContext(52.5, 13.4, 34.0, ZoneId.of("Europe/Berlin"), null));
+
+    SummaryCard card =
+        cardOfKind(
+            summaryOf(List.of(), Metric.HUMIDITY), CardKind.EXTREME_LOW, "Closest to dew point");
+
+    assertThat(card.date()).isEqualTo(LocalDate.of(2026, 9, 6));
+    assertThat(card.windowStart()).isEqualTo(LocalTime.of(0, 30));
+    // Only windowStart: a single reading is a moment, not a window, and the frontend tells the two
+    // shapes apart by whether windowEnd arrived.
+    assertThat(card.windowEnd()).isNull();
+  }
+
+  /**
+   * A range with no hour carrying both a temperature and a humidity yields no card, not a crash.
+   */
+  @Test
+  void closestToDewPoint_isOmittedWhenTheRangeHasNoUsableHour() {
+    givenHumidityByHourOfDay(flatHours(60.0));
+    given(
+            hourlyWeatherRecordRepository.findLowestDewPointGap(
+                any(), any(), anyDouble(), anyDouble()))
+        .willReturn(null);
+
+    MetricSummary summary = summaryOf(List.of(), Metric.HUMIDITY);
+
+    assertThat(summary.cards()).hasSize(2).noneMatch(c -> c.label().equals("Closest to dew point"));
   }
 
   /**

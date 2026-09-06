@@ -11,10 +11,12 @@
 // chart uses and dates render in the viewer's locale — server-formatted text would
 // disagree with the chart tooltip sitting directly below it.
 //
-// A card carries one of three context shapes and the caption is chosen by which
-// fields arrived, not by kind: a single `date`, a `rangeStart`/`rangeEnd` pair of
-// days, or a `windowStart`/`windowEnd` pair of times. The last is humidity's, whose
-// extremes name an hour of the day rather than a date.
+// A card carries one of four context shapes and the caption is chosen by which
+// fields arrived, not by kind: a single `date`; a `rangeStart`/`rangeEnd` pair of
+// days; a `windowStart`/`windowEnd` pair of times, naming a recurring stretch of
+// the day and no date at all; or a `date` with a bare `windowStart`, one reading at
+// one hour. Matching on fields rather than kind is what lets the backend add a card
+// shape without touching this file — two of these arrived that way.
 //
 // One caption to be aware of: a "Coldest night" date is the morning the night
 // ended on, since a night runs from the previous evening's sunset.
@@ -44,7 +46,10 @@ function stationHour(isoTime) {
 
 function formatValue(card, metric) {
     if (card.value == null) return '–';
-    const unit = unitFor(metric);
+    // Nearly every card is measured in its own tab's unit, and `unitMetric` is the
+    // exception the backend flags: the dew point card sits on the humidity tab but
+    // reports a temperature spread, and would otherwise read "1.7%".
+    const unit = unitFor(card.unitMetric ?? metric);
     const rounded = Number(card.value).toFixed(1);
     // A trend is a change, so it carries its sign; an extreme is a reading and does not.
     const signed = card.kind === 'TREND' && card.value > 0 ? `+${rounded}` : rounded;
@@ -56,6 +61,12 @@ function formatContext(card) {
     // so the end reading earlier than the start is correct, not a pair to reorder.
     if (card.windowStart && card.windowEnd) {
         return `${stationHour(card.windowStart)}–${stationHour(card.windowEnd)}`;
+    }
+    // One reading at one hour. The hour is half the answer — a small dew point gap
+    // at 03:00 is an ordinary clear night, the same gap at 14:00 is fog — so it is
+    // shown alongside the date rather than rounded away to the day.
+    if (card.date && card.windowStart) {
+        return `${shortDate(card.date)}, ${stationHour(card.windowStart)}`;
     }
     if (card.kind === 'TREND') {
         return card.rangeStart && card.rangeEnd

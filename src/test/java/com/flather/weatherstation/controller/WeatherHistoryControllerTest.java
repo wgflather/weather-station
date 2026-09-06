@@ -304,7 +304,54 @@ class WeatherHistoryControllerTest {
         .andExpect(jsonPath("$.summary.cards[0].rangeStart").doesNotExist())
         // Wrapping past midnight is normal, not a swap to correct on the client.
         .andExpect(jsonPath("$.summary.cards[1].windowStart").value("23:00:00"))
-        .andExpect(jsonPath("$.summary.cards[1].windowEnd").value("02:00:00"));
+        .andExpect(jsonPath("$.summary.cards[1].windowEnd").value("02:00:00"))
+        // No unit override: these read in the tab's own unit.
+        .andExpect(jsonPath("$.summary.cards[0].unitMetric").doesNotExist());
+  }
+
+  /**
+   * The dew point card is the fourth context shape and the only one carrying a unit override.
+   *
+   * <p>It sends a {@code date} with a bare {@code windowStart} — a reading at an hour, not a
+   * recurring window — so {@code windowEnd} stays absent and the client tells the two apart by
+   * that. And it sits on the humidity tab while reporting a temperature spread, so {@code
+   * unitMetric} names the metric whose unit applies; without it the client appends the tab's unit
+   * and renders a °C spread as a percentage.
+   */
+  @Test
+  void shouldReturnDewPointCard_withItsHourAndAUnitOverride() throws Exception {
+    LocalDate from = LocalDate.of(2026, 6, 1);
+    LocalDate to = LocalDate.of(2026, 6, 16);
+
+    given(historyService.getDailyHistory(from, to, Metric.HUMIDITY))
+        .willReturn(
+            new DailyHistoryDto(
+                List.of(),
+                new MetricSummary(
+                    Metric.HUMIDITY,
+                    List.of(
+                        SummaryCard.onDateAndHour(
+                            CardKind.EXTREME_LOW,
+                            "Closest to dew point",
+                            1.717,
+                            "temperature",
+                            LocalDate.of(2026, 6, 15),
+                            LocalTime.of(20, 0))))));
+
+    mockMvc
+        .perform(
+            get(WeatherHistoryController.DAILY_PATH)
+                .param("from", "2026-06-01")
+                .param("to", "2026-06-16")
+                .param("metric", "humidity")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.summary.cards[0].kind").value("EXTREME_LOW"))
+        .andExpect(jsonPath("$.summary.cards[0].value").value(1.717))
+        .andExpect(jsonPath("$.summary.cards[0].unitMetric").value("temperature"))
+        .andExpect(jsonPath("$.summary.cards[0].date").value("2026-06-15"))
+        .andExpect(jsonPath("$.summary.cards[0].windowStart").value("20:00:00"))
+        .andExpect(jsonPath("$.summary.cards[0].windowEnd").doesNotExist());
   }
 
   @Test

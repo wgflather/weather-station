@@ -20,21 +20,37 @@ import java.time.LocalTime;
  * diurnal card ranks hours of the day rather than days at all. See {@code SummaryCardService} for
  * which, and why.
  *
- * <p>A card carries <em>one</em> of three context shapes, and the other two stay null: a single
- * {@code date}, a {@code rangeStart}/{@code rangeEnd} pair of days, or a {@code windowStart}/{@code
- * windowEnd} pair of times.
+ * <p><strong>Context shapes.</strong> A card names when its value happened in one of four ways, and
+ * whichever fields the shape does not use stay null:
+ *
+ * <ul>
+ *   <li>a single {@code date} — the day extremes;
+ *   <li>a {@code rangeStart}/{@code rangeEnd} pair of days — the trend;
+ *   <li>a {@code windowStart}/{@code windowEnd} pair of times — the diurnal extremes, which name a
+ *       recurring stretch of the day and no date at all;
+ *   <li>a {@code date} <em>and</em> a bare {@code windowStart} — one reading at one hour, where the
+ *       hour is half the point ("closest to dew point, Sep 5, 20:00"). {@code windowStart} carries
+ *       the hour here rather than a window opening, which is why the frontend picks its caption
+ *       from which fields arrived rather than from {@code kind}.
+ * </ul>
  *
  * @param kind what the card measures; the frontend styles and formats on this.
  * @param label the card's heading, e.g. "Warmest day".
- * @param value the number itself, unformatted and in the metric's own unit.
+ * @param value the number itself, unformatted.
+ * @param unitMetric the metric whose unit {@code value} is in, as its request key ({@code
+ *     "temperature"}), or null when it is the card's own metric — which is the normal case. Set
+ *     only where a card carries a quantity its tab is not measured in: the dew point card sits on
+ *     the humidity tab but reports a temperature spread in °C, and would otherwise render as a
+ *     percentage. A key rather than a unit string, so the unit table stays the frontend's alone.
  * @param date the day the value belongs to. Set for point-in-time kinds (the extremes), null for
  *     kinds that describe a span.
  * @param rangeStart first day of the span a spanning kind covers, null otherwise.
  * @param rangeEnd last day of that span, null otherwise.
- * @param windowStart first hour of the time-of-day window a diurnal card covers, null otherwise.
- *     This is <strong>wall-clock time at the station</strong>, not an instant — a viewer in another
- *     zone must still read the hour the station experienced, or the card would disagree with the
- *     chart beside it, which also resolves its days in the station's zone.
+ * @param windowStart first hour of the time-of-day window a diurnal card covers — or, alongside a
+ *     {@code date}, the single hour a reading landed on. Null otherwise. This is <strong>wall-clock
+ *     time at the station</strong>, not an instant — a viewer in another zone must still read the
+ *     hour the station experienced, or the card would disagree with the chart beside it, which also
+ *     resolves its days in the station's zone.
  * @param windowEnd the hour that window runs up to, exclusive, null otherwise. "13:00 → 16:00"
  *     covers the hours beginning 13, 14 and 15, matching the half-open convention the chart windows
  *     already use. It wraps past midnight, so it is not necessarily later than {@code windowStart}.
@@ -43,6 +59,7 @@ public record SummaryCard(
     CardKind kind,
     String label,
     Double value,
+    String unitMetric,
     LocalDate date,
     LocalDate rangeStart,
     LocalDate rangeEnd,
@@ -51,18 +68,32 @@ public record SummaryCard(
 
   /** A card about one specific day — the extremes. */
   public static SummaryCard onDate(CardKind kind, String label, Double value, LocalDate date) {
-    return new SummaryCard(kind, label, value, date, null, null, null, null);
+    return new SummaryCard(kind, label, value, null, date, null, null, null, null);
+  }
+
+  /**
+   * A card about one reading at one hour, in {@code unitMetric}'s unit — pass null for that to read
+   * in the card's own metric.
+   */
+  public static SummaryCard onDateAndHour(
+      CardKind kind,
+      String label,
+      Double value,
+      String unitMetric,
+      LocalDate date,
+      LocalTime hour) {
+    return new SummaryCard(kind, label, value, unitMetric, date, null, null, hour, null);
   }
 
   /** A card about a span of days — the trend. */
   public static SummaryCard overRange(
       CardKind kind, String label, Double value, LocalDate from, LocalDate to) {
-    return new SummaryCard(kind, label, value, null, from, to, null, null);
+    return new SummaryCard(kind, label, value, null, null, from, to, null, null);
   }
 
   /** A card about a recurring time of day rather than a date — the diurnal extremes. */
   public static SummaryCard overWindow(
       CardKind kind, String label, Double value, LocalTime from, LocalTime to) {
-    return new SummaryCard(kind, label, value, null, null, null, from, to);
+    return new SummaryCard(kind, label, value, null, null, null, null, from, to);
   }
 }

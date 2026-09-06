@@ -15,6 +15,7 @@ import com.flather.weatherstation.util.MeteoMath;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -53,7 +54,6 @@ public class SummaryCardService {
   private static final double TEMPERATURE_TREND_THRESHOLD = 0.5; // °C
 
   private static final double PRESSURE_TREND_THRESHOLD = 2.0; // hPa
-  private static final double HUMIDITY_TREND_THRESHOLD = 3.0; // %
 
   private static final int HOURS_PER_DAY = 24;
 
@@ -96,7 +96,7 @@ public class SummaryCardService {
     return switch (metric) {
       case TEMPERATURE -> new MetricSummary(metric, temperatureCards(data));
       case PRESSURE -> new MetricSummary(metric, pressureCards(data));
-      case HUMIDITY -> new MetricSummary(metric, humidityCards(data, from, to));
+      case HUMIDITY -> new MetricSummary(metric, humidityCards(from, to));
       case SURFACE_WETNESS -> new MetricSummary(metric, surfaceWetnessCards(data));
       // No cards defined yet is an empty answer, not an error. The cards travel with the chart
       // data, so throwing here would take the whole range down for a metric that charts fine.
@@ -148,22 +148,27 @@ public class SummaryCardService {
    * "which hours are reliably the most humid" describes the site itself — a fact the daily chart
    * beside these cards cannot show, because it carries one point per day.
    *
-   * <p>The two cards rank three-hour windows rather than single hours: relative humidity pins near
-   * 100 % through the small hours, so a single-hour pick decides a near-tie and moves between
-   * neighbouring hours on reload. See {@link #WINDOW_HOURS}.
+   * <p>The two stretch cards rank three-hour windows rather than single hours: relative humidity
+   * pins near 100 % through the small hours, so a single-hour pick decides a near-tie and moves
+   * between neighbouring hours on reload. See {@link #WINDOW_HOURS}.
    *
-   * <p>One query serves both cards. The scan over 24 buckets is repeated per card, which is free;
-   * the round trip is not, and this is the only builder that makes one.
+   * <p>The third card leaves relative humidity behind entirely. RH is confounded by temperature —
+   * 90 % at 2 °C is dry air, 90 % at 20 °C is a great deal of water — so it cannot answer whether
+   * anything actually got wet. The temperature-to-dew-point spread can, and its smallest value over
+   * the range is the moment the station came nearest to condensation.
+   *
+   * <p>This builder makes <strong>two</strong> queries and is the only one that queries at all: one
+   * for the diurnal buckets, one for the closest approach to dew. The 24-bucket scan is repeated
+   * per stretch card, which is free; the round trips are not, which is why the two stretch cards
+   * share their fetch rather than each making their own.
    */
-  private List<SummaryCard> humidityCards(
-      List<DayPeriodMetrics> data, LocalDate from, LocalDate to) {
-    Metric metric = Metric.HUMIDITY;
+  private List<SummaryCard> humidityCards(LocalDate from, LocalDate to) {
     Double[] byHourOfDay = humidityByHourOfDay(from, to);
 
     return cards(
         extremeWindow(byHourOfDay, CardKind.EXTREME_HIGH, "Most humid stretch"),
         extremeWindow(byHourOfDay, CardKind.EXTREME_LOW, "Driest stretch"),
-        trend(data, metric, DayPeriod.FULL, "Humidity trend", HUMIDITY_TREND_THRESHOLD));
+        closestToDewPoint(from, to));
   }
 
   /**
@@ -197,6 +202,53 @@ public class SummaryCardService {
       means[row.hourOfDay()] = row.value();
     }
     return means;
+  }
+
+  /**
+   * The moment in the range that came nearest to condensation: the smallest gap between temperature
+   * and dew point, with the hour it happened.
+   *
+   * <p>An {@code EXTREME_LOW}, because that is what the number is — the smallest of something. The
+   * card's question lives in its label, not in a {@code CardKind} of its own; a kind per question
+   * would grow one entry per card and tell the frontend nothing it can style on.
+   *
+   * <p>It carries the hour as well as the date, and the hour is half the answer: a 1.5 °C spread at
+   * 03:00 is an ordinary clear night, the same spread at 14:00 is fog. Both come from resolving the
+   * returned instant in the station's zone, so the pair always agree — reading the date from one
+   * source and the hour from another is how a card ends up naming an evening it did not measure.
+   *
+   * <p>The value is in <strong>°C, not the humidity tab's percent</strong>, so the card names
+   * temperature as its unit metric. Without that the frontend would append the tab's unit and print
+   * a temperature spread as "1.7 %".
+   *
+   * <p>The range bound matches {@link #humidityByHourOfDay}: {@code to} is an inclusive date, so
+   * the query runs to the start of the day after it.
+   */
+  private SummaryCard closestToDewPoint(LocalDate from, LocalDate to) {
+    ZoneId zoneId = configurationCache.getLocationContext().zoneId();
+
+    DataPoint smallestGap =
+        hourlyWeatherRecordRepository.findLowestDewPointGap(
+            from.atStartOfDay(zoneId).toInstant(),
+            to.plusDays(1).atStartOfDay(zoneId).toInstant(),
+            MeteoMath.DEW_POINT_A,
+            MeteoMath.DEW_POINT_B);
+
+    // No hour in the range had both a temperature and a humidity; the card is omitted like any
+    // other with nothing behind it.
+    if (smallestGap == null || smallestGap.value() == null) {
+      return null;
+    }
+
+    ZonedDateTime measuredAt = smallestGap.hour().atZone(zoneId);
+
+    return SummaryCard.onDateAndHour(
+        CardKind.EXTREME_LOW,
+        "Closest to dew point",
+        smallestGap.value(),
+        Metric.TEMPERATURE.getRequestKey(),
+        measuredAt.toLocalDate(),
+        measuredAt.toLocalTime());
   }
 
   /**
