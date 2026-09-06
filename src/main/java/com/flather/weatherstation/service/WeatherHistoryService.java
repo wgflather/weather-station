@@ -100,7 +100,8 @@ public class WeatherHistoryService {
     List<FullDaySummary> summaries = new ArrayList<>(byDate.size());
     byDate.forEach((date, rows) -> summaries.add(toSummary(date, rows, false)));
 
-    return new DailyHistoryDto(summaries, summaryCardService.buildSummary(rangeData, metric));
+    return new DailyHistoryDto(
+        summaries, summaryCardService.buildSummary(rangeData, metric, from, to));
   }
 
   /**

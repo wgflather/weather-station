@@ -50,7 +50,7 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 - **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists.
 - **`SeeingCalculator`** — Hufnagel-Valley HV 5/7 atmospheric turbulence model; inputs are jet-stream speed (200 hPa) and surface wind speed; outputs FWHM seeing in arc-seconds (Excellent / Good / Fair / Poor / Very Poor).
 - **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date. `getDayChart(date, metric)` is the only chart entry point: it resolves the date to midnight-to-midnight in the *station's* zone (not the caller's, which would straddle two station days and disagree with the per-period rows beside it) and routes on age — see `RAW_RETENTION_DAYS` below. `findHourlyDataPoints` is exhaustive over `Metric` for the same reason `getMetricChart` is. It once delegated to a `getChart(metric, from, to)` behind a second `/chart` endpoint; nothing consumed the range form, so both are gone.
-- **`SummaryCardService`** — builds the history modal's stat cards (warmest/coldest/trend) per metric. Which period a metric reads is a per-metric decision — see below.
+- **`SummaryCardService`** — builds the history modal's stat cards (warmest/coldest/trend) per metric. Which period a metric reads, and whether it answers with a date or an hour of the day, are per-metric decisions — see below. Humidity's builder is the only one that queries; the rest work from the rows the caller passes in.
 - **`WeatherRetentionService`** — scheduled hourly/daily rollups and raw cleanup, in a 02:00–02:10 window.
 - **`StationConfigurationService`** — CRUD for `StationConfiguration`; publishes `ConfigurationUpdatedEvent` on save.
 - **`DatabaseRawViewService`** — paged raw record queries for the admin view.
@@ -152,6 +152,11 @@ table. `getDayChart` picks one on the day's age and neither caller knows which a
 pair of queries must return the same unit**. Conversions therefore live in the queries, not in Java:
 whatever a chart query emits is charted as-is.
 
+Not everything in `HourlyWeatherRecordRepository` is a chart tier, though: `findHumidityByHourOfDay`
+aggregates by hour *of the day* for the summary cards, has no raw twin and is under none of the
+contracts below. It is also the only query in there that takes the station's zone, because bucketing
+a `TIMESTAMPTZ` by clock hour is the one thing that cannot be done in UTC and corrected later.
+
 Both tiers finish through `AnalyticsService.toChartPoints(points)`, which only maps the timestamp
 into the station's zone and **drops null values**. It takes no `Metric` — deliberately, so it cannot
 become the place metric-specific rules accumulate. The null-dropping is load-bearing rather than
@@ -227,29 +232,74 @@ cards) — from a single query. They are bundled because the modal reloads the r
 tab anyway, so separate calls only cost a second round trip. A metric with no card builder yields an
 empty card list rather than an error, so its chart still renders.
 
-Every card decision in `SummaryCardService` is per-metric, not a default. Three axes, each chosen
-per metric and each stated in the builder's own javadoc:
+Every card decision in `SummaryCardService` is per-metric, not a default. Four axes, each chosen per
+metric and each stated in the builder's own javadoc:
+
+**What shape the answer takes.** Most cards name a *date* and are built from the daily rows the
+caller already loaded. Humidity's two extremes name an *hour of the day* instead — "Most humid
+stretch 94 %, 23:00–02:00" — because its cycle is strong, inverted against temperature and repeats
+nightly, so "which day was most humid" mostly reports which airmass happened to sit over the station,
+while "which hours are reliably the most humid" describes the site itself. It is also the one thing
+the chart beside the cards cannot show, since that carries one point per day. This is the only
+builder that goes back to the database, reading
+`HourlyWeatherRecordRepository.findHumidityByHourOfDay`, so only the humidity tab pays for the extra
+round trip — and the modal reloads the range on *every* metric tab, so that is per click, not per
+open. The fetch sits in the builder rather than in `WeatherHistoryService` precisely so the choice
+stays next to the reasoning for it; hoisting it into the caller would put "humidity needs hourly
+rows" in a class that otherwise knows nothing about which metric wants what.
 
 **Which period.** Temperature takes *one card from each side of the split* — "Warmest day" from
 `DAY`, "Coldest night" from `NIGHT` — because that is the pair of questions the day/night rows exist
 to answer. Both cards previously read `DAY`, which wasted half the split and produced a daytime
 *low*: a quantity nobody asks for, since the cold part of a date happens before dawn and lives in
-that date's `NIGHT` row. Pressure, humidity and wetness read `FULL`, because their extremes fall
-outside daylight — a depression bottoming out at 03:00, a humidity peak before dawn, dew that forms
-after dark. Consequence to expect: a range of dates rolled up before the split has `FULL` rows only,
-so temperature yields **no** extreme cards for it rather than falling back.
+that date's `NIGHT` row. Pressure and wetness read `FULL`, because their extremes fall outside
+daylight — a depression bottoming out at 03:00, dew that forms after dark. Humidity's extremes read
+no period at all, only its trend does. Consequence to expect: a range of dates rolled up before the
+split has `FULL` rows only, so temperature yields **no** extreme cards for it rather than falling
+back.
 
-**Ranked on the average or on the extreme.** Temperature and humidity rank on the period *average*;
-pressure and wetness on the stored min/max. The label has to match what the number measures — a
-"Warmest day" answered by the single highest sample is a claim about a day answered by a property of
-a moment, set by whichever minute the sun was on the enclosure, and not comparable between days. It
-matters most for humidity, whose peak pins near 100 % on most nights, so a peak-ranked card decides
-a near-tie across half the range. Pressure keeps the extreme because the deepest low *is* the storm,
-and wetness because its peak answers "did it get wet at all" while its mean is near zero for days.
+**Ranked on the average or on the extreme.** Temperature ranks on the period *average*; pressure and
+wetness on the stored min/max. The label has to match what the number measures — a "Warmest day"
+answered by the single highest sample is a claim about a day answered by a property of a moment, set
+by whichever minute the sun was on the enclosure, and not comparable between days. Pressure keeps the
+extreme because the deepest low *is* the storm, and wetness because its peak answers "did it get wet
+at all" while its mean is near zero for days.
 
 **Whether there is a trend at all.** Wetness has none — a least-squares fit over a bimodal,
-event-driven signal reports where the wet days fell in the range, not a direction. Thresholds are
+event-driven signal reports where the wet days fell in the range, not a direction. Humidity keeps
+one, and it is now the only humidity card that reads daily rows and names dates. Thresholds are
 likewise per-metric: 0.5 °C is a real shift, 0.5 hPa is noise.
+
+The diurnal cards rank **three-hour windows**, not single hours. The width is fixed rather than
+chosen per range, and deliberately not a "best of 2 or 3": a narrower window can always drop its
+worst hour and so scores more extreme in *both* directions, which means letting the width vary would
+simply return the narrowest one every time. Three is wide enough that the winner shifts smoothly —
+neighbouring windows differ by swapping one hour in and one out — where a single-hour pick flips
+between near-tied hours on reload. Relative humidity pins near 100 % through the small hours, so the
+overnight maximum is a near-tie by nature; that is the same objection that kept the old day-ranked
+card off the peak, reappearing on a different axis.
+
+Three things the scan has to get right, each with a test naming it:
+
+- It **wraps past midnight.** The most humid stretch of a clear night genuinely runs 23:00 → 02:00,
+  and a scan stopping at hour 23 would report the second-best answer without saying so. `windowEnd`
+  is then *earlier* on the clock than `windowStart` — correct, not a pair to reorder.
+- The query's end bound is **`to.plusDays(1)`**. `to` is an inclusive date and the bound is
+  half-open, so stopping at `to` silently drops the newest day of every range — the one the reader
+  is most likely looking at — while the chart beside it still charts that day.
+- An hour observed on fewer than 70 % of the range's days is **unrankable**, and a window containing
+  one is skipped whole rather than averaged around: a mean over two hours is not comparable with the
+  three-hour means it would be ranked against. `HourOfDayAverage` carries the `samples` count for
+  exactly this. If no window survives, the cards are omitted like any other card with nothing behind
+  it.
+
+`SummaryCard` therefore carries one of three context shapes, with the other two null: a `date`, a
+`rangeStart`/`rangeEnd` pair of days, or a `windowStart`/`windowEnd` pair of `LocalTime`. Those times
+are **wall-clock at the station**, not instants, and `summary-cards.js` renders them verbatim rather
+than through `toLocaleTimeString` — a viewer in another zone must read the hour the station
+experienced, or the caption disagrees with the chart below it, which resolves its own days in the
+station's zone too. The frontend branches on *which fields arrived*, not on `kind`, so a second
+diurnal metric would need no frontend change at all.
 
 `extremeHigh`/`extremeLow` take a `Function<DayPeriodMetrics, Double>` that supplies **the value the
 card displays**, and rank on that same function — selection and display must not come from different
@@ -340,7 +390,7 @@ History has no standalone page — it opens as a modal from the dashboard (`hist
 | File | Role |
 |---|---|
 | `history-modal.js` | History chart modal (date picker + range tabs, period breakdown, legend toggles) |
-| `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block |
+| `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block. Picks a caption from which context fields arrived (date / date range / time window), not from `kind` |
 | `metric-units.js` | The one place a metric's display unit is written down; used by the modal, its cards and the daily chart |
 | `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js` |
 | `database-view.js` / `config.js` | Admin pages only, not loaded by the dashboard |

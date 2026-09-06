@@ -11,6 +11,11 @@
 // chart uses and dates render in the viewer's locale — server-formatted text would
 // disagree with the chart tooltip sitting directly below it.
 //
+// A card carries one of three context shapes and the caption is chosen by which
+// fields arrived, not by kind: a single `date`, a `rangeStart`/`rangeEnd` pair of
+// days, or a `windowStart`/`windowEnd` pair of times. The last is humidity's, whose
+// extremes name an hour of the day rather than a date.
+//
 // One caption to be aware of: a "Coldest night" date is the morning the night
 // ended on, since a night runs from the previous evening's sunset.
 
@@ -23,6 +28,20 @@ function shortDate(isoDate) {
     return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/**
+ * "13:00" from the backend's "13:00:00".
+ *
+ * Deliberately not run through `Date` and not locale-converted, unlike the dates
+ * above. These are wall-clock hours *at the station*, not instants — there is no
+ * day attached to convert from. A viewer in another zone must read the hour the
+ * station experienced, or the card would disagree with the chart beside it, which
+ * resolves its own days in the station's zone too.
+ */
+function stationHour(isoTime) {
+    const match = /^(\d{2}):(\d{2})/.exec(isoTime ?? '');
+    return match ? `${match[1]}:${match[2]}` : '';
+}
+
 function formatValue(card, metric) {
     if (card.value == null) return '–';
     const unit = unitFor(metric);
@@ -33,6 +52,11 @@ function formatValue(card, metric) {
 }
 
 function formatContext(card) {
+    // A stretch of the day, not a date. It may wrap past midnight — "23:00–02:00" —
+    // so the end reading earlier than the start is correct, not a pair to reorder.
+    if (card.windowStart && card.windowEnd) {
+        return `${stationHour(card.windowStart)}–${stationHour(card.windowEnd)}`;
+    }
     if (card.kind === 'TREND') {
         return card.rangeStart && card.rangeEnd
             ? `${shortDate(card.rangeStart)} → ${shortDate(card.rangeEnd)}`

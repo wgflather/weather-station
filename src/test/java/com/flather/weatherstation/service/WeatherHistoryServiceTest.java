@@ -338,7 +338,7 @@ class WeatherHistoryServiceTest {
                 .surfaceWetnessMin(700.0)
                 .surfaceWetnessMax(3226.0)
                 .build());
-    given(summaryCardService.buildSummary(List.of(row), Metric.SURFACE_WETNESS))
+    given(summaryCardService.buildSummary(List.of(row), Metric.SURFACE_WETNESS, date, date))
         .willReturn(new MetricSummary(Metric.SURFACE_WETNESS, List.of()));
 
     DailyHistoryDto result = service.getDailyHistory(date, date, Metric.SURFACE_WETNESS);
@@ -355,7 +355,7 @@ class WeatherHistoryServiceTest {
     List<DayPeriodMetrics> rows = List.of(periodRow(from, DayPeriod.FULL));
 
     given(dailyRepository.findByDateBetweenOrderByDateAsc(from, to)).willReturn(rows);
-    given(summaryCardService.buildSummary(rows, Metric.TEMPERATURE))
+    given(summaryCardService.buildSummary(rows, Metric.TEMPERATURE, from, to))
         .willReturn(new MetricSummary(Metric.TEMPERATURE, List.of()));
 
     DailyHistoryDto result = service.getDailyHistory(from, to, Metric.TEMPERATURE);
@@ -363,7 +363,7 @@ class WeatherHistoryServiceTest {
     assertThat(result.summary().metric()).isEqualTo(Metric.TEMPERATURE);
     // One query feeds both halves: the cards see the very rows the chart was built from.
     verify(dailyRepository, times(1)).findByDateBetweenOrderByDateAsc(from, to);
-    verify(summaryCardService).buildSummary(rows, Metric.TEMPERATURE);
+    verify(summaryCardService).buildSummary(rows, Metric.TEMPERATURE, from, to);
   }
 
   @Test

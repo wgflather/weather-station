@@ -22,6 +22,7 @@ import com.flather.weatherstation.dto.weather.PeriodMetricDto;
 import com.flather.weatherstation.service.WeatherHistoryService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -252,6 +253,58 @@ class WeatherHistoryControllerTest {
         .andExpect(jsonPath("$.summary.cards[1].date").doesNotExist());
 
     verify(historyService).getDailyHistory(from, to, Metric.TEMPERATURE);
+  }
+
+  /**
+   * Pins the wire format of a diurnal card, which the frontend parses by hand.
+   *
+   * <p>The times are wall-clock at the station, so they go out bare — no offset, no date — and the
+   * client renders them as they arrive rather than converting into the viewer's zone. A window that
+   * wraps past midnight ends earlier on the clock than it starts, and the date fields stay absent
+   * so the client can tell the two context shapes apart by presence alone.
+   */
+  @Test
+  void shouldReturnDiurnalCards_asBareWallClockTimes() throws Exception {
+    LocalDate from = LocalDate.of(2026, 6, 1);
+    LocalDate to = LocalDate.of(2026, 6, 16);
+
+    DailyHistoryDto payload =
+        new DailyHistoryDto(
+            List.of(),
+            new MetricSummary(
+                Metric.HUMIDITY,
+                List.of(
+                    SummaryCard.overWindow(
+                        CardKind.EXTREME_LOW,
+                        "Driest stretch",
+                        29.8,
+                        LocalTime.of(13, 0),
+                        LocalTime.of(16, 0)),
+                    SummaryCard.overWindow(
+                        CardKind.EXTREME_HIGH,
+                        "Most humid stretch",
+                        94.1,
+                        LocalTime.of(23, 0),
+                        LocalTime.of(2, 0)))));
+
+    given(historyService.getDailyHistory(from, to, Metric.HUMIDITY)).willReturn(payload);
+
+    mockMvc
+        .perform(
+            get(WeatherHistoryController.DAILY_PATH)
+                .param("from", "2026-06-01")
+                .param("to", "2026-06-16")
+                .param("metric", "humidity")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.summary.cards[0].label").value("Driest stretch"))
+        .andExpect(jsonPath("$.summary.cards[0].windowStart").value("13:00:00"))
+        .andExpect(jsonPath("$.summary.cards[0].windowEnd").value("16:00:00"))
+        .andExpect(jsonPath("$.summary.cards[0].date").doesNotExist())
+        .andExpect(jsonPath("$.summary.cards[0].rangeStart").doesNotExist())
+        // Wrapping past midnight is normal, not a swap to correct on the client.
+        .andExpect(jsonPath("$.summary.cards[1].windowStart").value("23:00:00"))
+        .andExpect(jsonPath("$.summary.cards[1].windowEnd").value("02:00:00"));
   }
 
   @Test

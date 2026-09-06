@@ -2,7 +2,11 @@ package com.flather.weatherstation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.offset;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.config.LocationContext;
@@ -13,13 +17,19 @@ import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.DayPeriodMetrics;
 import com.flather.weatherstation.dto.analytics.MetricSummary;
 import com.flather.weatherstation.dto.analytics.SummaryCard;
+import com.flather.weatherstation.dto.projection.HourOfDayAverage;
+import com.flather.weatherstation.repository.HourlyWeatherRecordRepository;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,7 +43,14 @@ class SummaryCardServiceTest {
   private static final ZoneId UTC = ZoneId.of("UTC");
   private static final LocalDate START = LocalDate.of(2026, 8, 28);
 
+  /** Inclusive end of the range the helpers below build summaries over — seven days in all. */
+  private static final LocalDate END = START.plusDays(6);
+
+  /** Days an hour must appear on to be rankable over that seven-day range: ceil(7 × 0.7). */
+  private static final long ENOUGH_SAMPLES = 5;
+
   @Mock ConfigurationCache configurationCache;
+  @Mock HourlyWeatherRecordRepository hourlyWeatherRecordRepository;
   @InjectMocks SummaryCardService service;
 
   @BeforeEach
@@ -46,6 +63,34 @@ class SummaryCardServiceTest {
             new WeatherValidationConfig(
                 -50, 60, 900, 1100, 0, 100, 20, 5.0, 10.0, 150, 3230, 0.0, 60.0, 15.0, 0.0, 15.0,
                 5.0));
+  }
+
+  /** The cards for a metric over the fixed {@link #START}–{@link #END} range. */
+  private MetricSummary summaryOf(List<DayPeriodMetrics> data, Metric metric) {
+    return service.buildSummary(data, metric, START, END);
+  }
+
+  /**
+   * Stubs the diurnal query with one bucket per hour, {@code values[h]} at hour h, every hour
+   * observed on enough days to be rankable. A null entry leaves that hour out of the result
+   * entirely, standing for an hour the station never recorded.
+   */
+  private void givenHumidityByHourOfDay(Double[] values) {
+    List<HourOfDayAverage> rows = new ArrayList<>();
+    for (int hour = 0; hour < 24; hour++) {
+      if (values[hour] != null) {
+        rows.add(new HourOfDayAverage(hour, values[hour], ENOUGH_SAMPLES));
+      }
+    }
+    given(hourlyWeatherRecordRepository.findHumidityByHourOfDay(any(), any(), any()))
+        .willReturn(rows);
+  }
+
+  /** 24 hours all sitting at {@code value}, for fixtures that then dent a few of them. */
+  private static Double[] flatHours(double value) {
+    Double[] hours = new Double[24];
+    Arrays.fill(hours, value);
+    return hours;
   }
 
   private static DayPeriodMetrics day(LocalDate date, DayPeriod period, double min, double max) {
@@ -83,8 +128,7 @@ class SummaryCardServiceTest {
                 5.0,
                 7.0)); // avg  6.0 — genuinely the coldest night
 
-    SummaryCard low =
-        cardOfKind(service.buildSummary(data, Metric.TEMPERATURE), CardKind.EXTREME_LOW);
+    SummaryCard low = cardOfKind(summaryOf(data, Metric.TEMPERATURE), CardKind.EXTREME_LOW);
 
     assertThat(low).isNotNull();
     assertThat(low.label()).isEqualTo("Coldest night");
@@ -104,7 +148,7 @@ class SummaryCardServiceTest {
             day(START, DayPeriod.NIGHT, 2.0, 10.0), //            avg  6.0
             day(START.plusDays(1), DayPeriod.NIGHT, 0.0, 8.0)); // avg  4.0 — coldest night
 
-    MetricSummary summary = service.buildSummary(data, Metric.TEMPERATURE);
+    MetricSummary summary = summaryOf(data, Metric.TEMPERATURE);
     SummaryCard high = cardOfKind(summary, CardKind.EXTREME_HIGH);
     SummaryCard low = cardOfKind(summary, CardKind.EXTREME_LOW);
 
@@ -125,7 +169,7 @@ class SummaryCardServiceTest {
   @Test
   void coldestNight_isOmittedWhenTheRangeHasNoNightRows() {
     MetricSummary summary =
-        service.buildSummary(List.of(day(START, DayPeriod.DAY, 12.0, 25.0)), Metric.TEMPERATURE);
+        summaryOf(List.of(day(START, DayPeriod.DAY, 12.0, 25.0)), Metric.TEMPERATURE);
 
     assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH)).isNotNull();
     assertThat(cardOfKind(summary, CardKind.EXTREME_LOW)).isNull();
@@ -139,7 +183,7 @@ class SummaryCardServiceTest {
       data.add(day(START.plusDays(i), DayPeriod.DAY, 10.0 + 2 * i, 10.0 + 2 * i));
     }
 
-    SummaryCard trend = cardOfKind(service.buildSummary(data, Metric.TEMPERATURE), CardKind.TREND);
+    SummaryCard trend = cardOfKind(summaryOf(data, Metric.TEMPERATURE), CardKind.TREND);
 
     assertThat(trend.value()).isEqualTo(10.0);
     assertThat(trend.rangeStart()).isEqualTo(START);
@@ -156,7 +200,7 @@ class SummaryCardServiceTest {
       data.add(day(START.plusDays(i), DayPeriod.DAY, 10.0 + 0.2 * i, 10.0 + 0.2 * i));
     }
 
-    SummaryCard trend = cardOfKind(service.buildSummary(data, Metric.TEMPERATURE), CardKind.TREND);
+    SummaryCard trend = cardOfKind(summaryOf(data, Metric.TEMPERATURE), CardKind.TREND);
 
     assertThat(trend.value()).isEqualTo(6.0);
   }
@@ -177,7 +221,7 @@ class SummaryCardServiceTest {
             day(START.plusDays(1), DayPeriod.NIGHT, -8.0, 6.0), //    avg -1.0 — expected low
             day(START.plusDays(1), DayPeriod.FULL, -30.0, -20.0)); // avg -25.0 — would win the low
 
-    MetricSummary summary = service.buildSummary(data, Metric.TEMPERATURE);
+    MetricSummary summary = summaryOf(data, Metric.TEMPERATURE);
 
     assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH).value()).isEqualTo(18.5);
     assertThat(cardOfKind(summary, CardKind.EXTREME_LOW).value()).isEqualTo(-1.0);
@@ -201,7 +245,7 @@ class SummaryCardServiceTest {
     daytime.setPressureMax(1016.0);
     daytime.setPressureAvg(1010.0);
 
-    MetricSummary summary = service.buildSummary(List.of(full, daytime), Metric.PRESSURE);
+    MetricSummary summary = summaryOf(List.of(full, daytime), Metric.PRESSURE);
 
     // Reading daylight rows would report 1004 and miss the depression entirely.
     assertThat(cardOfKind(summary, CardKind.EXTREME_LOW).value()).isEqualTo(981.0);
@@ -220,8 +264,7 @@ class SummaryCardServiceTest {
       data.add(row);
     }
 
-    assertThat(cardOfKind(service.buildSummary(data, Metric.PRESSURE), CardKind.TREND).value())
-        .isEqualTo(0.0);
+    assertThat(cardOfKind(summaryOf(data, Metric.PRESSURE), CardKind.TREND).value()).isEqualTo(0.0);
   }
 
   // ---- humidity ----
@@ -238,27 +281,157 @@ class SummaryCardServiceTest {
   }
 
   /**
-   * Two properties at once: humidity reads FULL rows, and it ranks them on the mean. Both peaks sit
-   * near 100 % — which is why the peak is the wrong thing to rank on for this metric — so a
-   * peak-ranked card would be deciding between 97 and 99 and would report a different day.
+   * The two extremes moved to hours of the day, but the trend still reads the daily FULL rows and
+   * still describes the range as a span of dates. It is the one humidity card the diurnal pair did
+   * not replace.
    */
   @Test
-  void humidityCards_readFullDayRows_rankedByAverage() {
+  void humidityTrend_stillReadsTheDailyFullRows() {
     List<DayPeriodMetrics> data =
         List.of(
-            humidityRow(START, DayPeriod.FULL, 38.0, 97.0, 65.0),
-            humidityRow(START, DayPeriod.DAY, 38.0, 61.0, 48.0),
-            humidityRow(START.plusDays(1), DayPeriod.FULL, 60.0, 99.0, 80.0),
-            humidityRow(START.plusDays(1), DayPeriod.DAY, 55.0, 78.0, 70.0));
+            humidityRow(START, DayPeriod.FULL, 38.0, 97.0, 60.0),
+            humidityRow(START.plusDays(1), DayPeriod.FULL, 45.0, 98.0, 70.0),
+            humidityRow(START.plusDays(2), DayPeriod.FULL, 55.0, 99.0, 80.0));
 
-    MetricSummary summary = service.buildSummary(data, Metric.HUMIDITY);
+    SummaryCard trend = cardOfKind(summaryOf(data, Metric.HUMIDITY), CardKind.TREND);
+
+    assertThat(trend.value()).isEqualTo(20.0);
+    assertThat(trend.rangeStart()).isEqualTo(START);
+    assertThat(trend.rangeEnd()).isEqualTo(START.plusDays(2));
+    assertThat(trend.windowStart()).isNull();
+  }
+
+  /**
+   * Humidity's extremes name a time of day, not a date — the property that separates them from
+   * every other metric's cards, and the one the frontend branches on to decide what to print
+   * underneath the value.
+   */
+  @Test
+  void humidityExtremes_nameAnHourOfDay_ratherThanADate() {
+    Double[] hours = flatHours(60.0);
+    hours[3] = 90.0;
+    hours[4] = 90.0;
+    hours[5] = 90.0;
+    givenHumidityByHourOfDay(hours);
+
+    MetricSummary summary = summaryOf(List.of(), Metric.HUMIDITY);
     SummaryCard high = cardOfKind(summary, CardKind.EXTREME_HIGH);
-    SummaryCard low = cardOfKind(summary, CardKind.EXTREME_LOW);
 
-    assertThat(high.value()).isEqualTo(80.0);
-    assertThat(high.date()).isEqualTo(START.plusDays(1));
-    assertThat(low.value()).isEqualTo(65.0);
-    assertThat(low.date()).isEqualTo(START);
+    assertThat(high.date()).isNull();
+    assertThat(high.rangeStart()).isNull();
+    assertThat(high.windowStart()).isEqualTo(LocalTime.of(3, 0));
+    assertThat(high.windowEnd()).isEqualTo(LocalTime.of(6, 0));
+    assertThat(high.value()).isEqualTo(90.0);
+  }
+
+  /**
+   * The card ranks three-hour stretches, not single hours. The fixture separates the two: hour 15
+   * alone is by far the driest reading, but the three hours around 03:00 are collectively drier, so
+   * an hour-ranked card would answer 15:00 and a window-ranked one will not.
+   *
+   * <p>This is the whole reason for the window. A lone spike is one hour of one day's weather; a
+   * stretch is the shape of the site's day.
+   */
+  @Test
+  void driestStretch_ranksWindows_notTheSingleDriestHour() {
+    Double[] hours = flatHours(60.0);
+    hours[15] = 10.0;
+    hours[2] = 20.0;
+    hours[3] = 20.0;
+    hours[4] = 20.0;
+    givenHumidityByHourOfDay(hours);
+
+    SummaryCard low = cardOfKind(summaryOf(List.of(), Metric.HUMIDITY), CardKind.EXTREME_LOW);
+
+    assertThat(low.windowStart()).isEqualTo(LocalTime.of(2, 0));
+    assertThat(low.windowEnd()).isEqualTo(LocalTime.of(5, 0));
+    assertThat(low.value()).isEqualTo(20.0);
+  }
+
+  /**
+   * A stretch may run through midnight, and then its end is <em>earlier</em> on the clock than its
+   * start. A scan that stopped at hour 23 would still find an answer here — the second-best one —
+   * and report it with no sign that it had missed the real peak.
+   */
+  @Test
+  void mostHumidStretch_wrapsPastMidnight() {
+    Double[] hours = flatHours(40.0);
+    hours[23] = 95.0;
+    hours[0] = 95.0;
+    hours[1] = 95.0;
+    givenHumidityByHourOfDay(hours);
+
+    SummaryCard high = cardOfKind(summaryOf(List.of(), Metric.HUMIDITY), CardKind.EXTREME_HIGH);
+
+    assertThat(high.windowStart()).isEqualTo(LocalTime.of(23, 0));
+    assertThat(high.windowEnd()).isEqualTo(LocalTime.of(2, 0));
+    assertThat(high.value()).isEqualTo(95.0);
+  }
+
+  /**
+   * An hour the station only caught on a couple of days is not comparable with one it caught every
+   * day, so it is excluded rather than ranked. Here the thinly-sampled hours hold the lowest
+   * readings in the range: without the coverage floor they would win the card outright.
+   */
+  @Test
+  void driestStretch_ignoresHoursObservedOnTooFewDays() {
+    List<HourOfDayAverage> rows = new ArrayList<>();
+    for (int hour = 0; hour < 24; hour++) {
+      double value = (hour >= 2 && hour <= 4) ? 20.0 : 60.0;
+      long samples = (hour >= 10 && hour <= 12) ? ENOUGH_SAMPLES - 1 : ENOUGH_SAMPLES;
+      rows.add(new HourOfDayAverage(hour, hour >= 10 && hour <= 12 ? 5.0 : value, samples));
+    }
+    given(hourlyWeatherRecordRepository.findHumidityByHourOfDay(any(), any(), any()))
+        .willReturn(rows);
+
+    SummaryCard low = cardOfKind(summaryOf(List.of(), Metric.HUMIDITY), CardKind.EXTREME_LOW);
+
+    assertThat(low.windowStart()).isEqualTo(LocalTime.of(2, 0));
+    assertThat(low.value()).isEqualTo(20.0);
+  }
+
+  /**
+   * With gaps every other hour no window is complete, and a window is never averaged around a hole
+   * — a mean over two hours is not comparable with the three-hour means it would be ranked against.
+   * The cards are then omitted, exactly as any card with nothing behind it is.
+   */
+  @Test
+  void humidityWindows_areOmittedWithoutThreeUnbrokenHours() {
+    Double[] hours = new Double[24];
+    for (int hour = 0; hour < 24; hour += 2) {
+      hours[hour] = 50.0;
+    }
+    givenHumidityByHourOfDay(hours);
+
+    MetricSummary summary = summaryOf(List.of(), Metric.HUMIDITY);
+
+    assertThat(cardOfKind(summary, CardKind.EXTREME_HIGH)).isNull();
+    assertThat(cardOfKind(summary, CardKind.EXTREME_LOW)).isNull();
+  }
+
+  /**
+   * Both cards come from one query, and that query covers the whole inclusive range.
+   *
+   * <p>Two regressions in one test. The bounds are half-open, so the end has to be the start of the
+   * day <em>after</em> the range's last date — stopping at the last date itself silently drops the
+   * newest day of every range, which is the one the reader is most likely looking at. And the two
+   * cards must share a fetch: building them independently doubles the round trip for a payload the
+   * modal already re-requests on every metric tab.
+   */
+  @Test
+  void humidityWindows_queryTheInclusiveRangeExactlyOnce() {
+    givenHumidityByHourOfDay(flatHours(60.0));
+
+    MetricSummary summary = summaryOf(List.of(), Metric.HUMIDITY);
+
+    ArgumentCaptor<Instant> from = ArgumentCaptor.forClass(Instant.class);
+    ArgumentCaptor<Instant> to = ArgumentCaptor.forClass(Instant.class);
+    verify(hourlyWeatherRecordRepository, times(1))
+        .findHumidityByHourOfDay(eq(UTC.getId()), from.capture(), to.capture());
+
+    assertThat(from.getValue()).isEqualTo(START.atStartOfDay(UTC).toInstant());
+    assertThat(to.getValue()).isEqualTo(END.plusDays(1).atStartOfDay(UTC).toInstant());
+    assertThat(summary.cards()).isNotEmpty();
   }
 
   @Test
@@ -266,7 +439,7 @@ class SummaryCardServiceTest {
     // The cards ride along with the chart data, so throwing here would take the whole range
     // response down for a metric that charts perfectly well.
     MetricSummary summary =
-        service.buildSummary(List.of(day(START, DayPeriod.DAY, 1.0, 5.0)), Metric.UV_INDEX);
+        summaryOf(List.of(day(START, DayPeriod.DAY, 1.0, 5.0)), Metric.UV_INDEX);
 
     assertThat(summary.metric()).isEqualTo(Metric.UV_INDEX);
     assertThat(summary.cards()).isEmpty();
@@ -275,7 +448,7 @@ class SummaryCardServiceTest {
   @Test
   void everySupportedMetricProducesLabelledCards() {
     for (Metric metric : List.of(Metric.TEMPERATURE, Metric.PRESSURE, Metric.HUMIDITY)) {
-      MetricSummary summary = service.buildSummary(List.of(), metric);
+      MetricSummary summary = summaryOf(List.of(), metric);
       assertThat(summary.metric()).isEqualTo(metric);
       assertThat(summary.cards()).isEmpty();
     }
@@ -306,7 +479,7 @@ class SummaryCardServiceTest {
             wetnessDay(START.plusDays(1), 700.0, 3200.0), // soaked at some point
             wetnessDay(START.plusDays(2), 2500.0, 3210.0));
 
-    MetricSummary summary = service.buildSummary(data, Metric.SURFACE_WETNESS);
+    MetricSummary summary = summaryOf(data, Metric.SURFACE_WETNESS);
     SummaryCard wettest = cardOfKind(summary, CardKind.EXTREME_HIGH);
 
     assertThat(wettest.label()).isEqualTo("Wettest day");
@@ -321,7 +494,7 @@ class SummaryCardServiceTest {
             wetnessDay(START, 3000.0, 3226.0), // driest moment of the range
             wetnessDay(START.plusDays(1), 700.0, 3200.0));
 
-    MetricSummary summary = service.buildSummary(data, Metric.SURFACE_WETNESS);
+    MetricSummary summary = summaryOf(data, Metric.SURFACE_WETNESS);
     SummaryCard driest = cardOfKind(summary, CardKind.EXTREME_LOW);
     SummaryCard wettest = cardOfKind(summary, CardKind.EXTREME_HIGH);
 
@@ -345,7 +518,7 @@ class SummaryCardServiceTest {
             wetnessDay(START.plusDays(1), 1800.0, 2100.0),
             wetnessDay(START.plusDays(2), 3000.0, 3200.0));
 
-    MetricSummary summary = service.buildSummary(data, Metric.SURFACE_WETNESS);
+    MetricSummary summary = summaryOf(data, Metric.SURFACE_WETNESS);
 
     assertThat(summary.cards()).hasSize(2);
     assertThat(cardOfKind(summary, CardKind.TREND)).isNull();
@@ -356,7 +529,7 @@ class SummaryCardServiceTest {
     // Both extremes are answerable from a single date, but a trend is not: the fit needs two
     // points on different days.
     MetricSummary oneDate =
-        service.buildSummary(
+        summaryOf(
             List.of(day(START, DayPeriod.DAY, 12.0, 25.0), day(START, DayPeriod.NIGHT, 2.0, 8.0)),
             Metric.TEMPERATURE);
     assertThat(oneDate.cards()).hasSize(2);
@@ -365,7 +538,7 @@ class SummaryCardServiceTest {
     // Dates rolled up before the day/night split have a FULL row alone, and no temperature card
     // reads FULL — so such a range yields nothing rather than falling back to it.
     MetricSummary fullOnly =
-        service.buildSummary(List.of(day(START, DayPeriod.FULL, 1.0, 5.0)), Metric.TEMPERATURE);
+        summaryOf(List.of(day(START, DayPeriod.FULL, 1.0, 5.0)), Metric.TEMPERATURE);
     assertThat(fullOnly.cards()).isEmpty();
   }
 }
