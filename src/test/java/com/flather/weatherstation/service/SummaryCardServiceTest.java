@@ -151,7 +151,7 @@ class SummaryCardServiceTest {
     SummaryCard low = cardOfKind(summaryOf(data, Metric.TEMPERATURE), CardKind.EXTREME_LOW);
 
     assertThat(low).isNotNull();
-    assertThat(low.label()).isEqualTo("Coldest night");
+    assertThat(low.label()).isEqualTo("Coldest night avg");
     assertThat(low.value()).isEqualTo(6.0);
     assertThat(low.date()).isEqualTo(START.plusDays(2));
   }
@@ -173,11 +173,11 @@ class SummaryCardServiceTest {
     SummaryCard low = cardOfKind(summary, CardKind.EXTREME_LOW);
 
     // 31.0 is the highest reading in the range; ranking on peaks would report it and the wrong day.
-    assertThat(high.label()).isEqualTo("Warmest day");
+    assertThat(high.label()).isEqualTo("Warmest daylight avg");
     assertThat(high.value()).isEqualTo(18.5);
     assertThat(high.date()).isEqualTo(START);
 
-    assertThat(low.label()).isEqualTo("Coldest night");
+    assertThat(low.label()).isEqualTo("Coldest night avg");
     assertThat(low.value()).isEqualTo(4.0);
     assertThat(low.date()).isEqualTo(START.plusDays(1));
   }
@@ -555,7 +555,7 @@ class SummaryCardServiceTest {
   /**
    * The whole hazard in one test: a higher ADC count is a drier surface, so the wettest day is the
    * one with the <em>lowest</em> stored reading. Selecting it with the same comparator the other
-   * metrics use would return the driest day under a "Wettest day" heading.
+   * metrics use would return the driest day under a "Wettest reading" heading.
    */
   @Test
   void wettestDay_picksTheLowestRawCount_andReportsItAsAPercentage() {
@@ -568,7 +568,7 @@ class SummaryCardServiceTest {
     MetricSummary summary = summaryOf(data, Metric.SURFACE_WETNESS);
     SummaryCard wettest = cardOfKind(summary, CardKind.EXTREME_HIGH);
 
-    assertThat(wettest.label()).isEqualTo("Wettest day");
+    assertThat(wettest.label()).isEqualTo("Wettest reading");
     assertThat(wettest.date()).isEqualTo(START.plusDays(1));
     assertThat(wettest.value()).isCloseTo(82.14, offset(0.01));
   }
@@ -584,7 +584,7 @@ class SummaryCardServiceTest {
     SummaryCard driest = cardOfKind(summary, CardKind.EXTREME_LOW);
     SummaryCard wettest = cardOfKind(summary, CardKind.EXTREME_HIGH);
 
-    assertThat(driest.label()).isEqualTo("Driest day");
+    assertThat(driest.label()).isEqualTo("Driest reading");
     assertThat(driest.date()).isEqualTo(START);
     assertThat(driest.value()).isCloseTo(0.13, offset(0.01));
     // The pair has to stay the right way round once converted.

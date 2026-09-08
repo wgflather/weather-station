@@ -472,7 +472,7 @@ async function loadMultiDay(fromStr, toStr, metric) {
  * the view shows one day while "7D" stays lit; and the flatpickr input keeps whatever it
  * was last set to, so the picker would name a different date than the chart below it.
  *
- * Note what a "Coldest night" card opens. A NIGHT row for date D covers D-1's sunset to
+ * Note what a "Coldest night avg" card opens. A NIGHT row for date D covers D-1's sunset to
  * D's sunrise, so the day this lands on holds only the second half of that night — the
  * evening that began it is on the previous day's chart. The coldest hour is normally just
  * before dawn and so is in view, but this is deliberately the date the card names rather

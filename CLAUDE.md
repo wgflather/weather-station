@@ -268,6 +268,21 @@ empty card list rather than an error, so its chart still renders.
 Every card decision in `SummaryCardService` is per-metric, not a default. Four axes, each chosen per
 metric and each stated in the builder's own javadoc:
 
+**A card's label names its statistic, not just its question.** The cards do not agree on one:
+temperature's extremes are period *averages*, pressure's and wetness's are single stored
+*extremes*, and humidity's stretches are means of a three-hour window. Worded as plain
+superlatives — "Warmest day", "Wettest day" — they read alike and invite the reader to compare a
+mean against a peak, so the labels are "Warmest daylight avg" / "Coldest night avg" against
+"Highest reading" / "Lowest reading" / "Wettest reading" / "Driest reading". Pressure's dropped the
+metric name the tab directly above already carries, which is what pays for the added qualifier.
+
+The qualifier is in the heading rather than in the caption. Measured across 320-1071px, putting it
+in the caption is very slightly the more compact of the two, but the caption is the smallest,
+dimmest line on the card and already carries the date and the drill-down chevron. These headings
+were also chosen against the measurements: "Warmest daylight avg" wraps to the same two lines
+"Warmest day" did at every width, where "Warmest daylight average" needs three, and "Highest
+reading" is *shorter* than "Highest pressure" — so the whole set costs no height anywhere.
+
 **What shape the answer takes.** Most cards name a *date* and are built from the daily rows the
 caller already loaded. Humidity's two extremes name an *hour of the day* instead — "Most humid
 stretch 94 %, 23:00–02:00" — because its cycle is strong, inverted against temperature and repeats
@@ -341,6 +356,14 @@ Three things the scan has to get right, each with a test naming it:
   three-hour means it would be ranked against. `HourOfDayAverage` carries the `samples` count for
   exactly this. If no window survives, the cards are omitted like any other card with nothing behind
   it.
+
+`summary-cards.js` renders a card's unit in its own `.hist-summary-unit` span at `0.72em`. Three
+cards share one row at every width, so the widest value a metric can produce has 70-80px on a phone
+and " hPa" is a third of "1013.8 hPa" — which wrapped between number and unit at every phone width
+tested, and made the pressure tab's card row taller than every other tab's. It is also the right
+hierarchy: the number is the reading, the unit is a label on it. Sized in `em` so it tracks whatever
+value size the breakpoints settled on. The aria-label is unaffected, since it reads the value
+element's `textContent`, which still spans both.
 
 `SummaryCard` therefore carries one of **four** context shapes, with the unused fields null:
 
@@ -643,6 +666,50 @@ rule.
 Consequence to expect: the single-day view hides the card row, so clicking a card makes the
 whole row — including the card just clicked — disappear. There is no back affordance beyond
 the range tabs.
+
+**The modal body scrolls only because its children are told not to shrink.**
+`.hist-modal-body` is a flex column with `overflow-y: auto`, and a flex item's default
+`flex-shrink: 1` let the single card child compress *below* its content height — so on any
+viewport too short for the card the chart was cut mid-plot and the legend and note vanished
+with **no scrollbar**, because the body's `scrollHeight` equalled its `clientHeight` and
+there was nothing to scroll. `.hist-modal-body > * { flex-shrink: 0 }` is what pushes the
+overflow up to the body. Symptom to recognise: content silently missing on a short window
+rather than reachable by scrolling.
+
+The chart is sized off the viewport's **height** (`clamp(180px, 30vh, 320px)`), not its
+width. It sits at the bottom of a fixed-height modal under chrome that does not shrink, so
+what decides whether its axis is on screen is how tall the window is — the old `35vw` gave a
+tall narrow phone *less* chart than a short wide one. A `max-height: 560px` block (landscape
+phones) trims the header, topbar and cards and drops the chart to `clamp(130px, 42vh,
+200px)`; below that height nothing makes the view roomy, but it does put the chart on screen
+at all.
+
+Below 480px the four metric tabs become a **2x2 grid** rather than free-wrapping. They cannot
+fit one row inside a 320–390px panel at any readable size, so the only choice is which ragged
+shape they wrap into — and free wrapping gave 3+1 at 390px and 2+2 at 360px, i.e. the row
+reflowed as the phone changed.
+
+The summary cards stay on **one row at every width**, sharing it equally: below 480px they
+are `flex: 1 1 0` with `min-width: 0`, so two cards take halves and three take thirds, and
+the type steps down (again at 380px) rather than the row breaking. Wrapping two-and-one
+left the odd card stretched the full width with its short value adrift in a mostly empty
+box, and made the row's shape depend on how many cards the metric happened to contribute.
+`min-width: 0` is the part that does it — without it each card floors at its longest word
+and the row wraps again; the labels pay for it by running to two or three lines, which is
+the right thing to spend, since a label is skimmed and a value is read.
+`.hist-summary-label` carries `margin-bottom: auto` so the values sit on a common baseline
+across a row whose labels wrap to different depths.
+
+**The daily chart's x-axis step is derived from the plot's width, not from the day count.**
+It was `<= 8 ? 1 : <= 16 ? 2 : 5`, so a 30-day range drew seven `MMM d` labels whatever the
+screen — about 240px of text in the ~230px a 320px phone has for the plot, and they
+overlapped into a smear. Chart.js cannot rescue this itself: an explicit `stepSize` on a
+time axis suppresses its own autoSkip. The step is now the first of `[1, 2, 3, 5, 7, 10,
+14, 21, 30]` that keeps the label count inside `plotWidth / LABEL_PX`, snapped to that set
+so ticks stay on a calendar-legible rhythm. `LABEL_PX` on desktop (78) is deliberately
+wider than a label really is, chosen to reproduce the step-of-5 the 30-day chart already
+used there — so this rule only ever *thins* an axis that could not fit, and never changes
+what a wide screen already showed.
 
 **A trap this file has now hit four times: `[hidden]` loses to `display: flex`.** The
 browser's `[hidden] { display: none }` comes from the *UA* stylesheet, so any author rule

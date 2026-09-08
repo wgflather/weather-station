@@ -1,7 +1,8 @@
 // summary-cards.js
 //
-// The stat cards above the history chart in multi-day views: "Warmest day 24.6°C
-// Aug 30", "Coldest night 8.2°C Aug 31", "Daylight trend +3°C Aug 28 → Sep 3".
+// The stat cards above the history chart in multi-day views: "Warmest daylight avg
+// 24.6°C Aug 30", "Coldest night avg 8.2°C Aug 31", "Daylight trend +3°C Aug 28 →
+// Sep 3".
 //
 // The backend decides which cards a metric can answer and what each one is called,
 // and the values it sends are period averages for some metrics and stored extremes
@@ -18,7 +19,7 @@
 // one hour. Matching on fields rather than kind is what lets the backend add a card
 // shape without touching this file — two of these arrived that way.
 //
-// One caption to be aware of: a "Coldest night" date is the morning the night
+// One caption to be aware of: a "Coldest night avg" date is the morning the night
 // ended on, since a night runs from the previous evening's sunset.
 
 import { unitFor } from './metric-units.js';
@@ -44,16 +45,37 @@ function stationHour(isoTime) {
     return match ? `${match[1]}:${match[2]}` : '';
 }
 
-function formatValue(card, metric) {
+/** The number a card shows, signed for a trend, without its unit. */
+function formatNumber(card) {
     if (card.value == null) return '–';
-    // Nearly every card is measured in its own tab's unit, and `unitMetric` is the
-    // exception the backend flags: the dew point card sits on the humidity tab but
-    // reports a temperature spread, and would otherwise read "1.7%".
-    const unit = unitFor(card.unitMetric ?? metric);
     const rounded = Number(card.value).toFixed(1);
     // A trend is a change, so it carries its sign; an extreme is a reading and does not.
-    const signed = card.kind === 'TREND' && card.value > 0 ? `+${rounded}` : rounded;
-    return `${signed}${unit}`;
+    return card.kind === 'TREND' && card.value > 0 ? `+${rounded}` : rounded;
+}
+
+/**
+ * Fills `el` with the number and, in a smaller span, its unit.
+ *
+ * The unit is set smaller because it is the part that does not scale with the card:
+ * three cards share one row at every width, so on a 360-390px phone the widest value
+ * a metric can produce has 70-80px to live in, and " hPa" is a third of "1013.8 hPa".
+ * At one size that string wrapped between number and unit on every phone tested.
+ *
+ * Nearly every card is measured in its own tab's unit; `unitMetric` is the exception
+ * the backend flags, for the dew point card, which sits on the humidity tab but
+ * reports a temperature spread and would otherwise read "1.7%".
+ */
+function renderValue(el, card, metric) {
+    el.replaceChildren();
+    el.append(formatNumber(card));
+
+    const unit = card.value == null ? '' : unitFor(card.unitMetric ?? metric);
+    if (!unit) return;
+
+    const unitEl = document.createElement('span');
+    unitEl.className = 'hist-summary-unit';
+    unitEl.textContent = unit;
+    el.append(unitEl);
 }
 
 function formatContext(card) {
@@ -113,7 +135,7 @@ export function renderSummaryCards(container, summary, metric) {
 
         const value = document.createElement('span');
         value.className = 'hist-summary-value';
-        value.textContent = formatValue(card, metric);
+        renderValue(value, card, metric);
 
         const context = document.createElement('span');
         context.className = 'hist-summary-context';

@@ -225,7 +225,10 @@ class WeatherHistoryControllerTest {
                 Metric.TEMPERATURE,
                 List.of(
                     SummaryCard.onDate(
-                        CardKind.EXTREME_HIGH, "Warmest day", 31.0, LocalDate.of(2026, 6, 15)),
+                        CardKind.EXTREME_HIGH,
+                        "Warmest daylight avg",
+                        31.0,
+                        LocalDate.of(2026, 6, 15)),
                     SummaryCard.overRange(CardKind.TREND, "Daylight trend", 3.0, from, to))));
 
     given(historyService.getDailyHistory(from, to, Metric.TEMPERATURE)).willReturn(payload);

@@ -410,7 +410,22 @@ export function renderDailyChart(summaries, metric, canvasId, fromStr, toStr,
     const xMax = new Date(new Date(toStr   + 'T00:00:00').getTime() + HALF_DAY);
 
     const totalDays = dates.length;
-    const xStep = totalDays <= 8 ? 1 : totalDays <= 16 ? 2 : 5;
+
+    // The step has to come from the width, not from the day count alone: a 30-day range
+    // drew a tick every 5 days regardless, which is seven "Aug 13"-sized labels — about
+    // 240px of text in the ~230px plot a 320px phone has, so they ran into each other.
+    // Chart.js will not thin a time axis for us here, because an explicit `stepSize`
+    // suppresses its own autoSkip. Snapped to a calendar-legible set so the labels stay
+    // on the same weekday-ish rhythm rather than landing on an arbitrary interval.
+    // Desktop's figure is deliberately generous rather than the label's true width: it
+    // reproduces the step-of-5 the 30-day chart already used there, so this only ever
+    // *thins* the axis on screens that could not fit it.
+    const LABEL_PX  = isMobile ? 46 : 78;
+    const measured  = Math.max(canvas.clientWidth, canvas.parentElement?.clientWidth ?? 0);
+    const plotWidth = Math.max(measured - (isMobile ? 34 : 44), 120);
+    const maxLabels = Math.max(2, Math.floor(plotWidth / LABEL_PX));
+    const xStep = [1, 2, 3, 5, 7, 10, 14, 21, 30]
+        .find(step => Math.ceil(totalDays / step) <= maxLabels) ?? 30;
 
     // Glow only where there is a single dominant line to lift. With Daylight and Night
     // drawn there is no primary, and glowing both just fogs the plot.

@@ -24,6 +24,11 @@ import org.springframework.stereotype.Service;
  * its extremes fall outside daylight — a depression bottoming out at 03:00. Each builder states its
  * own reasoning.
  *
+ * <p>So is the <em>statistic</em>, and every label names it, because the cards do not agree on one:
+ * temperature's are period averages ("Warmest daylight avg") and pressure's and wetness's are
+ * single stored extremes ("Highest reading"). Worded as plain superlatives they read alike and
+ * invite the reader to compare a mean with a peak.
+ *
  * <p>So is the <em>shape</em> of the answer. Most cards name a date, and those are built from the
  * daily rows the caller already loaded. Humidity's extremes name an hour of the day instead, which
  * the daily rows cannot answer at any period, so that builder — alone — reaches the hourly table,
@@ -82,10 +87,15 @@ public class SummaryCardService {
    * reading {@code DAY} wasted half of it, and a daytime <em>low</em> is a quantity nobody asks
    * for: the cold part of a date happens before dawn, which lives in that date's {@code NIGHT} row.
    *
-   * <p>Both rank on the period <em>average</em>, not on a single reading. "Warmest day" is a claim
-   * about a day, so it has to be answered by something that describes one; the highest sample is a
-   * property of a moment, is set by whichever minute the sun was on the enclosure, and cannot be
-   * compared between days.
+   * <p>Both rank on the period <em>average</em>, not on a single reading. A card about a day has to
+   * be answered by something that describes one; the highest sample is a property of a moment, is
+   * set by whichever minute the sun was on the enclosure, and cannot be compared between days.
+   *
+   * <p>Which is why both labels say so — "Warmest daylight avg", not "Warmest day". Under the old
+   * wording these two cards and pressure's read identically while measuring different things: an
+   * average of a period here, a single extreme reading there. The qualifier is in the heading
+   * rather than the caption because the caption is the smallest, dimmest line on the card and is
+   * already carrying the date and the drill-down affordance.
    *
    * <p>Note the night for date D runs from D-1's sunset to D's sunrise, so the date on a "Coldest
    * night" card is the morning the night ended on.
@@ -94,9 +104,9 @@ public class SummaryCardService {
     Metric metric = Metric.TEMPERATURE;
     return cards(
         analytics.extremeHigh(
-            data, DayPeriod.DAY, "Warmest day", day -> day.getAvgByMetric(metric)),
+            data, DayPeriod.DAY, "Warmest daylight avg", day -> day.getAvgByMetric(metric)),
         analytics.extremeLow(
-            data, DayPeriod.NIGHT, "Coldest night", day -> day.getAvgByMetric(metric)),
+            data, DayPeriod.NIGHT, "Coldest night avg", day -> day.getAvgByMetric(metric)),
         analytics.trend(
             data, metric, DayPeriod.DAY, "Daylight trend", TEMPERATURE_TREND_THRESHOLD));
   }
@@ -104,14 +114,19 @@ public class SummaryCardService {
   /**
    * Pressure reads the whole day. It has no diurnal cycle worth splitting on, and a depression
    * bottoming out at 03:00 is still that day's low — restricting to daylight would simply miss it.
+   *
+   * <p>Unlike temperature's, these rank on the stored <em>extreme</em> rather than the average: the
+   * deepest low <em>is</em> the storm. So the labels say "reading", which is the word that
+   * distinguishes them from temperature's "avg" cards; the metric name the old labels carried was
+   * already on the tab directly above.
    */
   private List<SummaryCard> pressureCards(List<DayPeriodMetrics> data) {
     Metric metric = Metric.PRESSURE;
     return cards(
         analytics.extremeHigh(
-            data, DayPeriod.FULL, "Highest pressure", day -> day.getMaxByMetric(metric)),
+            data, DayPeriod.FULL, "Highest reading", day -> day.getMaxByMetric(metric)),
         analytics.extremeLow(
-            data, DayPeriod.FULL, "Lowest pressure", day -> day.getMinByMetric(metric)),
+            data, DayPeriod.FULL, "Lowest reading", day -> day.getMinByMetric(metric)),
         analytics.trend(data, metric, DayPeriod.FULL, "Pressure trend", PRESSURE_TREND_THRESHOLD));
   }
 
@@ -152,10 +167,10 @@ public class SummaryCardService {
    *
    * <p>It is the one metric stored on an <em>inverted</em> scale — {@code daily_weather_record}
    * holds the raw ADC count, and a higher count is a drier surface. So the selections swap: the
-   * wettest day is the one with the smallest stored minimum, found by {@code extremeLow} but
-   * reported as an {@link CardKind#EXTREME_HIGH} because converted it is the largest percentage on
-   * screen. Passing the conversion in rather than converting the rows keeps the entities untouched
-   * and the arithmetic in one expression.
+   * wettest reading is the smallest stored minimum, found by {@code extremeLow} but reported as an
+   * {@link CardKind#EXTREME_HIGH} because converted it is the largest percentage on screen. Passing
+   * the conversion in rather than converting the rows keeps the entities untouched and the
+   * arithmetic in one expression.
    *
    * <p>The two extremes are the whole set: there is deliberately <strong>no trend card</strong>.
    * The other three metrics vary continuously, so a least-squares fit over their daily averages
@@ -177,14 +192,14 @@ public class SummaryCardService {
         analytics.extremeLow(
             data,
             DayPeriod.FULL,
-            "Wettest day",
+            "Wettest reading",
             CardKind.EXTREME_HIGH,
             day -> day.getMinByMetric(metric),
             toPercentage),
         analytics.extremeHigh(
             data,
             DayPeriod.FULL,
-            "Driest day",
+            "Driest reading",
             CardKind.EXTREME_LOW,
             day -> day.getMaxByMetric(metric),
             toPercentage));

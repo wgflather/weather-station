@@ -1782,7 +1782,11 @@ span.flatpickr-weekday {
     border-radius: 10px;
 }
 
+/* Pushes the value and context to the bottom of the card. The cards in a row are
+   equal height, and a label that wraps to two lines ("Most humid stretch" at 375px)
+   would otherwise sit its value a line lower than its neighbour's. */
 .hist-summary-label {
+    margin-bottom: auto;
     font-size: 0.62rem;
     font-weight: var(--fw-label);
     color: var(--text-muted);
@@ -1796,6 +1800,17 @@ span.flatpickr-weekday {
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
     line-height: 1.2;
+}
+
+/* Sized in `em` so it tracks whichever value size the breakpoints have settled on.
+   Three cards share one row at every width, so the widest value a metric can produce
+   gets 70-80px on a phone — and " hPa" is a third of "1013.8 hPa", which wrapped
+   between the number and its unit on every phone width tested. Shrinking the unit is
+   also the right hierarchy: the number is the reading, the unit is a label on it. */
+.hist-summary-unit {
+    font-size: 0.72em;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
 }
 
 .hist-summary-context {
@@ -1983,15 +1998,103 @@ button.hist-summary-card:hover .hist-summary-context {
 }
 
 @media (max-width: 480px) {
-    .hist-summary-card { flex-basis: 100px; padding: 8px 10px; }
-    .hist-summary-value { font-size: 1rem; }
     .hist-legend { gap: 10px; }
 }
 
+/* The four metric tabs cannot fit one row inside a 320-390px panel at any readable size,
+   so the only choice is which ragged shape they wrap into — and free wrapping gives 3+1
+   at 390 and 2+2 at 360, i.e. the row reflows as the phone changes. A 2x2 grid is the
+   same two rows, always the same shape, and each tab gets a full half-width tap target
+   instead of shrink-to-fit. */
+@media (max-width: 480px) {
+    .hist-modal-body .history-metric-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        width: 100%;
+    }
+
+    .hist-modal-body .history-metric-tab {
+        padding: 7px 4px;
+        font-size: 0.66rem;
+        text-align: center;
+    }
+
+    /* One row, equal shares, whatever the count — `flex: 1 1 0` divides the width rather
+       than sizing to content, so a metric with two cards gets halves and one with three
+       gets thirds. Wrapping two-and-one instead left the odd card stretched across the
+       full width with its short value adrift in it, and made the row's shape depend on
+       how many cards the metric happened to contribute.
+
+       `min-width: 0` is what allows it: without it each card floors at its longest
+       word's width and the row wraps again. The labels take the hit and run to two or
+       three lines, which is fine — they are the part a reader skims, not reads. */
+    .hist-summary-cards {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+
+    .hist-summary-card {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 8px;
+    }
+
+    .hist-summary-label {
+        font-size: 0.58rem;
+        letter-spacing: 0.2px;
+    }
+
+    .hist-summary-value {
+        font-size: 0.95rem;
+    }
+
+    .hist-summary-context {
+        font-size: 0.6rem;
+    }
+}
+
+/* Thirds of a 320px panel are ~82px wide, where the dew card's "27 серп., 05:00" is the
+   binding constraint rather than any label. */
+@media (max-width: 380px) {
+    .hist-summary-card    { padding: 7px 6px; }
+    .hist-summary-label   { font-size: 0.55rem; }
+    .hist-summary-value   { font-size: 0.85rem; }
+    .hist-summary-context { font-size: 0.56rem; }
+}
+
+/* Short viewports: the cards are the largest block of fixed chrome between the tabs and
+   the canvas, so they shrink first. */
+@media (max-height: 560px) {
+    .hist-summary-cards { padding: 2px 0 8px; gap: 6px; }
+    .hist-periods       { padding: 2px 0 6px; }
+    .hist-legend        { padding: 8px 0 2px; }
+}
+
+/* Card sizing for a short *and wide* window only — a narrow one is already sized by the
+   width blocks above, and these later rules would otherwise undo them. */
+@media (max-height: 560px) and (min-width: 481px) {
+    .hist-summary-card  { padding: 7px 10px; }
+    .hist-summary-value { font-size: 1rem; }
+}
+
+/* Sized off the viewport's *height*, not its width. The chart lives at the bottom of a
+   fixed-height modal under chrome that does not shrink, so what decides whether its axis
+   is on screen is how tall the window is — and a width-driven 35vw made a tall, narrow
+   phone (390x844) reserve less chart than a short, wide one. */
 .history-chart-card .chart-container {
     position: relative;
     width: 100%;
-    height: clamp(200px, 35vw, 300px);
+    height: clamp(180px, 30vh, 320px);
+}
+
+/* Below this the 30vh floor is doing nothing and the chart is competing with the cards
+   for a few hundred pixels; give it a share rather than a fixed 180. */
+@media (max-height: 560px) {
+    .history-chart-card .chart-container {
+        height: clamp(130px, 42vh, 200px);
+    }
 }
 
 .history-chart-card .chart-container canvas {

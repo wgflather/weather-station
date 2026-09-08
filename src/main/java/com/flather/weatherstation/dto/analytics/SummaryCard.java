@@ -5,8 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 /**
- * One stat card above the history chart — "Warmest day 24.6°C, Aug 30", "Coldest night 8.2°C, Aug
- * 31", "Daylight trend +3°C, Aug 28 → Sep 3", "Driest stretch 29.8 %, 13:00 → 16:00".
+ * One stat card above the history chart — "Warmest daylight avg 24.6°C, Aug 30", "Coldest night avg
+ * 8.2°C, Aug 31", "Daylight trend +3°C, Aug 28 → Sep 3", "Driest stretch 29.8 %, 13:00 → 16:00".
  *
  * <p>Values and dates stay structured rather than pre-formatted. Units live in the frontend, in
  * {@code metric-units.js} — the single table the cards, the daily chart and the modal all read —
@@ -35,7 +35,9 @@ import java.time.LocalTime;
  * </ul>
  *
  * @param kind what the card measures; the frontend styles and formats on this.
- * @param label the card's heading, e.g. "Warmest day".
+ * @param label the card's heading, e.g. "Warmest daylight avg". It names the statistic as well as
+ *     the question, because the cards do not all report one: some are period averages and some are
+ *     single stored extremes.
  * @param value the number itself, unformatted.
  * @param unitMetric the metric whose unit {@code value} is in, as its request key ({@code
  *     "temperature"}), or null when it is the card's own metric — which is the normal case. Set

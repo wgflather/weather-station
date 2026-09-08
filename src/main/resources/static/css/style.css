@@ -3429,6 +3429,24 @@ h3 {
     gap: 14px;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    /* Matches the admin table's scroller. A default scrollbar is an opaque light slab
+       against the panel's dark glass and, being classic (not overlay) on Windows, it
+       takes 15px out of the chart's width when a short viewport makes it appear. */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(162, 198, 248, 0.35) transparent;
+}
+
+.hist-modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.hist-modal-body::-webkit-scrollbar-thumb {
+    background: rgba(162, 198, 248, 0.35);
+    border-radius: 3px;
+}
+
+.hist-modal-body::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .hist-modal-body .configuration_block {
@@ -3437,7 +3455,25 @@ h3 {
     background: rgba(255, 255, 255, 0.07);
 }
 
+/* The body is a flex column, so its children shrink below their content by default.
+   That silently *clipped* the card on any viewport too short for it — the chart was cut
+   mid-plot and the legend and note vanished, with no scrollbar, because the body's own
+   scrollHeight equalled its clientHeight and there was nothing to scroll. The overflow
+   has to reach the body for `overflow-y: auto` above to mean anything. */
+.hist-modal-body > * {
+    flex-shrink: 0;
+}
+
 @media (max-width: 600px) {
+    /* Every pixel of gutter is a pixel the chart does not get. The safe-area insets
+       stay in the max() so a notched phone still clears its own chrome. */
+    .hist-modal {
+        padding-top:    max(8px, env(safe-area-inset-top));
+        padding-right:  max(8px, env(safe-area-inset-right));
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+        padding-left:   max(8px, env(safe-area-inset-left));
+    }
+
     .hist-modal-header {
         padding: 12px 14px;
     }
@@ -3458,6 +3494,17 @@ h3 {
         align-items: flex-start;
         gap: 8px;
     }
+}
+
+/* A landscape phone gives the panel ~360px of height, and the fixed chrome above the
+   canvas — header, topbar, metric tabs, cards — eats most of it, so the chart starts
+   below the fold and the modal opens on a strip of axis. Trimming the chrome does not
+   make the view roomy, but it does put the chart on screen at all. */
+@media (max-height: 560px) {
+    .hist-modal-header { padding: 8px 14px; }
+    .hist-modal-title  { font-size: 0.85rem; }
+    .hist-modal-topbar { padding: 6px 12px; }
+    .hist-modal-body   { padding: 10px 12px; gap: 8px; }
 }
 
 /* =========================================================
