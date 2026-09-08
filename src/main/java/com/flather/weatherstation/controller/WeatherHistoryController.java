@@ -24,7 +24,6 @@ public class WeatherHistoryController {
   public static final String HOURLY_PATH = BASE_PATH + "/hourly";
   public static final String DAILY_PATH = BASE_PATH + "/daily";
   public static final String DAILY_SUMMARY_PATH = DAILY_PATH + "/summary";
-  public static final String CHART_PATH = BASE_PATH + "/chart";
   public static final String CHART_DAY_PATH = BASE_PATH + "/chart/day";
   public static final String AVAILABLE_DATES_PATH = BASE_PATH + "/available-dates";
 
@@ -35,12 +34,6 @@ public class WeatherHistoryController {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
     return ResponseEntity.ok(historyService.getAvailableDates(from, to));
-  }
-
-  @GetMapping(CHART_PATH)
-  public ResponseEntity<ChartDto> getHistoryChart(
-      @RequestParam Metric metric, @RequestParam Instant from, @RequestParam Instant to) {
-    return ResponseEntity.ok(historyService.getChart(metric, from, to));
   }
 
   @GetMapping(CHART_DAY_PATH)

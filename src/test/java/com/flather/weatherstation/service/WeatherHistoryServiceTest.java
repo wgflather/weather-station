@@ -2,14 +2,17 @@ package com.flather.weatherstation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.offset;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.config.LocationContext;
+import com.flather.weatherstation.config.WeatherValidationConfig;
 import com.flather.weatherstation.domain.constant.DayPeriod;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.entity.DayPeriodMetrics;
@@ -53,26 +56,64 @@ class WeatherHistoryServiceTest {
 
   private static final ZoneId UTC = ZoneId.of("UTC");
 
+  // The station's own calibration, so a swapped pair would be visible in the assertion below.
+  private static final int WET_BASELINE = 150;
+  private static final int DRY_BASELINE = 3230;
+
   @BeforeEach
   void setup() {
     LocationContext location = new LocationContext(52.5, 13.4, 34.0, UTC, null);
     given(configurationCache.getLocationContext()).willReturn(location);
+    given(configurationCache.getValidationConfig())
+        .willReturn(
+            new WeatherValidationConfig(
+                -50,
+                60,
+                900,
+                1100,
+                0,
+                100,
+                20,
+                5.0,
+                10.0,
+                WET_BASELINE,
+                DRY_BASELINE,
+                0.0,
+                60.0,
+                15.0,
+                0.0,
+                15.0,
+                5.0));
   }
 
-  // ---- getChart: routing based on age ----
+  // ---- getDayChart: date resolution and routing based on age ----
 
   @Test
-  void getChart_recentDate_usesAnalyticsService() {
-    Instant from = Instant.now().minusSeconds(86400); // 1 day ago
-    Instant to = Instant.now();
+  void getDayChart_convertsDateToStationLocalDayBounds() {
+    LocalDate date = LocalDate.now(UTC).minusDays(1);
+    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
+    Instant expectedTo = date.plusDays(1).atStartOfDay(UTC).toInstant();
+
+    given(analyticsService.getMetricChart(expectedFrom, expectedTo, Metric.HUMIDITY, 60))
+        .willReturn(List.of());
+
+    ChartDto result = service.getDayChart(date, Metric.HUMIDITY);
+
+    assertThat(result.metric()).isEqualTo("Humidity");
+    verify(analyticsService).getMetricChart(expectedFrom, expectedTo, Metric.HUMIDITY, 60);
+  }
+
+  @Test
+  void getDayChart_recentDate_usesAnalyticsService() {
+    LocalDate date = LocalDate.now(UTC).minusDays(1);
     ChartPointDto point = new ChartPointDto(ZonedDateTime.now(UTC), 21.0);
 
     given(
             analyticsService.getMetricChart(
-                eq(from), any(Instant.class), eq(Metric.TEMPERATURE), eq(60)))
+                any(Instant.class), any(Instant.class), eq(Metric.TEMPERATURE), eq(60)))
         .willReturn(List.of(point));
 
-    ChartDto result = service.getChart(Metric.TEMPERATURE, from, to);
+    ChartDto result = service.getDayChart(date, Metric.TEMPERATURE);
 
     assertThat(result.metric()).isEqualTo("Temperature");
     assertThat(result.chartPoints()).hasSize(1);
@@ -80,49 +121,56 @@ class WeatherHistoryServiceTest {
   }
 
   @Test
-  void getChart_oldDate_usesHourlyRepository() {
-    // 40 days ago is beyond the 30-day raw retention cutoff
-    Instant from = Instant.now().minusSeconds(40L * 86400);
-    Instant to = Instant.now().minusSeconds(35L * 86400);
-    DataPoint dataPoint = new DataPoint(from, 20.0);
+  void getDayChart_oldDate_usesHourlyRepository() {
+    // 40 days back is beyond the raw retention cutoff, so the pre-rolled table answers
+    LocalDate date = LocalDate.now(UTC).minusDays(40);
+    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
+    DataPoint dataPoint = new DataPoint(expectedFrom, 20.0);
 
-    given(hourlyRepository.findChartTemperature(eq(from), any(Instant.class)))
+    given(hourlyRepository.findChartTemperature(eq(expectedFrom), any(Instant.class)))
         .willReturn(List.of(dataPoint));
+    given(analyticsService.toChartPoints(List.of(dataPoint)))
+        .willReturn(List.of(new ChartPointDto(expectedFrom.atZone(UTC), 20.0)));
 
-    ChartDto result = service.getChart(Metric.TEMPERATURE, from, to);
+    ChartDto result = service.getDayChart(date, Metric.TEMPERATURE);
 
     assertThat(result.metric()).isEqualTo("Temperature");
-    verify(hourlyRepository).findChartTemperature(eq(from), any(Instant.class));
-    verifyNoInteractions(analyticsService);
+    assertThat(result.chartPoints()).hasSize(1);
+    verify(hourlyRepository).findChartTemperature(eq(expectedFrom), any(Instant.class));
+    verify(analyticsService, never()).getMetricChart(any(), any(), any(), anyInt());
+  }
+
+  /**
+   * The tier decides which table is read, not how the value is scaled. Surface wetness is converted
+   * to a percentage inside each tier's own query, so the hourly one has to be handed the same
+   * baselines the raw one gets — otherwise the chart reads 0–100 on one side of the retention
+   * boundary and raw ADC counts on the other. Both are ints, so the order is pinned too: swapping
+   * them compiles and would invert every wetness chart.
+   */
+  @Test
+  void getDayChart_oldDateSurfaceWetness_passesBaselinesToTheHourlyQuery() {
+    LocalDate date = LocalDate.now(UTC).minusDays(40);
+    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
+
+    given(hourlyRepository.findChartSurfaceWetness(any(), any(), anyInt(), anyInt()))
+        .willReturn(List.of());
+
+    service.getDayChart(date, Metric.SURFACE_WETNESS);
+
+    verify(hourlyRepository)
+        .findChartSurfaceWetness(
+            eq(expectedFrom), any(Instant.class), eq(DRY_BASELINE), eq(WET_BASELINE));
   }
 
   @Test
-  void getChart_oldDatePressure_usesHourlyPressureMethod() {
-    Instant from = Instant.now().minusSeconds(40L * 86400);
-    Instant to = Instant.now().minusSeconds(35L * 86400);
+  void getDayChart_oldDatePressure_usesHourlyPressureMethod() {
+    LocalDate date = LocalDate.now(UTC).minusDays(40);
 
     given(hourlyRepository.findChartPressure(any(), any())).willReturn(List.of());
 
-    service.getChart(Metric.PRESSURE, from, to);
+    service.getDayChart(date, Metric.PRESSURE);
 
     verify(hourlyRepository).findChartPressure(any(), any());
-  }
-
-  // ---- getDayChart ----
-
-  @Test
-  void getDayChart_convertsDateToInstantRange_andDelegates() {
-    LocalDate date = LocalDate.of(2026, 6, 15);
-    Instant expectedFrom = date.atStartOfDay(UTC).toInstant();
-
-    given(
-            analyticsService.getMetricChart(
-                eq(expectedFrom), any(Instant.class), eq(Metric.HUMIDITY), eq(60)))
-        .willReturn(List.of());
-
-    ChartDto result = service.getDayChart(date, Metric.HUMIDITY);
-
-    assertThat(result.metric()).isEqualTo("Humidity");
   }
 
   // ---- getAvailableDates ----
@@ -229,6 +277,77 @@ class WeatherHistoryServiceTest {
     return PeriodMetricDto.builder().period(period).temperatureAvg(temperatureAvg).build();
   }
 
+  // ---- surface wetness: raw ADC out of the rollup, percentage out of the API ----
+
+  /**
+   * The ADC→percentage transform is decreasing, so the stored minimum count is the wettest moment
+   * and has to come back as the maximum percentage. Converting each field in place would leave min
+   * above max — the assertion that would catch it is the ordering, so it is asserted explicitly.
+   */
+  @Test
+  void getHistoryDailySummary_surfaceWetness_convertsToPercentageAndSwapsMinMax() {
+    LocalDate date = LocalDate.of(2026, 6, 15);
+    DayPeriodMetrics row = periodRow(date, DayPeriod.FULL);
+
+    given(dailyRepository.findByDate(date)).willReturn(List.of(row));
+    given(mapper.toDto(row))
+        .willReturn(
+            PeriodMetricDto.builder()
+                .period(DayPeriod.FULL)
+                .surfaceWetnessMin(700.0) // lowest ADC count = wettest
+                .surfaceWetnessMax(3226.0) // highest ADC count = driest
+                .surfaceWetnessAvg(3194.0)
+                .build());
+
+    PeriodMetricDto result = service.getHistoryDailySummary(date).fullDay();
+
+    // 3226 and 700 against the 150/3230 baselines, per MeteoMath.rawToWetnessPct
+    assertThat(result.getSurfaceWetnessMin()).isCloseTo(0.13, offset(0.01));
+    assertThat(result.getSurfaceWetnessMax()).isCloseTo(82.14, offset(0.01));
+    assertThat(result.getSurfaceWetnessAvg()).isCloseTo(1.17, offset(0.01));
+    assertThat(result.getSurfaceWetnessMin()).isLessThan(result.getSurfaceWetnessMax());
+  }
+
+  @Test
+  void getHistoryDailySummary_surfaceWetness_leavesAbsentReadingsNull() {
+    LocalDate date = LocalDate.of(2026, 6, 15);
+    DayPeriodMetrics row = periodRow(date, DayPeriod.FULL);
+
+    given(dailyRepository.findByDate(date)).willReturn(List.of(row));
+    given(mapper.toDto(row)).willReturn(periodDto(DayPeriod.FULL, 21.5));
+
+    PeriodMetricDto result = service.getHistoryDailySummary(date).fullDay();
+
+    assertThat(result.getSurfaceWetnessMin()).isNull();
+    assertThat(result.getSurfaceWetnessMax()).isNull();
+    assertThat(result.getSurfaceWetnessAvg()).isNull();
+    assertThat(result.getTemperatureAvg()).isEqualTo(21.5);
+  }
+
+  /** {@code /daily} goes through the same assembly, so the conversion has to reach it too. */
+  @Test
+  void getDailyHistory_surfaceWetness_convertsThePeriodRowsToo() {
+    LocalDate date = LocalDate.of(2026, 6, 15);
+    DayPeriodMetrics row = periodRow(date, DayPeriod.FULL);
+
+    given(dailyRepository.findByDateBetweenOrderByDateAsc(date, date)).willReturn(List.of(row));
+    given(mapper.toDto(row))
+        .willReturn(
+            PeriodMetricDto.builder()
+                .period(DayPeriod.FULL)
+                .surfaceWetnessMin(700.0)
+                .surfaceWetnessMax(3226.0)
+                .build());
+    given(summaryCardService.buildSummary(List.of(row), Metric.SURFACE_WETNESS, date, date))
+        .willReturn(new MetricSummary(Metric.SURFACE_WETNESS, List.of()));
+
+    DailyHistoryDto result = service.getDailyHistory(date, date, Metric.SURFACE_WETNESS);
+
+    PeriodMetricDto fullDay = result.days().getFirst().fullDay();
+    assertThat(fullDay.getSurfaceWetnessMin()).isCloseTo(0.13, offset(0.01));
+    assertThat(fullDay.getSurfaceWetnessMax()).isCloseTo(82.14, offset(0.01));
+  }
+
   @Test
   void getDailyHistory_bundlesTheCardsFromTheSameRowsItCharts() {
     LocalDate from = LocalDate.of(2026, 6, 14);
@@ -236,7 +355,7 @@ class WeatherHistoryServiceTest {
     List<DayPeriodMetrics> rows = List.of(periodRow(from, DayPeriod.FULL));
 
     given(dailyRepository.findByDateBetweenOrderByDateAsc(from, to)).willReturn(rows);
-    given(summaryCardService.buildSummary(rows, Metric.TEMPERATURE))
+    given(summaryCardService.buildSummary(rows, Metric.TEMPERATURE, from, to))
         .willReturn(new MetricSummary(Metric.TEMPERATURE, List.of()));
 
     DailyHistoryDto result = service.getDailyHistory(from, to, Metric.TEMPERATURE);
@@ -244,7 +363,7 @@ class WeatherHistoryServiceTest {
     assertThat(result.summary().metric()).isEqualTo(Metric.TEMPERATURE);
     // One query feeds both halves: the cards see the very rows the chart was built from.
     verify(dailyRepository, times(1)).findByDateBetweenOrderByDateAsc(from, to);
-    verify(summaryCardService).buildSummary(rows, Metric.TEMPERATURE);
+    verify(summaryCardService).buildSummary(rows, Metric.TEMPERATURE, from, to);
   }
 
   @Test

@@ -3,7 +3,11 @@
 // Point-array transforms the 24-hour chart runs before handing data to
 // Chart.js: gap detection, y-axis bounds, and locating the extremes.
 //
-// All pure — array in, array or number out. No Chart.js, no DOM.
+// All pure — array in, array or number out. No Chart.js, no DOM. The one import
+// is a lookup table, kept in chart-metrics.js because that is where every other
+// per-metric chart constant lives and the daily chart needs the same limits.
+
+import { clampAxisBounds } from './chart-metrics.js';
 
 /* =========================================================
    GAP DETECTION — inserts null sentinels into main dataset
@@ -83,23 +87,22 @@ export function getDynamicYBounds(points, metric) {
     const real = (points || []).filter(p => p.y != null);
 
     if (!real.length) {
-        if (metric === 'humidity') return { suggestedMin: 20,  suggestedMax: 100  };
-        if (metric === 'pressure') return { suggestedMin: 990, suggestedMax: 1030 };
-        if (metric === 'wind')     return { suggestedMin: 0,   suggestedMax: 15   };
-        if (metric === 'uvIndex')  return { suggestedMin: 0,   suggestedMax: 10   };
+        if (metric === 'humidity')       return { suggestedMin: 20,  suggestedMax: 100  };
+        if (metric === 'surfaceWetness') return { suggestedMin: 0,   suggestedMax: 100  };
+        if (metric === 'pressure')       return { suggestedMin: 990, suggestedMax: 1030 };
+        if (metric === 'wind')           return { suggestedMin: 0,   suggestedMax: 15   };
+        if (metric === 'uvIndex')        return { suggestedMin: 0,   suggestedMax: 10   };
         return { suggestedMin: 10, suggestedMax: 30 };
     }
 
-    const values = real.map(p => p.y);
-    const pad    = metric === 'humidity' ? 3 : 2;
-    const rawMin = Math.min(...values) - pad;
-    const rawMax = Math.max(...values) + pad;
+    const values  = real.map(p => p.y);
+    const pad     = metric === 'humidity' ? 3 : 2;
+    const dataMin = Math.min(...values);
+    const dataMax = Math.max(...values);
 
-    const floorAtZero = metric === 'wind' || metric === 'uvIndex';
-    return {
-        suggestedMin: floorAtZero ? Math.max(0, rawMin) : rawMin,
-        suggestedMax: rawMax,
-    };
+    // The floor-at-zero special case that used to live here covered wind and uvIndex only,
+    // and as a `suggestedMin` it could not hold anyway — see clampAxisBounds.
+    return clampAxisBounds(metric, dataMin, dataMax, dataMin - pad, dataMax + pad);
 }
 
 /* =========================================================

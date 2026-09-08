@@ -1,7 +1,6 @@
 package com.flather.weatherstation.controller;
 
 import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +22,7 @@ import com.flather.weatherstation.dto.weather.PeriodMetricDto;
 import com.flather.weatherstation.service.WeatherHistoryService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -61,40 +61,12 @@ class WeatherHistoryControllerTest {
   }
 
   @Test
-  void shouldReturnHistoryChart_byInstantRange() throws Exception {
-    Instant from = Instant.parse("2026-06-15T00:00:00Z");
-    Instant to = Instant.parse("2026-06-16T00:00:00Z");
-
-    ChartDto chart =
-        new ChartDto(
-            "temperature",
-            List.of(new ChartPointDto(ZonedDateTime.parse("2026-06-15T10:00Z"), 20.0)),
-            Instant.parse("2026-06-16T01:00:00Z"),
-            DataProvider.LOCAL_SENSOR);
-
-    given(historyService.getChart(eq(Metric.TEMPERATURE), eq(from), eq(to))).willReturn(chart);
-
-    mockMvc
-        .perform(
-            get(WeatherHistoryController.CHART_PATH)
-                .param("metric", "temperature")
-                .param("from", "2026-06-15T00:00:00Z")
-                .param("to", "2026-06-16T00:00:00Z")
-                .accept(MediaType.APPLICATION_JSON))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.metric").value("temperature"))
-        .andExpect(jsonPath("$.chartPoints", hasSize(1)));
-
-    verify(historyService).getChart(eq(Metric.TEMPERATURE), eq(from), eq(to));
-  }
-
-  @Test
   void shouldReturnDayChart_byDateAndMetric() throws Exception {
     LocalDate date = LocalDate.of(2026, 6, 15);
     ChartDto chart =
         new ChartDto(
             "pressure",
-            List.of(),
+            List.of(new ChartPointDto(ZonedDateTime.parse("2026-06-15T10:00Z"), 1013.0)),
             Instant.parse("2026-06-16T00:00:00Z"),
             DataProvider.LOCAL_SENSOR);
 
@@ -107,7 +79,8 @@ class WeatherHistoryControllerTest {
                 .param("metric", "pressure")
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.metric").value("pressure"));
+        .andExpect(jsonPath("$.metric").value("pressure"))
+        .andExpect(jsonPath("$.chartPoints", hasSize(1)));
 
     verify(historyService).getDayChart(date, Metric.PRESSURE);
   }
@@ -252,7 +225,10 @@ class WeatherHistoryControllerTest {
                 Metric.TEMPERATURE,
                 List.of(
                     SummaryCard.onDate(
-                        CardKind.EXTREME_HIGH, "Warmest day", 31.0, LocalDate.of(2026, 6, 15)),
+                        CardKind.EXTREME_HIGH,
+                        "Warmest daylight avg",
+                        31.0,
+                        LocalDate.of(2026, 6, 15)),
                     SummaryCard.overRange(CardKind.TREND, "Daylight trend", 3.0, from, to))));
 
     given(historyService.getDailyHistory(from, to, Metric.TEMPERATURE)).willReturn(payload);
@@ -280,6 +256,105 @@ class WeatherHistoryControllerTest {
         .andExpect(jsonPath("$.summary.cards[1].date").doesNotExist());
 
     verify(historyService).getDailyHistory(from, to, Metric.TEMPERATURE);
+  }
+
+  /**
+   * Pins the wire format of a diurnal card, which the frontend parses by hand.
+   *
+   * <p>The times are wall-clock at the station, so they go out bare — no offset, no date — and the
+   * client renders them as they arrive rather than converting into the viewer's zone. A window that
+   * wraps past midnight ends earlier on the clock than it starts, and the date fields stay absent
+   * so the client can tell the two context shapes apart by presence alone.
+   */
+  @Test
+  void shouldReturnDiurnalCards_asBareWallClockTimes() throws Exception {
+    LocalDate from = LocalDate.of(2026, 6, 1);
+    LocalDate to = LocalDate.of(2026, 6, 16);
+
+    DailyHistoryDto payload =
+        new DailyHistoryDto(
+            List.of(),
+            new MetricSummary(
+                Metric.HUMIDITY,
+                List.of(
+                    SummaryCard.overWindow(
+                        CardKind.EXTREME_LOW,
+                        "Driest stretch",
+                        29.8,
+                        LocalTime.of(13, 0),
+                        LocalTime.of(16, 0)),
+                    SummaryCard.overWindow(
+                        CardKind.EXTREME_HIGH,
+                        "Most humid stretch",
+                        94.1,
+                        LocalTime.of(23, 0),
+                        LocalTime.of(2, 0)))));
+
+    given(historyService.getDailyHistory(from, to, Metric.HUMIDITY)).willReturn(payload);
+
+    mockMvc
+        .perform(
+            get(WeatherHistoryController.DAILY_PATH)
+                .param("from", "2026-06-01")
+                .param("to", "2026-06-16")
+                .param("metric", "humidity")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.summary.cards[0].label").value("Driest stretch"))
+        .andExpect(jsonPath("$.summary.cards[0].windowStart").value("13:00:00"))
+        .andExpect(jsonPath("$.summary.cards[0].windowEnd").value("16:00:00"))
+        .andExpect(jsonPath("$.summary.cards[0].date").doesNotExist())
+        .andExpect(jsonPath("$.summary.cards[0].rangeStart").doesNotExist())
+        // Wrapping past midnight is normal, not a swap to correct on the client.
+        .andExpect(jsonPath("$.summary.cards[1].windowStart").value("23:00:00"))
+        .andExpect(jsonPath("$.summary.cards[1].windowEnd").value("02:00:00"))
+        // No unit override: these read in the tab's own unit.
+        .andExpect(jsonPath("$.summary.cards[0].unitMetric").doesNotExist());
+  }
+
+  /**
+   * The dew point card is the fourth context shape and the only one carrying a unit override.
+   *
+   * <p>It sends a {@code date} with a bare {@code windowStart} — a reading at an hour, not a
+   * recurring window — so {@code windowEnd} stays absent and the client tells the two apart by
+   * that. And it sits on the humidity tab while reporting a temperature spread, so {@code
+   * unitMetric} names the metric whose unit applies; without it the client appends the tab's unit
+   * and renders a °C spread as a percentage.
+   */
+  @Test
+  void shouldReturnDewPointCard_withItsHourAndAUnitOverride() throws Exception {
+    LocalDate from = LocalDate.of(2026, 6, 1);
+    LocalDate to = LocalDate.of(2026, 6, 16);
+
+    given(historyService.getDailyHistory(from, to, Metric.HUMIDITY))
+        .willReturn(
+            new DailyHistoryDto(
+                List.of(),
+                new MetricSummary(
+                    Metric.HUMIDITY,
+                    List.of(
+                        SummaryCard.onDateAndHour(
+                            CardKind.EXTREME_LOW,
+                            "Closest to dew point",
+                            1.717,
+                            "temperature",
+                            LocalDate.of(2026, 6, 15),
+                            LocalTime.of(20, 0))))));
+
+    mockMvc
+        .perform(
+            get(WeatherHistoryController.DAILY_PATH)
+                .param("from", "2026-06-01")
+                .param("to", "2026-06-16")
+                .param("metric", "humidity")
+                .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.summary.cards[0].kind").value("EXTREME_LOW"))
+        .andExpect(jsonPath("$.summary.cards[0].value").value(1.717))
+        .andExpect(jsonPath("$.summary.cards[0].unitMetric").value("temperature"))
+        .andExpect(jsonPath("$.summary.cards[0].date").value("2026-06-15"))
+        .andExpect(jsonPath("$.summary.cards[0].windowStart").value("20:00:00"))
+        .andExpect(jsonPath("$.summary.cards[0].windowEnd").doesNotExist());
   }
 
   @Test
@@ -317,10 +392,9 @@ class WeatherHistoryControllerTest {
   void shouldReturn400_whenHistoryChartMetricIsInvalid() throws Exception {
     mockMvc
         .perform(
-            get(WeatherHistoryController.CHART_PATH)
+            get(WeatherHistoryController.CHART_DAY_PATH)
                 .param("metric", "unknown")
-                .param("from", "2026-06-15T00:00:00Z")
-                .param("to", "2026-06-16T00:00:00Z")
+                .param("date", "2026-06-15")
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isBadRequest());
   }

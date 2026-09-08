@@ -30,6 +30,17 @@ export const COLOR_SCALES = {
         { stop:  80, r:  14, g: 165, b: 233 },
         { stop: 100, r:  37, g:  99, b: 235 },
     ],
+    // Stops sit on SurfaceWetnessStatus's boundaries — dry (<10), damp (<40),
+    // wet (<70), soaked — so the line changes colour where the status label does.
+    // Teal-led rather than humidity's slate->blue: the two are both 0-100 % and
+    // would otherwise be hard to tell apart at a glance.
+    surfaceWetness: [
+        { stop:   0, r: 214, g: 211, b: 209 },
+        { stop:  10, r: 153, g: 246, b: 228 },
+        { stop:  40, r:  45, g: 212, b: 191 },
+        { stop:  70, r:  13, g: 148, b: 136 },
+        { stop: 100, r:  15, g:  76, b: 129 },
+    ],
     // low/stormy (indigo) -> normal (slate) -> high/fair (green->amber)
     pressure: [
         { stop:  985, r: 129, g: 140, b: 248 },
@@ -125,6 +136,22 @@ export const METRIC_CONFIG = {
         innerBorder:   '#e0f2fe',
         closeThreshold: 2,
     },
+    surfaceWetness: {
+        label:         'Surface Wetness',
+        tooltipSuffix: '%',
+        yAxisSuffix:   '%',
+        yStep:         10,
+        // null line/fill: the value gradient above carries the meaning here, the
+        // same as temperature, wind and UV.
+        lineColor:     null,
+        shadowColor:   'rgba(45, 212, 191, 0.25)',
+        fillTop:       null,
+        fillMid:       null,
+        maxNodeColor:  '#0d9488',
+        minNodeColor:  '#d6d3d1',
+        innerBorder:   '#ccfbf1',
+        closeThreshold: 2,
+    },
     wind: {
         label:          'Wind',
         tooltipSuffix:  ' m/s',
@@ -157,18 +184,75 @@ export const METRIC_CONFIG = {
 
 
 /* =========================================================
+   PHYSICAL AXIS LIMITS
+   Values a metric cannot take, whatever the padding says.
+========================================================= */
+/**
+ * Only metrics with a *physical* bound appear here. Temperature and pressure have none
+ * worth enforcing, so they are absent rather than given an invented range.
+ *
+ * These exist because padding alone is not the whole story: the y bounds are handed to
+ * Chart.js as `suggestedMin`/`suggestedMax`, and its linear scale then rounds *outward*
+ * to a nice tick. A wetness reading flat near 0 all day pads to -2 and rounds to -10, and
+ * a humid night pads to 103 and rounds to 110 — neither is a value the sensor can report.
+ */
+export const AXIS_LIMITS = {
+    humidity:       { min: 0, max: 100 },
+    surfaceWetness: { min: 0, max: 100 },
+    wind:           { min: 0 },
+    uvIndex:        { min: 0 },
+    windDirection:  { min: 0, max: 360 },
+};
+
+/**
+ * Padded y bounds for `metric`, clamped where they would leave the possible range.
+ *
+ * Returns `suggestedMin`/`suggestedMax` always, plus a hard `min`/`max` *only* on the side
+ * where the clamp actually bites. The hard bound is what does the work: `suggestedMin: 0`
+ * still lets the tick algorithm round below zero, which is the whole bug. Leaving the other
+ * side suggested keeps Chart.js free to pick nice ticks where nothing constrains it, and
+ * the clamped values themselves (0, 100, 360) are already round, so the ticks stay clean.
+ *
+ * The data's own range is passed separately from the padded range so a clamp can never
+ * crop a real reading: a sensor that reports 100.4 % through rounding is still drawn, and
+ * only the empty padding above it is trimmed.
+ */
+export function clampAxisBounds(metric, dataMin, dataMax, paddedMin, paddedMax) {
+    const bounds = { suggestedMin: paddedMin, suggestedMax: paddedMax };
+    const limit  = AXIS_LIMITS[metric];
+    if (!limit) return bounds;
+
+    if (limit.min != null && paddedMin < limit.min && dataMin >= limit.min) {
+        bounds.suggestedMin = limit.min;
+        bounds.min = limit.min;
+    }
+    if (limit.max != null && paddedMax > limit.max && dataMax <= limit.max) {
+        bounds.suggestedMax = limit.max;
+        bounds.max = limit.max;
+    }
+    return bounds;
+}
+
+/* =========================================================
    VALUE-BASED LINE GRADIENT
    Maps the visible y-axis range onto the metric's color scale,
    so the line color tracks the reading's value at every height.
 ========================================================= */
-export function createDynamicGradient(ctx, chartArea, yAxis, scale) {
+/**
+ * `alpha` below 1 is what the daily chart's min/max band uses: the same value->colour
+ * mapping as the line, but translucent enough to sit behind it. Keep it well above ~0.15
+ * for a fill — under that every stop desaturates toward the page background and the whole
+ * gradient collapses into one muddy colour, which reads as decoration rather than as the
+ * value scale it is.
+ */
+export function createDynamicGradient(ctx, chartArea, yAxis, scale, alpha = 1) {
     const grad = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
     const maxV = yAxis.max;
     const minV = yAxis.min;
     for (let i = 0; i <= 10; i++) {
         const pos   = i / 10;
         const value = maxV - (pos * (maxV - minV));
-        grad.addColorStop(pos, scaleToRgbString(scale, value));
+        grad.addColorStop(pos, scaleToRgbString(scale, value, alpha));
     }
     return grad;
 }

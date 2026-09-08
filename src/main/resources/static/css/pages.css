@@ -1484,6 +1484,12 @@ span.flatpickr-weekday {
     gap: 8px;
 }
 
+/* Our display:flex overrides the browser's [hidden]{display:none} — restore it. The date
+   and month pickers swap by `hidden`, so without this the month view shows both at once. */
+.history-picker-group[hidden] {
+    display: none;
+}
+
 .history-period-tabs {
     display: flex;
     gap: 4px;
@@ -1600,6 +1606,7 @@ span.flatpickr-weekday {
 /* Metric tab switcher */
 .history-metric-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
@@ -1775,7 +1782,11 @@ span.flatpickr-weekday {
     border-radius: 10px;
 }
 
+/* Pushes the value and context to the bottom of the card. The cards in a row are
+   equal height, and a label that wraps to two lines ("Most humid stretch" at 375px)
+   would otherwise sit its value a line lower than its neighbour's. */
 .hist-summary-label {
+    margin-bottom: auto;
     font-size: 0.62rem;
     font-weight: var(--fw-label);
     color: var(--text-muted);
@@ -1791,11 +1802,58 @@ span.flatpickr-weekday {
     line-height: 1.2;
 }
 
+/* Sized in `em` so it tracks whichever value size the breakpoints have settled on.
+   Three cards share one row at every width, so the widest value a metric can produce
+   gets 70-80px on a phone — and " hPa" is a third of "1013.8 hPa", which wrapped
+   between the number and its unit on every phone width tested. Shrinking the unit is
+   also the right hierarchy: the number is the reading, the unit is a label on it. */
+.hist-summary-unit {
+    font-size: 0.72em;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
+}
+
 .hist-summary-context {
     font-size: 0.66rem;
     font-weight: var(--fw-regular);
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+}
+
+/* Cards that name a single date render as <button> and open that day's hourly chart.
+   The reset is needed because the shared .hist-summary-card rules were written for a
+   div — a button brings its own font, centred text and UA chrome. */
+button.hist-summary-card {
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    appearance: none;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.hist-summary-card:hover {
+    background: var(--control-bg-hover);
+    border-color: rgba(148, 163, 184, 0.34);
+}
+
+button.hist-summary-card:focus-visible {
+    outline: 2px solid rgba(56, 189, 248, 0.6);
+    outline-offset: 2px;
+}
+
+/* The row mixes clickable and static cards — a trend spans days and a diurnal stretch
+   names none, so neither has a day to open. Without a difference visible at rest, the
+   two that do nothing read as broken rather than as a different kind of card. The mark
+   sits on the date because the date is what gets opened. */
+button.hist-summary-card .hist-summary-context::after {
+    content: '\203A';
+    margin-left: 4px;
+    opacity: 0.55;
+}
+
+button.hist-summary-card:hover .hist-summary-context {
+    color: var(--text-secondary);
 }
 
 /* Deliberately not green-for-up: on a weather dashboard a rise is not "good", and
@@ -1805,11 +1863,100 @@ span.flatpickr-weekday {
 }
 
 /* Legend doubles as the series toggle for the daily chart. */
+/* The month picker sits where the date picker does and swaps with it, so it inherits
+   .db-date-input's box and only adds what a <select> needs: the native chrome removed and
+   the same chevron .db-select draws, plus room for it. Sized wider than the date input
+   because a localised "September 2026" is longer than "2026-09-05". */
+.history-month-select {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 165px;
+    padding-right: 28px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a3adbb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+}
+
+.history-month-select:hover:not(:disabled) {
+    border-color: rgba(148, 163, 184, 0.34);
+}
+
+.history-month-select:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* Native option lists are drawn by the OS, so they ignore the page's dark tokens and can
+   come out black-on-black. Set both explicitly. */
+.history-month-select option {
+    background-color: #16233c;
+    color: var(--text-secondary);
+}
+
 .hist-legend {
     display: flex;
     flex-wrap: wrap;
     gap: 14px;
     padding: 12px 0 2px;
+}
+
+/* Our display:flex overrides the browser's [hidden]{display:none} — restore it.
+   Without this the legend only *looked* hidden on the single-day view because it was
+   still empty; once a multi-day range had populated it, switching back to a single day
+   left its period switches on screen, offering to toggle series that view does not draw. */
+.hist-legend[hidden],
+.hist-chart-note[hidden],
+.hist-summary-cards[hidden] {
+    display: none;
+}
+
+/* The band carries a different quantity from the lines, and nothing else on screen
+   says so — without this it reads as a confidence interval, a forecast, or decoration.
+   Quieter than the legend beside it: the legend is interactive, this is only a key. */
+.hist-chart-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 6px 0 0;
+    font-size: 0.68rem;
+    color: rgba(148, 163, 184, 0.72);
+}
+
+.hist-chart-note span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hist-chart-note i {
+    display: inline-block;
+    width: 14px;
+    flex: none;
+}
+
+.hist-note-line {
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(226, 232, 240, 0.75);
+}
+
+/* A neutral stand-in for the value ramp the real band is filled with — the swatch
+   cannot show the metric's colours without being redrawn per tab. */
+.hist-note-band {
+    height: 9px;
+    border-radius: 2px;
+    background: linear-gradient(
+        to bottom,
+        rgba(226, 232, 240, 0.28),
+        rgba(226, 232, 240, 0.08)
+    );
+    border-top: 1px solid rgba(226, 232, 240, 0.38);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.38);
+}
+
+@media (max-width: 480px) {
+    .hist-chart-note { font-size: 0.63rem; gap: 4px 12px; }
 }
 
 .hist-legend-item {
@@ -1851,15 +1998,103 @@ span.flatpickr-weekday {
 }
 
 @media (max-width: 480px) {
-    .hist-summary-card { flex-basis: 100px; padding: 8px 10px; }
-    .hist-summary-value { font-size: 1rem; }
     .hist-legend { gap: 10px; }
 }
 
+/* The four metric tabs cannot fit one row inside a 320-390px panel at any readable size,
+   so the only choice is which ragged shape they wrap into — and free wrapping gives 3+1
+   at 390 and 2+2 at 360, i.e. the row reflows as the phone changes. A 2x2 grid is the
+   same two rows, always the same shape, and each tab gets a full half-width tap target
+   instead of shrink-to-fit. */
+@media (max-width: 480px) {
+    .hist-modal-body .history-metric-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        width: 100%;
+    }
+
+    .hist-modal-body .history-metric-tab {
+        padding: 7px 4px;
+        font-size: 0.66rem;
+        text-align: center;
+    }
+
+    /* One row, equal shares, whatever the count — `flex: 1 1 0` divides the width rather
+       than sizing to content, so a metric with two cards gets halves and one with three
+       gets thirds. Wrapping two-and-one instead left the odd card stretched across the
+       full width with its short value adrift in it, and made the row's shape depend on
+       how many cards the metric happened to contribute.
+
+       `min-width: 0` is what allows it: without it each card floors at its longest
+       word's width and the row wraps again. The labels take the hit and run to two or
+       three lines, which is fine — they are the part a reader skims, not reads. */
+    .hist-summary-cards {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+
+    .hist-summary-card {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 8px;
+    }
+
+    .hist-summary-label {
+        font-size: 0.58rem;
+        letter-spacing: 0.2px;
+    }
+
+    .hist-summary-value {
+        font-size: 0.95rem;
+    }
+
+    .hist-summary-context {
+        font-size: 0.6rem;
+    }
+}
+
+/* Thirds of a 320px panel are ~82px wide, where the dew card's "27 серп., 05:00" is the
+   binding constraint rather than any label. */
+@media (max-width: 380px) {
+    .hist-summary-card    { padding: 7px 6px; }
+    .hist-summary-label   { font-size: 0.55rem; }
+    .hist-summary-value   { font-size: 0.85rem; }
+    .hist-summary-context { font-size: 0.56rem; }
+}
+
+/* Short viewports: the cards are the largest block of fixed chrome between the tabs and
+   the canvas, so they shrink first. */
+@media (max-height: 560px) {
+    .hist-summary-cards { padding: 2px 0 8px; gap: 6px; }
+    .hist-periods       { padding: 2px 0 6px; }
+    .hist-legend        { padding: 8px 0 2px; }
+}
+
+/* Card sizing for a short *and wide* window only — a narrow one is already sized by the
+   width blocks above, and these later rules would otherwise undo them. */
+@media (max-height: 560px) and (min-width: 481px) {
+    .hist-summary-card  { padding: 7px 10px; }
+    .hist-summary-value { font-size: 1rem; }
+}
+
+/* Sized off the viewport's *height*, not its width. The chart lives at the bottom of a
+   fixed-height modal under chrome that does not shrink, so what decides whether its axis
+   is on screen is how tall the window is — and a width-driven 35vw made a tall, narrow
+   phone (390x844) reserve less chart than a short, wide one. */
 .history-chart-card .chart-container {
     position: relative;
     width: 100%;
-    height: clamp(200px, 35vw, 300px);
+    height: clamp(180px, 30vh, 320px);
+}
+
+/* Below this the 30vh floor is doing nothing and the chart is competing with the cards
+   for a few hundred pixels; give it a share rather than a fixed 180. */
+@media (max-height: 560px) {
+    .history-chart-card .chart-container {
+        height: clamp(130px, 42vh, 200px);
+    }
 }
 
 .history-chart-card .chart-container canvas {

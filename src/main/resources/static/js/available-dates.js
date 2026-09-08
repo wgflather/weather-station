@@ -70,6 +70,55 @@ export function createAvailableDates(endpoint) {
         return promise;
     }
 
+    /**
+     * Every month that has at least one day of data, oldest first, as 'YYYY-MM'.
+     *
+     * One request rather than probing month by month: the caller (a month picker) has to
+     * know the whole set before it can render, and walking backwards until a month comes
+     * back empty would stop at the first gap. The response is a flat list of dates — about
+     * 20 kB for five years — so asking for everything is cheaper than being clever.
+     *
+     * The dates it gets back are not thrown away: every month they cover is folded into
+     * the same cache `loadMonth` fills, so the day picker opens already warm and
+     * `isDateEnabled` stops answering "nothing enabled" on first paint.
+     */
+    let monthsPromise = null;
+
+    function loadAvailableMonths() {
+        if (monthsPromise) return monthsPromise;
+
+        // Wide enough to predate any station, and the endpoint answers from the daily
+        // rollup, so the cost tracks days of data rather than the span requested.
+        const from = '2000-01-01';
+        const to = isoDateKey(new Date());
+
+        monthsPromise = (async () => {
+            try {
+                const res = await fetch(`${endpoint}?from=${from}&to=${to}`);
+                if (!res.ok) throw new Error(`status ${res.status}`);
+                const dates = await res.json();
+
+                const byMonth = new Map();
+                for (const date of dates) {
+                    const key = date.slice(0, 7);
+                    if (!byMonth.has(key)) byMonth.set(key, new Set());
+                    byMonth.get(key).add(date);
+                }
+                // Seed rather than overwrite: a month loadMonth already fetched is
+                // identical, and one it is fetching right now must not be clobbered.
+                for (const [key, set] of byMonth) {
+                    if (!monthCache.has(key)) monthCache.set(key, set);
+                }
+                return [...byMonth.keys()].sort();
+            } catch {
+                monthsPromise = null; // Transient failure — let a later open retry.
+                return [];
+            }
+        })();
+
+        return monthsPromise;
+    }
+
     function isDateEnabled(date) {
         const set = monthCache.get(monthKey(date.getFullYear(), date.getMonth()));
         // Not yet loaded — disable the cell; it enables on the next redraw
@@ -116,5 +165,11 @@ export function createAvailableDates(endpoint) {
         };
     }
 
-    return { loadMonth, isDateEnabled, ensureMonthsLoaded, pickerOptions };
+    return {
+        loadMonth,
+        loadAvailableMonths,
+        isDateEnabled,
+        ensureMonthsLoaded,
+        pickerOptions,
+    };
 }

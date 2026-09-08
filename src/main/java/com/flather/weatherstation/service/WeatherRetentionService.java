@@ -2,6 +2,7 @@ package com.flather.weatherstation.service;
 
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.constant.DayPeriod;
+import com.flather.weatherstation.domain.constant.WindAggregation;
 import com.flather.weatherstation.dto.astronomy.DayPeriodInterval;
 import com.flather.weatherstation.repository.DailyWeatherRecordRepository;
 import com.flather.weatherstation.repository.WeatherRetentionRepository;
@@ -27,14 +28,6 @@ public class WeatherRetentionService {
 
   private static final int RAW_RETENTION_DAYS = 29;
 
-  // Wind direction is only aggregated from readings above this speed: a vane sitting in still air
-  // reports noise, and averaging that noise in drags the resultant bearing off the real one.
-  private static final double CALM_THRESHOLD_MS = 0.5;
-
-  // Below this resultant-vector length the hour's bearings cancelled out and no single direction
-  // describes the hour, so the bearing is stored as null rather than as a meaningless number.
-  private static final double MIN_DIRECTION_CONSISTENCY = 0.05;
-
   private final WeatherRetentionRepository retentionRepository;
   private final DailyWeatherRecordRepository dailyRecordRepository;
   private final ConfigurationCache configurationCache;
@@ -52,7 +45,8 @@ public class WeatherRetentionService {
     LocalDate today = LocalDate.now(zoneId);
     Instant cutoff = today.minusDays(RAW_RETENTION_DAYS).atStartOfDay(zoneId).toInstant();
 
-    retentionRepository.rollupHourly(cutoff, CALM_THRESHOLD_MS, MIN_DIRECTION_CONSISTENCY);
+    retentionRepository.rollupHourly(
+        cutoff, WindAggregation.CALM_THRESHOLD_MS, WindAggregation.MIN_DIRECTION_CONSISTENCY);
 
     // Every complete day still covered by raw data is recomputed, not just yesterday. The rollups
     // are upserts, so this makes the tables self-healing: downtime, a late reading, or a newly

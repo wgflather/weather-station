@@ -15,18 +15,30 @@ public class MeteoMath {
   private static final double TREND_THRESHOLD = 0.15; // °/hour
 
   /**
+   * Magnus coefficients for the dew point, in the Alduchov–Eskridge fit.
+   *
+   * <p>Public because the history card's dew point is computed in SQL — the smallest spread across
+   * a range is a ranking, not a per-row transform — and the two must agree. Several published pairs
+   * are in circulation (17.27 / 237.7 is the older Magnus–Tetens) and they disagree by only ~0.02
+   * °C, which is exactly why a second copy would go unnoticed: nothing on screen would look wrong,
+   * the two definitions would simply drift apart.
+   */
+  public static final double DEW_POINT_A = 17.625;
+
+  public static final double DEW_POINT_B = 243.04;
+
+  /**
    * Calculates the dew point temperature using the Magnus formula.
    *
    * @param temperature ambient temperature in °C
-   * @param humidity relative humidity in % (0–100)
+   * @param humidity relative humidity in % (0–100), strictly above zero — the logarithm is
+   *     undefined at 0, and Postgres raises there rather than returning an infinity.
    * @return dew point temperature in °C, rounded to 1 decimal place
    */
   public static double calculateDewPoint(Double temperature, Double humidity) {
-    final double a = 17.625;
-    final double b = 243.04;
-
-    double alpha = Math.log(humidity / 100.0) + (a * temperature) / (b + temperature);
-    double dewPoint = (b * alpha) / (a - alpha);
+    double alpha =
+        Math.log(humidity / 100.0) + (DEW_POINT_A * temperature) / (DEW_POINT_B + temperature);
+    double dewPoint = (DEW_POINT_B * alpha) / (DEW_POINT_A - alpha);
 
     return Math.round(dewPoint * 10.0) / 10.0;
   }

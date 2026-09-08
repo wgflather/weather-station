@@ -286,6 +286,7 @@
                     <option value="temperature">Temperature</option>
                     <option value="pressure">Pressure</option>
                     <option value="humidity">Humidity</option>
+                    <option value="surfaceWetness">Surface Wetness</option>
                     <option value="wind">Wind</option>
                     <option value="uvIndex">UV Index</option>
                 </select>
@@ -385,11 +386,16 @@
                 <span class="history-picker-label">Date</span>
                 <input type="text" id="hist-date-input" class="db-date-input" placeholder="Select a date" readonly>
             </div>
+            <div id="hist-month-wrapper" class="history-picker-group" hidden>
+                <span class="history-picker-label">Month</span>
+                <select id="hist-month-select" class="db-date-input history-month-select"></select>
+            </div>
             <div class="history-period-tabs" id="hist-period-tabs">
                 <button class="history-period-btn active" data-days="1">Day</button>
                 <button class="history-period-btn" data-days="7">7D</button>
                 <button class="history-period-btn" data-days="14">14D</button>
                 <button class="history-period-btn" data-days="30">30D</button>
+                <button class="history-period-btn" data-days="month">Month</button>
             </div>
         </div>
         <div class="hist-modal-body">
@@ -400,6 +406,7 @@
                         <button class="history-metric-tab active" data-metric="temperature">Temperature</button>
                         <button class="history-metric-tab" data-metric="pressure">Pressure</button>
                         <button class="history-metric-tab" data-metric="humidity">Humidity</button>
+                        <button class="history-metric-tab" data-metric="surfaceWetness">Wetness</button>
                     </div>
                 </div>
                 <div class="hist-periods" id="hist-periods" role="group" aria-label="Show or hide periods">
@@ -430,6 +437,10 @@
                     <canvas id="hist-modal-chart"></canvas>
                 </div>
                 <div class="hist-legend" id="hist-legend" role="group" aria-label="Show or hide series" hidden></div>
+                <p class="hist-chart-note" id="hist-chart-note" hidden>
+                    <span><i class="hist-note-line"></i>Line — period average</span>
+                    <span><i class="hist-note-band"></i>Band — that day's recorded high and low</span>
+                </p>
                 <p class="history-chart-empty" id="hist-chart-empty" hidden>No chart data for this period</p>
             </div>
         </div>

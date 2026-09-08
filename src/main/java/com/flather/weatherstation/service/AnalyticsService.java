@@ -299,36 +299,64 @@ public class AnalyticsService {
         pctWetness, dataDetails, SurfaceWetnessStatus.classify(pctWetness));
   }
 
+  /**
+   * Exhaustive over {@link Metric} rather than defaulted: a metric added without a chart query then
+   * fails the build here instead of throwing on the first request for it.
+   */
   public List<ChartPointDto> getMetricChart(
       Instant from, Instant to, Metric metric, int resolution) {
     String bucketInterval = resolution + "minutes";
-    switch (metric) {
-      case TEMPERATURE -> {
-        return dataPointToDto(repository.findChartTemperature(from, to, bucketInterval));
-      }
-      case PRESSURE -> {
-        return dataPointToDto(repository.findChartPressure(from, to, bucketInterval));
-      }
-      case HUMIDITY -> {
-        return dataPointToDto(repository.findChartHumidity(from, to, bucketInterval));
-      }
-      case WIND -> {
-        return dataPointToDto(repository.findChartWind(from, to, bucketInterval));
-      }
-      case UV_INDEX -> {
-        return dataPointToDto(repository.findChartUvIndex(from, to, bucketInterval));
-      }
-      default -> throw new IllegalArgumentException("Unknown Metric");
-    }
+    var validation = configurationCache.getValidationConfig();
+
+    List<DataPoint> points =
+        switch (metric) {
+          case TEMPERATURE -> repository.findChartTemperature(from, to, bucketInterval);
+          case PRESSURE -> repository.findChartPressure(from, to, bucketInterval);
+          case HUMIDITY -> repository.findChartHumidity(from, to, bucketInterval);
+          case WIND -> repository.findChartWind(from, to, bucketInterval);
+          case UV_INDEX -> repository.findChartUvIndex(from, to, bucketInterval);
+          case SURFACE_WETNESS ->
+              repository.findChartSurfaceWetness(
+                  from,
+                  to,
+                  bucketInterval,
+                  validation.surfaceWetnessDryBaseline(),
+                  validation.surfaceWetnessWetBaseline());
+          case WIND_DIRECTION ->
+              repository.findChartWindDirection(
+                  from,
+                  to,
+                  bucketInterval,
+                  WindAggregation.CALM_THRESHOLD_MS,
+                  WindAggregation.MIN_DIRECTION_CONSISTENCY);
+        };
+
+    return toChartPoints(points);
   }
 
-  private List<ChartPointDto> dataPointToDto(List<DataPoint> dataPoints) {
+  /**
+   * Aggregated data points to chart points, in the station's zone.
+   *
+   * <p>Deliberately metric-agnostic: every query feeding it already returns the value in the unit
+   * its metric is charted in, surface wetness included — its percentage conversion lives in the two
+   * {@code findChartSurfaceWetness} queries so that both chart tiers convert identically without
+   * this method having to know which metric it is holding.
+   *
+   * <p>Shared with {@code WeatherHistoryService} rather than kept private so the pre-rolled tier
+   * lands on the same shape as the raw one.
+   *
+   * <p>Null values are dropped rather than carried through. A pre-rolled column is null for an hour
+   * with no valid reading — routine for wind direction, which is null whenever the hour had no
+   * consistent bearing — and {@link ChartPointDto#hourlyValue()} is a primitive, so passing one on
+   * unboxes to an NPE. Dropping also matches the raw tier, whose {@code GROUP BY} simply yields no
+   * row for such a bucket; a missing point reads as a gap on the chart either way.
+   */
+  public List<ChartPointDto> toChartPoints(List<DataPoint> dataPoints) {
+    ZoneId zoneId = configurationCache.getLocationContext().zoneId();
+
     return dataPoints.stream()
-        .map(
-            projection ->
-                new ChartPointDto(
-                    projection.hour().atZone(configurationCache.getLocationContext().zoneId()),
-                    projection.value()))
+        .filter(point -> point.value() != null)
+        .map(point -> new ChartPointDto(point.hour().atZone(zoneId), point.value()))
         .toList();
   }
 
