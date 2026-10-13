@@ -425,9 +425,56 @@ Google Java Format enforced by Spotless. Always run `./mvnw spotless:apply` befo
 
 History has no standalone page — it opens as a modal from the dashboard (`history-modal.js`).
 
+### Installable PWA
+
+The dashboard is installable to a phone home screen. `static/manifest.json` (standalone,
+portrait, `#21376e`), `static/icons/` + root `favicon*`, and `static/sw.js` registered by
+`js/pwa-register.js` — the only script `index.html` loads that is not a dashboard module.
+
+**The icons are generated, not hand-drawn.** `icons/icon-source.svg` is Meteocons'
+`thermometer-sun` (fill, MIT — the same set the forecast strip pulls from the CDN), vendored
+so the raster set is reproducible. The backdrop is `#195faf` — the Midday anchor's sky
+colour from `SKY_ANCHORS`, not the navy `theme_color` — chosen flat rather than as the
+midday gradient because the glyph's pale thermometer tube loses contrast against the
+gradient's lighter lower half at favicon sizes. Every PNG is derived from it:
+
+```bash
+rsvg-convert -w 1024 -h 1024 icons/icon-source.svg -o /tmp/big.png
+magick /tmp/big.png -trim +repage /tmp/glyph.png     # Meteocons artwork has slack in its viewBox
+magick /tmp/glyph.png -resize 360x360 -background "#195faf" -gravity center -extent 512x512 icons/icon-512.png
+```
+
+Two things to keep right when regenerating. **Trim first** — the artwork does not fill its
+viewBox, so scaling the raw SVG to the canvas leaves the glyph looking small and lost. And
+**`any` and `maskable` are separate files at different coverage** (~70% vs ~55%): a single
+`"purpose": "any maskable"` entry has to satisfy both, so it either gets cropped by Android's
+circular mask or floats undersized everywhere else. ImageMagick alone cannot rasterise these
+— it silently drops gradients and strokes, producing blank or partial output. `librsvg`
+(`brew install librsvg`) is required.
+
+**The service worker caches the static shell only** — `/css/`, `/js/`, `/img/`, `/icons/`,
+the manifest and the favicon, stale-while-revalidate. It deliberately never intercepts
+`/api/**` or the HTML: the dashboard polls live data every 30 s, and a cached API response
+would show a stale reading for a whole cycle. `CACHE_NAME` must be bumped on any shell
+change, or a returning client serves the previous CSS/JS for one more load.
+
+Two iOS-standalone-only behaviours, both easy to undo by accident:
+
+- **`<meta name="theme-color">` is removed when `navigator.standalone` is true**, in the
+  pre-paint boot script in `index.html` and again in `setBrowserChromeColor`. iOS honours
+  `apple-mobile-web-app-status-bar-style: black-translucent` *only* while no theme-color
+  exists; with one present it paints an opaque status bar from it and freezes that colour
+  at launch, which is how a night sky ended up under a daytime-blue bar. The test is
+  `navigator.standalone` (WebKit-only) rather than `display-mode: standalone`, which would
+  also match Android Chrome and break its working live tint.
+- **Safe-area padding is `calc(20px + env(...))`, never `max(20px, env(...))`.** The inset
+  says where the unsafe region ends; the page gutter belongs *inside* it. `max()` let a
+  59 px status bar swallow the 20 px gutter whole and parked the header card flush against
+  the bar. The same applies to all four modal rules.
+
 ### JavaScript modules (all under `static/js/`)
 
-`index.html` loads only five scripts: `realtime-script.js` (a plain script, runs synchronously before the rest) plus four `type="module"` entry points — `fetch-data.js`, `history-modal.js`, `cloud-forecast.js`, `equalize-card-height.js`. Everything else is reached through `import`. `/admin/config.html` loads `config.js` and `database-view.js`; neither is used by the dashboard.
+`index.html` loads six scripts: `realtime-script.js` (a plain script, runs synchronously before the rest), four `type="module"` entry points — `fetch-data.js`, `history-modal.js`, `cloud-forecast.js`, `equalize-card-height.js` — and `pwa-register.js` (plain, registers the service worker). Everything else is reached through `import`. `/admin/config.html` loads `config.js` and `database-view.js`; neither is used by the dashboard.
 
 **Dashboard shell**
 
@@ -504,13 +551,74 @@ The page background gradient is driven by the current sun altitude, updated on e
 - **`@property`** typed custom properties (`--bg-grad-top`, `--bg-grad-bottom`, `--card-bg`, etc.) enable CSS color interpolation between values.
 - **Background preference** (dynamic / static preset) is persisted in `localStorage` as `bgPreference`. Static mode uses a fixed anchor; dynamic mode follows live sun altitude. `getStarAltitude()` reads the preference to supply the correct effective altitude to the star field, and `moonAmbientFor()` uses it so a pinned preset also tints the moon disk.
 
+#### Browser chrome tint — why it is `<html>`'s background-color
+
+Safari 26 **dropped `<meta name="theme-color">`** for its own UI. It now samples a
+qualifying `position: fixed` element at a viewport edge, falling back to `<body>`'s
+background-color and then `<html>`'s. Only the body/html route has WebKit's live observer.
+
+`.safari-top-anchor` / `.safari-bottom-anchor` were that fixed element and are now
+**`display: none`** — kept in the three templates only so the markup is not churned. They
+were the bug: a fixed element *outranks* body/html but never re-samples, so it won the
+contest and then froze at its page-load colour. That is exactly the "chrome only updates
+when I switch tabs" symptom. Measured on macOS 26.4 and iOS: strips present, neither
+updates; strips gone, both track the sky live.
+
+`paintChromeTint(topHex)` therefore writes a **literal** colour onto `<html>`'s
+background-color each tick. Three things it must keep doing:
+
+- **A literal, not `var(--bg-grad-top)`.** The var rides `:root`'s 12 s transition, and
+  Safari re-samples on discrete changes, not during an interpolation. Expect the chrome to
+  snap while the page keeps transitioning — the two disagree for 12 s by design.
+- **`<html>`, not `<body>`.** `#star-field` is `z-index: -1` and paints *behind* body's
+  background, so an opaque `<body>` would hide the stars; the gradient is this same
+  element's background-image, which paints over the colour and is unaffected.
+- **The gradient's top colour.** Safari derives one tint for the whole UI, so top and bottom
+  chrome cannot differ. Top wins because the conspicuous chrome is at the top (iOS status
+  bar, macOS toolbar + tab bar). Consequence: the iOS bottom toolbar carries the top colour
+  and contrasts with the page above it, and an overscroll past the bottom flashes it too.
+
+Sampling rules worth knowing before touching anything at a viewport edge: `backdrop-filter`,
+`::before`/`::after`, `position: absolute` children of the fixed element, and `display: none`
+are all **never sampled**, while `visibility: hidden` and `pointer-events: none` still are.
+Users can also switch the whole feature off (macOS: Safari › Settings › Tabs › Show color in
+tab bar; iOS: Settings › Apps › Safari › Tabs › Allow Website Tinting). Reference:
+`github.com/andesco/safari-color-tinting`.
+
+#### The sky gradient is the `<html>` canvas background — never a fixed layer
+
+`html` carries `background-color` **and** the gradient `background-image`, at default
+(scroll) attachment. There is no `body::before`; it was removed.
+
+Two things it must not become, each tried and measured on device:
+
+- **Not a `position: fixed` layer.** iOS Safari does not re-render fixed layers
+  continuously during a scroll gesture — it composites them separately, so they lag and
+  clip while the bottom toolbar animates, briefly exposing the canvas beneath as a
+  hard-edged band along the bottom that *judders* as you scroll. Sizing is not the cause
+  and cannot be the fix: the fixed layer was measured at 200px **taller** than the viewport
+  (`beforeH` 939 vs `innerH` 739, visible area fully inside it) and the band still appeared.
+  `100lvh` did not help either, despite `CSS.supports` reporting it available.
+- **Not `background-attachment: fixed`.** iOS cannot composite that either — it repaints
+  the whole background every scroll frame, which is its own source of scroll judder.
+
+The trade is that the ramp spans the document rather than the viewport, so scrolling moves
+through the gradient instead of it staying pinned to the screen. In exchange the browser
+owns the painting: it never lags, and it covers the overscroll region and whatever strip
+the toolbar vacates for free.
+
+`#star-field` is still `position: fixed` and still lags for a frame on iOS — acceptable only
+because it is transparent, so it can drop stars briefly but can never expose a block of
+colour. It overshoots the viewport by a constant 200px so the toolbar-vacated strip is not
+starless.
+
 ### Star field (`star-field.js`)
 
 - Canvas-based background stars (140 stars, soft radial-gradient bloom) + 11 DOM highlight stars with CSS `star-breathe` animations.
 - Stars generated once with a seeded PRNG (`0xCAFEBABE`) — deterministic layout across every load.
 - `altToStarOpacity(alt)` ramp: fade begins at −4° (first stars visible), reaches 0.22 at −12° (civil), 0.62 at −18° (nautical), 1.0 at −27° (astronomical night).
 - Cloud cover from `window.getCurrentCloudCover()` acts as a multiplier (overcast reduces opacity by up to 85%).
-- `z-index: -1` — sits above the sky gradient (`body::before`) but below all dashboard content.
+- `z-index: -1` — sits above the sky gradient (html's canvas background) but below all dashboard content.
 - Modal dim: `setStarFieldModalDim(true/false)` drops to 22% instantly (bypasses the 18 s opacity transition).
 - Respects `prefers-reduced-motion`.
 

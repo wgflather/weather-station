@@ -91,6 +91,29 @@ function buildSkyState(lo, hi, t) {
     };
 }
 
+// True only inside an iOS home-screen web app. `navigator.standalone` is a
+// WebKit-only API, which is exactly the scoping we want: Android Chrome also
+// matches `display-mode: standalone` but handles theme-color correctly there,
+// so testing the media query instead would break Android's live tint.
+export function isIosStandalone() {
+    return navigator.standalone === true;
+}
+
+// Installed on the iOS home screen, `apple-mobile-web-app-status-bar-style:
+// black-translucent` only takes effect while there is NO <meta name="theme-color">
+// in the document. With one present, iOS paints an opaque status bar from it and
+// freezes that colour at launch — which is how a night sky ended up under a
+// daytime-blue bar. Removing the meta is what restores the translucent bar, so
+// the sky gradient runs edge-to-edge underneath it; body's safe-area-inset
+// padding is what keeps content from hiding behind the clock.
+//
+// Safari 26 ignores theme-color for its own chrome regardless (that tint comes
+// from html's background-color — see paintChromeTint), so removing the meta
+// costs nothing there; this is scoped to the installed app anyway.
+function stripThemeColorMeta() {
+    document.head.querySelectorAll('meta[name="theme-color"]').forEach(el => el.remove());
+}
+
 // iOS Safari caches the <meta name="theme-color"> value from initial page
 // load and ignores subsequent `setAttribute('content', ...)` updates — the
 // URL bar (and the bottom liquid-glass toolbar it feeds) keeps the old tint
@@ -100,6 +123,12 @@ function buildSkyState(lo, hi, t) {
 // On Chrome / Edge / Android Chrome, in-place mutation does work — but
 // replacing the element works too, and the cost is one DOM op every 30s.
 function setBrowserChromeColor(hex) {
+    // Re-adding the meta on the 30s tick would hand iOS an opaque status bar
+    // back a moment after the boot script removed it.
+    if (isIosStandalone()) {
+        stripThemeColorMeta();
+        return;
+    }
     const old = document.head.querySelector('meta[name="theme-color"]');
     if (old && old.getAttribute('content') === hex) return;
     const fresh = document.createElement('meta');
@@ -153,6 +182,40 @@ export function moonAmbientFor(sunAltDeg) {
     };
 }
 
+// Safari 26 no longer reads <meta name="theme-color"> for its chrome tint — it
+// samples a qualifying fixed element at the viewport edge, else <body>'s
+// background-color, else <html>'s. Only the body/html route has WebKit's live
+// observer, which is why the old .safari-*-anchor strips are now display:none
+// (see the CSS): a fixed element outranks body/html and then never re-samples.
+//
+// <html> rather than <body> because #star-field is z-index:-1 and paints behind
+// body's background — an opaque <body> colour would hide the stars. html's
+// background is the page canvas, so it sits under everything. Its own gradient
+// background-image paints over this colour and is unaffected; only the
+// background-color *property* is what Safari samples.
+//
+// The value must be a literal. Left as `var(--bg-grad-bottom)` it rides :root's
+// 12s transition, and Safari re-samples on discrete changes rather than during
+// an interpolation. (Measured: with a literal, the chrome switches immediately
+// while the page keeps transitioning — the two are allowed to disagree for 12s.)
+//
+// Safari derives ONE tint for the whole browser UI, so top and bottom chrome
+// cannot be given different colours — a fixed element could target each edge
+// separately, but that is the route with no live observer, which is the whole
+// reason the strips were removed. So this is a choice, not a limitation to
+// work around: it uses the gradient's TOP colour, because the chrome that sits
+// against the top of the page is the conspicuous one (the iOS status bar /
+// control-centre area and the macOS toolbar + tab bar), while the only chrome
+// at the bottom is the iOS toolbar.
+//
+// Consequence to expect: the iOS bottom toolbar now carries the top colour too,
+// so it contrasts with the page immediately above it. html's background-color
+// is also what fills the overscroll-bounce region, so an over-scroll past the
+// bottom flashes the top colour. Both are the cost of the single tint.
+function paintChromeTint(topHex) {
+    if (topHex) document.documentElement.style.backgroundColor = topHex;
+}
+
 let skyBackgroundPrimed = false;
 
 // Shared DOM-writer used by both the dynamic renderer and the static
@@ -178,6 +241,7 @@ function applySkyColors(colors, snap = false) {
     skyBackgroundPrimed = true;
 
     setBrowserChromeColor(colors.topHex);
+    paintChromeTint(colors.topHex);
     try {
         localStorage.setItem('skyColors', JSON.stringify({
             version: '2', top: colors.top, bottom: colors.bottom,
@@ -326,50 +390,21 @@ export function initBgPreference({ getSunAltitude: gsa, onApplied: cb } = {}) {
 }
 
 
-// Safari tints its liquid-glass chrome by sampling the fixed .safari-*-anchor
-// strips (theme-color only drives the iPhone status bar). After the app is
-// backgrounded and resumed, the TOP strip's composited layer can come back
-// stale or dropped, so Safari re-samples the wrong colour and the top chrome
-// ends up matching the BOTTOM strip. Switching tabs fixes it by forcing a full
-// re-composite — we reproduce that by hiding and re-showing the strips, which
-// drops and rebuilds their layers and makes Safari take a fresh sample. The
-// strips are 6px and sit behind the chrome, so the toggle is invisible.
-function forceChromeRepaint() {
-    const els = [
-        document.querySelector('.safari-top-anchor'),
-        document.querySelector('.safari-bottom-anchor'),
-    ].filter(Boolean);
-    if (!els.length) return;
-
-    const cycle = () => {
-        els.forEach(el => { el.style.display = 'none'; });
-        void document.documentElement.offsetHeight; // commit the hide before re-show
-        requestAnimationFrame(() => {
-            els.forEach(el => { el.style.display = ''; });
-        });
-    };
-
-    requestAnimationFrame(cycle);
-    // Safari can take its chrome sample a beat after the tab becomes visible,
-    // so run a second cycle shortly after to catch that later timing too.
-    setTimeout(cycle, 250);
-}
-
 // When iOS Safari restores a tab from the Back-Forward Cache (bfcache), JS
 // doesn't re-run and the 30s poll timer is frozen — so theme-color stays at
 // whatever it was when the tab was frozen, even if the sky has since changed.
 // pageshow (e.persisted) fires on every bfcache restore; visibilitychange
 // catches switching back to the tab without a full bfcache restore. Both
 // re-stamp theme-color from the localStorage cache immediately, before the
-// next poll tick, so the status bar matches the current sky on first glance,
-// and force the anchor strips to re-sample so the top chrome can't get stuck
-// on the bottom colour.
+// next poll tick, so the status bar matches the current sky on first glance.
 function refreshChromeColorFromCache() {
     try {
         const c = JSON.parse(localStorage.getItem('skyColors') || 'null');
-        if (c?.version === '2' && c.topHex) setBrowserChromeColor(c.topHex);
+        if (c?.version === '2' && c.topHex) {
+            setBrowserChromeColor(c.topHex);
+            paintChromeTint(c.topHex);
+        }
     } catch (_) {}
-    forceChromeRepaint();
 }
 window.addEventListener('pageshow', (e) => { if (e.persisted) refreshChromeColorFromCache(); });
 document.addEventListener('visibilitychange', () => {

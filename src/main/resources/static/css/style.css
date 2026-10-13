@@ -172,24 +172,52 @@
 }
 
 html {
-    /* The browser propagates the html background to the canvas — it fills
-       overscroll bounce regions and the strip exposed under a mobile
-       bottom URL bar when it slides up. The bottom of the gradient is
-       what's adjacent to that strip, so the solid fallback matches that
-       region; the gradient layered on top handles the rest. Using
-       background-color as the fallback (rather than the shorthand, which
-       resets it to transparent) guarantees no white flash if the gradient
-       image fails to paint on a given browser. */
-    background-color: var(--bg-grad-bottom);
+    /* The sky gradient lives here, on the page canvas, and nowhere else.
+
+       It is NOT painted by a `position: fixed` layer. iOS Safari does not
+       re-render fixed layers continuously during a scroll gesture — it
+       composites them separately, so they lag and clip while the bottom toolbar
+       animates, briefly exposing the canvas underneath as a hard-edged band that
+       judders along the bottom of the page. Measured on device: the fixed layer
+       was 200px *taller* than the viewport and the band still appeared, which is
+       what ruled sizing out as the cause.
+
+       It is also NOT `background-attachment: fixed`. iOS cannot composite that
+       either — it repaints the whole background every scroll frame.
+
+       So: default (scroll) attachment, painted as the canvas. The browser owns
+       it, it never lags, and it covers the overscroll region and whatever strip
+       the toolbar vacates for free. The trade is that the ramp spans the
+       document rather than the viewport, so scrolling moves through the gradient
+       instead of the gradient staying pinned to the screen.
+
+       background-color is both the fallback and what Safari 26 samples for its
+       chrome tint — sky-background.js overwrites it with a literal every tick
+       (see paintChromeTint), so treat it as live, not static. */
+    background-color: var(--bg-grad-top);
     background-image: linear-gradient(180deg, var(--bg-grad-top) 0%, var(--bg-grad-bottom) 100%);
-    background-attachment: fixed;
 }
+
 
 body {
     font-family: 'Figtree', sans-serif;
     color: #f1f5f9;
     margin: 0;
-    padding: 20px;
+    /* Installed as a standalone PWA (apple-mobile-web-app-status-bar-style:
+       black-translucent), iOS draws no status bar chrome of its own — the page
+       extends underneath it, so without this the header card renders behind the
+       status bar / notch.
+
+       These are `20px + inset`, not `max(20px, inset)`. The inset measures where
+       the unsafe region *ends*; the page's own gutter belongs inside that, so
+       max() is a category error — it let the 59px status bar swallow the gutter
+       whole and parked the header card flush against the bar with no gap, which
+       reads as the bar covering the card. Outside standalone every inset is 0,
+       so this stays exactly 20px in a browser tab. */
+    padding-top:    calc(20px + env(safe-area-inset-top));
+    padding-right:  calc(20px + env(safe-area-inset-right));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    padding-left:   calc(20px + env(safe-area-inset-left));
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -200,38 +228,36 @@ body {
     position: relative;
 }
 
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(180deg, var(--bg-grad-top) 0%, var(--bg-grad-bottom) 100%);
-}
 
 
 /* =========================================================
    SAFARI LIQUID GLASS CHROME TINTING ENGINE
 ========================================================= */
+/* Safari 26 dropped <meta name="theme-color"> for its chrome tint. It now
+   samples a qualifying fixed element at the viewport edge, falling back to
+   <body>'s background-color and then <html>'s.
+
+   These two strips used to be that fixed element, and they are deliberately
+   switched off. A fixed element takes PRIORITY over body/html, but only the
+   body/html background-color has WebKit's live observer behind it — so the
+   strips won the sampling contest and then froze at their page-load colour.
+   That is precisely the "chrome only updates when I switch tabs" symptom.
+   Measured on macOS 26.4 and iOS: with the strips removed the chrome tracks
+   the sky live on both; with them present neither updates.
+
+   display:none is the one method documented to reliably stop Safari sampling
+   an element — opacity:0, visibility:hidden and pointer-events:none are all
+   still sampled. backdrop-filter also prevents sampling, which is worth
+   remembering before adding one to anything at the viewport edge.
+
+   The tint now comes from <html>'s background-color, which sky-background.js
+   rewrites with a literal colour each tick (see paintChromeTint). It has to be
+   <html> rather than <body>: #star-field is z-index:-1 and paints *behind*
+   body's background, so giving <body> an opaque colour would hide the stars —
+   and the gradient is this element's own background image. */
 .safari-top-anchor,
 .safari-bottom-anchor {
-    position: fixed;
-    left: 0;
-
-    width: 100%;
-    height: 6px;
-
-    z-index: 9999;
-    pointer-events: none;
-}
-
-.safari-top-anchor {
-    top: 0;
-    background-color: var(--bg-grad-top);
-}
-
-.safari-bottom-anchor {
-    bottom: 0;
-    background-color: var(--bg-grad-bottom);
+    display: none;
 }
 
 /* =========================================================
@@ -1736,10 +1762,10 @@ h3 {
     display: none;
     align-items: center;
     justify-content: center;
-    padding-top:    max(24px, env(safe-area-inset-top));
-    padding-right:  max(24px, env(safe-area-inset-right));
-    padding-bottom: max(24px, env(safe-area-inset-bottom));
-    padding-left:   max(24px, env(safe-area-inset-left));
+    padding-top:    calc(24px + env(safe-area-inset-top));
+    padding-right:  calc(24px + env(safe-area-inset-right));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    padding-left:   calc(24px + env(safe-area-inset-left));
     box-sizing: border-box;
 
     /* allow-discrete lets `display` participate in the transition: on
@@ -2273,10 +2299,10 @@ h3 {
 
 @media (max-width: 480px) {
     .astro-modal {
-        padding-top:    max(12px, env(safe-area-inset-top));
-        padding-right:  max(12px, env(safe-area-inset-right));
-        padding-bottom: max(12px, env(safe-area-inset-bottom));
-        padding-left:   max(12px, env(safe-area-inset-left));
+        padding-top:    calc(12px + env(safe-area-inset-top));
+        padding-right:  calc(12px + env(safe-area-inset-right));
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+        padding-left:   calc(12px + env(safe-area-inset-left));
     }
     .astro-modal-panel {
         /* On phones, deliberately constrain to ~2/3 of the viewport so a
@@ -3328,10 +3354,10 @@ h3 {
     display: none;
     align-items: center;
     justify-content: center;
-    padding-top:    max(16px, env(safe-area-inset-top));
-    padding-right:  max(16px, env(safe-area-inset-right));
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-    padding-left:   max(16px, env(safe-area-inset-left));
+    padding-top:    calc(16px + env(safe-area-inset-top));
+    padding-right:  calc(16px + env(safe-area-inset-right));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    padding-left:   calc(16px + env(safe-area-inset-left));
     box-sizing: border-box;
     opacity: 0;
     transition:
@@ -3465,13 +3491,17 @@ h3 {
 }
 
 @media (max-width: 600px) {
-    /* Every pixel of gutter is a pixel the chart does not get. The safe-area insets
-       stay in the max() so a notched phone still clears its own chrome. */
+    /* Every pixel of gutter is a pixel the chart does not get, which is why the
+       base gutter is only 8px here. It is added to the inset rather than max()'d
+       against it: the inset says where the notch/home-indicator ends, so max()
+       let a 59px status bar absorb the gutter entirely and parked the panel flush
+       against the chrome. 8px on top of the inset is the smallest gap that still
+       reads as deliberate. */
     .hist-modal {
-        padding-top:    max(8px, env(safe-area-inset-top));
-        padding-right:  max(8px, env(safe-area-inset-right));
-        padding-bottom: max(8px, env(safe-area-inset-bottom));
-        padding-left:   max(8px, env(safe-area-inset-left));
+        padding-top:    calc(8px + env(safe-area-inset-top));
+        padding-right:  calc(8px + env(safe-area-inset-right));
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+        padding-left:   calc(8px + env(safe-area-inset-left));
     }
 
     .hist-modal-header {
@@ -3521,18 +3551,27 @@ h3 {
    STAR FIELD — atmospheric night background
    Generated once by star-field.js; opacity driven by sun
    altitude and cloud cover via the existing sky system.
-   Stars sit above the sky gradient (body::before, z:-1)
+   Stars sit above the sky gradient (html's canvas background)
    but below all dashboard content (same z-level, earlier
    in document order so cards paint over it).
 ========================================================= */
 #star-field {
     position: fixed;
-    inset: 0;
-    /* z-index: -1 places the star canvas at the same level as
-       body::before (sky gradient). Cards at z-index: auto sit
-       above both. This eliminates the compositor layer boundary
-       that produced a thin artifact at card edges when the canvas
-       was at z-index: 0.                                          */
+    top: 0;
+    left: 0;
+    right: 0;
+    /* Overshoots the viewport by a constant 200px so the strip the iOS toolbar
+       vacates on scroll is not starless. A fixed layer still lags during a
+       scroll gesture on iOS, but this one is transparent — it can only drop
+       stars for a frame, never expose a block of colour, which is why the sky
+       gradient is on the canvas instead. */
+    height: calc(100vh + 200px);
+    height: calc(100lvh + 200px);
+    /* z-index: -1 keeps the star canvas behind body's content while
+       still above html's canvas background (the sky gradient). Cards
+       at z-index: auto sit above it. This eliminates the compositor
+       layer boundary that produced a thin artifact at card edges when
+       the canvas was at z-index: 0.                                  */
     z-index: -1;
     pointer-events: none;
     opacity: 0;

@@ -8,7 +8,15 @@
          and refreshChromeColorFromCache() re-stamps it on bfcache restore. -->
     <meta name="theme-color" content="#21376e">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Weather">
+    <meta name="application-name" content="Weather Dashboard">
     <title>Weather Dashboard</title>
+    <link rel="manifest" th:href="@{/manifest.json}" href="../static/manifest.json">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" th:href="@{/favicon-32.png}" href="../static/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" th:href="@{/favicon-16.png}" href="../static/favicon-16.png">
+    <link rel="apple-touch-icon" th:href="@{/icons/apple-touch-icon.png}" href="../static/icons/apple-touch-icon.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css"/>
     <link rel="stylesheet" th:href="@{/css/style.css}" href="../static/css/style.css" />
     <!-- Apply last-known sky colors *before* first paint. Safari (both iOS
@@ -48,6 +56,16 @@
                 if (meta) meta.setAttribute('content', chromeColor);
             }
         })();
+        // Installed on the iOS home screen, a present theme-color makes iOS
+        // paint an OPAQUE status bar from it — frozen at the launch value — and
+        // ignore apple-mobile-web-app-status-bar-style: black-translucent.
+        // Dropping it here, before first paint, is what keeps the bar
+        // transparent so the sky gradient runs under it edge-to-edge.
+        // navigator.standalone is WebKit-only, so Android keeps its live tint.
+        // sky-background.js re-applies this on every tick; see setBrowserChromeColor.
+        if (navigator.standalone === true) {
+            document.head.querySelectorAll('meta[name="theme-color"]').forEach(el => el.remove());
+        }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
@@ -463,5 +481,6 @@
 <script type="module" th:src="@{/js/history-modal.js}"></script>
 <script type="module" th:src="@{/js/cloud-forecast.js}"></script>
 <script type="module" th:src="@{/js/equalize-card-height.js}"></script>
+<script th:src="@{/js/pwa-register.js}"></script>
 </body>
 </html>
