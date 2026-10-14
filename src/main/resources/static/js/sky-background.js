@@ -212,7 +212,8 @@ export function moonAmbientFor(sunAltDeg) {
 // painted on html's own box (see the CSS), so the colour at that edge is the
 // ramp interpolated at (scrollY + innerHeight) / htmlHeight. On iOS the only
 // tinted chrome is the bottom toolbar, so it blends with the page immediately
-// above it at every scroll position and every time of day.
+// above it at every scroll position and every time of day — and the top edge
+// where the chrome is at the top instead (macOS, iPad); see chromeIsAtBottom.
 //
 // Why not just send the top or the bottom colour: measured across SKY_ANCHORS,
 // top-vs-bottom separation is negligible at night (ΔRGB 26-36) but severe at
@@ -236,15 +237,32 @@ function hexToRgb(hex) {
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-// Fraction of the gradient visible at the viewport's bottom edge.
-function viewportBottomFraction() {
+// Which viewport edge the browser chrome actually sits against. iPhone Safari
+// puts its toolbar at the BOTTOM; macOS Safari tints the tab bar at the TOP, as
+// does iPad. Since Safari derives one tint for the whole UI, sampling the wrong
+// edge is not neutral — it is maximally wrong, because the two ends of the ramp
+// are furthest apart exactly when the mismatch is most visible (dawn/dusk).
+//
+// maxTouchPoints alone would misclassify iPad, whose chrome is at the top. The
+// short side of the screen separates them and is orientation-invariant: a phone
+// is under 500px that way in both portrait and landscape, a tablet is not.
+// Worst case this is cosmetic — a wrong guess picks the other edge, nothing
+// breaks.
+function chromeIsAtBottom() {
+    return navigator.maxTouchPoints > 0 &&
+           Math.min(window.innerWidth, window.innerHeight) < 500;
+}
+
+// Fraction of the gradient sitting against the chrome.
+function viewportChromeFraction() {
     const boxH = document.documentElement.offsetHeight || window.innerHeight || 1;
-    return Math.min(1, Math.max(0, (window.scrollY + window.innerHeight) / boxH));
+    const y = chromeIsAtBottom() ? window.scrollY + window.innerHeight : window.scrollY;
+    return Math.min(1, Math.max(0, y / boxH));
 }
 
 function paintChromeTint() {
     if (!tintTopRgb || !tintBottomRgb) return;
-    const hex = rgbHex(lerpTriplet(tintTopRgb, tintBottomRgb, viewportBottomFraction()));
+    const hex = rgbHex(lerpTriplet(tintTopRgb, tintBottomRgb, viewportChromeFraction()));
     // Writing on every scroll frame would repaint the canvas for no visible
     // gain; the colour only matters when it actually changes by a whole step.
     if (hex === lastTintHex) return;

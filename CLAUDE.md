@@ -580,6 +580,13 @@ background-color each tick. Three things it must keep doing:
   (168 at the horizon anchor, 187 at golden hour), where the sky is cool above and warm at
   the horizon. So `paintChromeTint` interpolates the ramp at the **bottom edge of the
   viewport** — `(scrollY + innerHeight) / html.offsetHeight` — and re-samples on scroll,
+  **or the top edge (`scrollY / offsetHeight`) where the chrome sits at the top instead**.
+  iPhone Safari puts its toolbar at the bottom; macOS Safari and iPad tint at the top, and
+  sampling the wrong edge is maximally wrong rather than neutral. `chromeIsAtBottom()`
+  separates them by touch support *and* a short side under 500px — `maxTouchPoints` alone
+  misclassifies iPad. The short side is orientation-invariant, so a phone qualifies in
+  landscape too. A wrong guess is cosmetic: it picks the other edge, nothing breaks.
+  It re-samples on scroll,
   rAF-coalesced and skipped when the rounded colour has not changed. On iOS the only tinted
   chrome is the bottom toolbar, so it blends with the page directly above it at any scroll
   position. Flattening the ramp would also have fixed this, and was rejected: it costs the
