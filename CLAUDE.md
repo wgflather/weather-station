@@ -587,7 +587,13 @@ background-color each tick. Three things it must keep doing:
   misclassifies iPad — and returns false outright in the installed app, where there is no
   browser chrome at either edge. What the choice decides in standalone is only the overscroll
   rubber-band colour (the translucent status bar shows real page pixels, not a tint), and
-  sampling the bottom there made a pull-down at the top flash a bottom-of-ramp colour. The short side is orientation-invariant, so a phone qualifies in
+  sampling the bottom there made a pull-down at the top flash a bottom-of-ramp colour.
+  The top-edge sample is additionally offset by `env(safe-area-inset-top)`, surfaced to JS
+  as the `--safe-area-top` custom property because `env()` cannot be read directly. Without
+  it the installed app shows a seam: iOS paints the status bar flat from this colour while
+  the page beneath keeps drawing the gradient, so sampling at `scrollY` makes the bar a
+  shade earlier in the ramp than the pixels directly below it. Measured on device at ~7
+  ΔRGB — small, but a flat band against a gradient makes it legible. The short side is orientation-invariant, so a phone qualifies in
   landscape too. A wrong guess is cosmetic: it picks the other edge, nothing breaks.
   It re-samples on scroll,
   rAF-coalesced and skipped when the rounded colour has not changed. On iOS the only tinted

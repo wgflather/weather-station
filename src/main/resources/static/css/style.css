@@ -9,6 +9,11 @@
    recedes so the eye lands on the atmospheric conditions first.
 ========================================================= */
 :root {
+    /* Readable from JS: env() cannot be queried directly, and paintChromeTint
+       needs the status-bar height to sample the gradient where the bar ends
+       rather than where the document starts. 0 everywhere but a notched device. */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+
     /* Type weight scale (Figtree is variable, so these are real) */
     --fw-hero:    700;   /* the temperature hero value          */
     --fw-value:   600;   /* other primary metric values         */

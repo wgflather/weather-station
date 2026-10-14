@@ -260,10 +260,26 @@ function chromeIsAtBottom() {
            Math.min(window.innerWidth, window.innerHeight) < 500;
 }
 
+// Height of the iOS status bar overlaying the page, 0 everywhere else.
+function safeAreaTop() {
+    const v = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--safe-area-top'));
+    return Number.isFinite(v) ? v : 0;
+}
+
 // Fraction of the gradient sitting against the chrome.
 function viewportChromeFraction() {
     const boxH = document.documentElement.offsetHeight || window.innerHeight || 1;
-    const y = chromeIsAtBottom() ? window.scrollY + window.innerHeight : window.scrollY;
+    // Sampling the top edge means scrollY — the top of the *document*. In the
+    // installed app that is wrong by the height of the status bar: the bar is
+    // painted flat from this colour while the page under it keeps drawing the
+    // gradient, so taking the ramp at scrollY makes the bar a shade earlier than
+    // the pixels directly below it, and the seam shows. Offsetting by the safe
+    // area samples where the bar actually ends. Measured on device the error is
+    // only ~7 ΔRGB, but a flat band against a gradient makes it legible.
+    const y = chromeIsAtBottom()
+        ? window.scrollY + window.innerHeight
+        : window.scrollY + safeAreaTop();
     return Math.min(1, Math.max(0, y / boxH));
 }
 
