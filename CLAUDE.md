@@ -573,10 +573,17 @@ background-color each tick. Three things it must keep doing:
 - **`<html>`, not `<body>`.** `#star-field` is `z-index: -1` and paints *behind* body's
   background, so an opaque `<body>` would hide the stars; the gradient is this same
   element's background-image, which paints over the colour and is unaffected.
-- **The gradient's top colour.** Safari derives one tint for the whole UI, so top and bottom
-  chrome cannot differ. Top wins because the conspicuous chrome is at the top (iOS status
-  bar, macOS toolbar + tab bar). Consequence: the iOS bottom toolbar carries the top colour
-  and contrasts with the page above it, and an overscroll past the bottom flashes it too.
+- **The colour where the chrome meets the page, not an endpoint.** Safari derives one tint
+  for the whole UI, so top and bottom chrome cannot differ — picking either endpoint is
+  therefore wrong by most of the ramp for half the day. Measured across `SKY_ANCHORS`,
+  top-vs-bottom separation is negligible at night (ΔRGB 26-36) but severe at dawn and dusk
+  (168 at the horizon anchor, 187 at golden hour), where the sky is cool above and warm at
+  the horizon. So `paintChromeTint` interpolates the ramp at the **bottom edge of the
+  viewport** — `(scrollY + innerHeight) / html.offsetHeight` — and re-samples on scroll,
+  rAF-coalesced and skipped when the rounded colour has not changed. On iOS the only tinted
+  chrome is the bottom toolbar, so it blends with the page directly above it at any scroll
+  position. Flattening the ramp would also have fixed this, and was rejected: it costs the
+  warm horizon, which is the whole reason dusk looks like dusk.
 
 Sampling rules worth knowing before touching anything at a viewport edge: `backdrop-filter`,
 `::before`/`::after`, `position: absolute` children of the fixed element, and `display: none`

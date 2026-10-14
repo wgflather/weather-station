@@ -88,6 +88,9 @@ function buildSkyState(lo, hi, t) {
         skyRgb:           accentRgb.join(', '),
         topHex:           rgbHex(topRgb),
         bottomHex:        rgbHex(bottomRgb),
+        // Raw endpoints for paintChromeTint, which interpolates between them.
+        topRgb:           topRgb,
+        bottomRgb:        bottomRgb,
     };
 }
 
@@ -199,22 +202,74 @@ export function moonAmbientFor(sunAltDeg) {
 // an interpolation. (Measured: with a literal, the chrome switches immediately
 // while the page keeps transitioning — the two are allowed to disagree for 12s.)
 //
-// Safari derives ONE tint for the whole browser UI, so top and bottom chrome
-// cannot be given different colours — a fixed element could target each edge
-// separately, but that is the route with no live observer, which is the whole
-// reason the strips were removed. So this is a choice, not a limitation to
-// work around: it uses the gradient's TOP colour, because the chrome that sits
-// against the top of the page is the conspicuous one (the iOS status bar /
-// control-centre area and the macOS toolbar + tab bar), while the only chrome
-// at the bottom is the iOS toolbar.
+// Safari derives ONE tint for the whole browser UI, so the top and bottom
+// chrome cannot be given different colours — a fixed element could target each
+// edge separately, but that is the route with no live observer, which is the
+// whole reason the strips were removed.
 //
-// Consequence to expect: the iOS bottom toolbar now carries the top colour too,
-// so it contrasts with the page immediately above it. html's background-color
-// is also what fills the overscroll-bounce region, so an over-scroll past the
-// bottom flashes the top colour. Both are the cost of the single tint.
-function paintChromeTint(topHex) {
-    if (topHex) document.documentElement.style.backgroundColor = topHex;
+// So instead of picking an endpoint, this samples the gradient *where the
+// chrome actually meets it*: the bottom edge of the viewport. The gradient is
+// painted on html's own box (see the CSS), so the colour at that edge is the
+// ramp interpolated at (scrollY + innerHeight) / htmlHeight. On iOS the only
+// tinted chrome is the bottom toolbar, so it blends with the page immediately
+// above it at every scroll position and every time of day.
+//
+// Why not just send the top or the bottom colour: measured across SKY_ANCHORS,
+// top-vs-bottom separation is negligible at night (ΔRGB 26-36) but severe at
+// dawn and dusk (168 at the horizon anchor, 187 at golden hour) where the sky
+// is cool above and warm at the horizon. Either endpoint is therefore wrong by
+// most of the ramp for half the day. Flattening the ramp would also fix it, but
+// it costs the warm horizon — the whole reason dusk looks like dusk.
+//
+// This is free to do because html's background-color is now purely a tint
+// signal: the gradient background-image paints over it everywhere except the
+// overscroll-bounce region, so it can carry any colour without being seen.
+let tintTopRgb = null;
+let tintBottomRgb = null;
+let lastTintHex = null;
+let tintScheduled = false;
+
+function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
+
+// Fraction of the gradient visible at the viewport's bottom edge.
+function viewportBottomFraction() {
+    const boxH = document.documentElement.offsetHeight || window.innerHeight || 1;
+    return Math.min(1, Math.max(0, (window.scrollY + window.innerHeight) / boxH));
+}
+
+function paintChromeTint() {
+    if (!tintTopRgb || !tintBottomRgb) return;
+    const hex = rgbHex(lerpTriplet(tintTopRgb, tintBottomRgb, viewportBottomFraction()));
+    // Writing on every scroll frame would repaint the canvas for no visible
+    // gain; the colour only matters when it actually changes by a whole step.
+    if (hex === lastTintHex) return;
+    lastTintHex = hex;
+    document.documentElement.style.backgroundColor = hex;
+}
+
+// Coalesced to one write per frame at most. Deliberately rAF rather than a
+// timer: a timer firing mid-gesture is exactly the pattern that re-introduces
+// scroll judder on iOS, and rAF is already aligned with the compositor.
+function scheduleChromeTint() {
+    if (tintScheduled) return;
+    tintScheduled = true;
+    requestAnimationFrame(() => { tintScheduled = false; paintChromeTint(); });
+}
+
+function setChromeTintEndpoints(topRgb, bottomRgb) {
+    if (!topRgb || !bottomRgb) return;
+    tintTopRgb = topRgb;
+    tintBottomRgb = bottomRgb;
+    paintChromeTint();
+}
+
+window.addEventListener('scroll', scheduleChromeTint, { passive: true });
+window.addEventListener('resize', scheduleChromeTint);
 
 let skyBackgroundPrimed = false;
 
@@ -241,7 +296,7 @@ function applySkyColors(colors, snap = false) {
     skyBackgroundPrimed = true;
 
     setBrowserChromeColor(colors.topHex);
-    paintChromeTint(colors.topHex);
+    setChromeTintEndpoints(colors.topRgb, colors.bottomRgb);
     try {
         localStorage.setItem('skyColors', JSON.stringify({
             version: '2', top: colors.top, bottom: colors.bottom,
@@ -402,7 +457,7 @@ function refreshChromeColorFromCache() {
         const c = JSON.parse(localStorage.getItem('skyColors') || 'null');
         if (c?.version === '2' && c.topHex) {
             setBrowserChromeColor(c.topHex);
-            paintChromeTint(c.topHex);
+            setChromeTintEndpoints(hexToRgb(c.topHex), hexToRgb(c.bottomHex));
         }
     } catch (_) {}
 }
