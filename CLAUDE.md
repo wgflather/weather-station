@@ -602,6 +602,13 @@ Two things it must not become, each tried and measured on device:
 - **Not `background-attachment: fixed`.** iOS cannot composite that either — it repaints
   the whole background every scroll frame, which is its own source of scroll judder.
 
+`html` also carries `min-height: 100vh` and `background-repeat: no-repeat`, and both are
+load-bearing. The gradient is sized to html's own box, which is only as tall as its content —
+so zooming out (or a very tall window) lets the viewport outgrow the content, the ramp ends
+early, and the default `repeat` starts a second copy underneath, which reads as a dark band
+across the bottom. `min-height` pins the box to at least one screen; `no-repeat` makes any
+residual shortfall fall back to the flat background-color instead of restarting the ramp.
+
 The trade is that the ramp spans the document rather than the viewport, so scrolling moves
 through the gradient instead of it staying pinned to the screen. In exchange the browser
 owns the painting: it never lags, and it covers the overscroll region and whatever strip

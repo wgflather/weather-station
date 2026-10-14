@@ -194,8 +194,18 @@ html {
        background-color is both the fallback and what Safari 26 samples for its
        chrome tint — sky-background.js overwrites it with a literal every tick
        (see paintChromeTint), so treat it as live, not static. */
+    /* The gradient is sized to html's own box, and html is only as tall as its
+       content. Zoom out (or open a very tall window) and the viewport outgrows
+       the content, so the ramp ends early and — because background-repeat
+       defaults to `repeat` — a second copy of it starts underneath, which reads
+       as a dark band across the bottom. min-height pins the box to the viewport
+       so the ramp always spans at least one screen, and no-repeat means any
+       residual shortfall falls back to the flat background-color rather than
+       restarting the gradient. */
+    min-height: 100vh;
     background-color: var(--bg-grad-top);
     background-image: linear-gradient(180deg, var(--bg-grad-top) 0%, var(--bg-grad-bottom) 100%);
+    background-repeat: no-repeat;
 }
 
 
