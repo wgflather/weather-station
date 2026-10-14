@@ -693,6 +693,14 @@ function applyScrub() {
 
 function hideScrub() {
     if (!chart?.els) return;
+    // Cancel any queued scrub frame first. pointermove coalesces into a rAF, so
+    // a finger lifting one frame after its last move leaves a frame pending:
+    // this clears the cursor, then that frame runs applyScrub() and puts it
+    // straight back. The readout then stays on screen after the touch ends.
+    if (chart.scrubRaf) {
+        cancelAnimationFrame(chart.scrubRaf);
+        chart.scrubRaf = null;
+    }
     chart.els.cursor.setAttribute('visibility', 'hidden');
     const readout = document.getElementById('sun-chart-readout');
     if (readout) readout.textContent = '';

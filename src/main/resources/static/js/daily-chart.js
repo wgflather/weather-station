@@ -25,6 +25,7 @@
 ========================================================= */
 
 import { getTooltipEl, setTooltipContent } from './chart-tooltip.js';
+import { installPointerHandlers } from './chart-interaction.js';
 import { unitFor } from './metric-units.js';
 import {
     COLOR_SCALES, METRIC_CONFIG, scaleToRgbString, createDynamicGradient, clampAxisBounds,
@@ -250,6 +251,13 @@ export function renderDailyChart(summaries, metric, canvasId, fromStr, toStr,
 
     // Destroy any existing chart on this canvas, from any module.
     Chart.getChart(canvas)?.destroy();
+
+    // Without this the tooltip stays on screen after a finger lifts: this chart
+    // shares the single floating tooltip with the 24-h one but had none of its
+    // touch dismissal. installPointerHandlers resolves the chart through
+    // Chart.getChart(canvas), so it already works here; it was simply never
+    // wired up. It is idempotent — guarded by a data attribute on the canvas.
+    installPointerHandlers(canvas);
 
     const scale    = COLOR_SCALES[metric] ?? COLOR_SCALES.temperature;
     const mcfg     = METRIC_CONFIG[metric] ?? METRIC_CONFIG.temperature;

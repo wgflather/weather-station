@@ -2851,6 +2851,13 @@ h3 {
     display: none;          /* hidden until .open is added */
     position: fixed;        /* escapes all overflow:hidden parents */
     min-width: 210px;
+    /* Without a ceiling the content sets the width, and on a phone that runs
+       past the screen. positionPopup() cannot rescue it either: once the box is
+       wider than the viewport its clamp solves to a NEGATIVE left, so the popup
+       hangs off the edge instead of being nudged back. The insets matter in
+       landscape, where the notch eats into one side. */
+    max-width: calc(100vw - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    box-sizing: border-box;
     background: linear-gradient(180deg,
         var(--popup-bg-strong),
         color-mix(in srgb, var(--popup-bg-strong) 85%, #000 15%));

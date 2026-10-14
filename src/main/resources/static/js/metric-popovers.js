@@ -242,8 +242,10 @@ function positionPopup(anchor) {
     let top  = r.bottom + margin;
     let left = r.right  - popupW;
 
-    if (left < margin)               left = margin;
+    // Order matters: the right-edge clamp can solve to a negative left when the
+    // popup is as wide as the viewport, so the lower bound is applied last.
     if (left + popupW > vw - margin) left = vw - popupW - margin;
+    if (left < margin)               left = margin;
     if (top  + popupH > vh - margin) top  = r.top - popupH - margin;
     if (top  < margin)               top  = margin;
 
