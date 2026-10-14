@@ -584,7 +584,10 @@ background-color each tick. Three things it must keep doing:
   iPhone Safari puts its toolbar at the bottom; macOS Safari and iPad tint at the top, and
   sampling the wrong edge is maximally wrong rather than neutral. `chromeIsAtBottom()`
   separates them by touch support *and* a short side under 500px — `maxTouchPoints` alone
-  misclassifies iPad. The short side is orientation-invariant, so a phone qualifies in
+  misclassifies iPad — and returns false outright in the installed app, where there is no
+  browser chrome at either edge. What the choice decides in standalone is only the overscroll
+  rubber-band colour (the translucent status bar shows real page pixels, not a tint), and
+  sampling the bottom there made a pull-down at the top flash a bottom-of-ramp colour. The short side is orientation-invariant, so a phone qualifies in
   landscape too. A wrong guess is cosmetic: it picks the other edge, nothing breaks.
   It re-samples on scroll,
   rAF-coalesced and skipped when the rounded colour has not changed. On iOS the only tinted

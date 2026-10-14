@@ -249,6 +249,13 @@ function hexToRgb(hex) {
 // Worst case this is cosmetic — a wrong guess picks the other edge, nothing
 // breaks.
 function chromeIsAtBottom() {
+    // Installed on the home screen there is no browser chrome at all, top or
+    // bottom — the only thing at a viewport edge is the translucent status bar,
+    // which is at the TOP. The status bar itself shows real page pixels rather
+    // than a tint, so what this actually decides in standalone is the colour of
+    // the overscroll rubber-band: sampling the bottom edge made a pull-down at
+    // the top flash a bottom-of-ramp colour against the gradient's top.
+    if (isIosStandalone()) return false;
     return navigator.maxTouchPoints > 0 &&
            Math.min(window.innerWidth, window.innerHeight) < 500;
 }
