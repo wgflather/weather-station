@@ -345,19 +345,71 @@ window.refreshCloudSunTimes = function (riseIso, setIso) {
 // FETCH
 // ==========================================
 
+// Open-Meteo publishes hourly, and CacheConfig holds the response for 20
+// minutes, so asking more often than that only burns a round trip.
+const FORECAST_TTL_MS = 20 * 60 * 1000;
+let _lastForecastLoad = 0;
+let _lastRenderedHour = -1;
+let _tooltipBound     = false;
+
 async function loadCloudForecast() {
     try {
         const res = await fetch('/api/forecast/clouds');
         if (!res.ok) return;
         const data = await res.json();
+        _lastForecastLoad = Date.now();
         _forecastPoints = data.forecastPoints ?? [];
         renderCloudStrip(_forecastPoints);
+        _lastRenderedHour = new Date().getHours();
         const strip = document.getElementById('cloud-strip');
-        if (strip) initTooltip(strip);
+        // initTooltip binds to document and window as well as to the strip, so
+        // it must run exactly once — re-binding on every refresh would stack a
+        // new set of click/scroll/resize handlers on each one.
+        if (strip && !_tooltipBound) {
+            initTooltip(strip);
+            _tooltipBound = true;
+        }
     } catch (e) {
         console.error('Cloud forecast fetch failed:', e);
     }
 }
+
+// This was fetched once at boot and never again: leave the dashboard open — or
+// installed and backgrounded — for a few hours and every other panel keeps
+// refreshing on the 30s poll while the forecast silently rots, needing a manual
+// reload to come back.
+//
+// A timer alone does not fix it. Backgrounded tabs and home-screen apps have
+// their timers frozen, which is exactly the case that goes stale, so coming back
+// to the app has to be a trigger in its own right: visibilitychange covers a tab
+// switch and an app resume, pageshow covers a bfcache restore (where no script
+// re-runs at all), and focus covers a desktop app-switch that never marks the
+// page hidden.
+function refreshForecastIfStale() {
+    if (Date.now() - _lastForecastLoad >= FORECAST_TTL_MS) loadCloudForecast();
+}
+
+// The strip is drawn relative to the current hour, so it also has to be redrawn
+// when the clock rolls over even if the data behind it is still fresh —
+// otherwise "now" stays highlighted on the hour that has just passed.
+function tickCloudForecast() {
+    if (Date.now() - _lastForecastLoad >= FORECAST_TTL_MS) {
+        loadCloudForecast();
+        return;
+    }
+    const hour = new Date().getHours();
+    if (hour !== _lastRenderedHour && _forecastPoints?.length) {
+        _lastRenderedHour = hour;
+        renderCloudStrip(_forecastPoints);
+    }
+}
+
+setInterval(tickCloudForecast, 60_000);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshForecastIfStale();
+});
+window.addEventListener('pageshow', (e) => { if (e.persisted) refreshForecastIfStale(); });
+window.addEventListener('focus', refreshForecastIfStale);
 
 loadCloudForecast();
 

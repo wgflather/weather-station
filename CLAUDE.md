@@ -186,8 +186,10 @@ which is exactly why a second hardcoded copy would go unnoticed rather than look
 also one bad row from a 500:** `LN` is undefined at zero and Postgres *raises* there rather than
 returning an infinity, so a single stored humidity of 0 % fails the query and, because the cards
 travel with the chart data, takes the whole `/daily` response down. No such row exists today and 0 %
-is a fault signature rather than a reading, so the floor belongs in validation — it is not there
-yet.
+is a fault signature rather than a reading, so the floor belongs in validation, and it is now
+there: `UpdateValidationRequest.humidityMinimal` carries `@DecimalMin(value = "0", inclusive =
+false)`, so the configured floor cannot be set to 0. A 0 % reading is then flagged ANOMALY, and
+the hourly rollup averages only `OK` rows, so it never reaches `humidity_avg`.
 
 Both tiers finish through `AnalyticsService.toChartPoints(points)`, which only maps the timestamp
 into the station's zone and **drops null values**. It takes no `Metric` — deliberately, so it cannot
@@ -654,7 +656,16 @@ starless.
 
 ### Cloud forecast strip (`cloud-forecast.js`)
 
-- Fetches `/api/forecast/clouds` once on boot; re-renders when `refreshCloudSunTimes` fires.
+- Fetches `/api/forecast/clouds` on boot, then re-checks every 60 s and refetches once the data
+  is older than `FORECAST_TTL_MS` (20 min, matching `CacheConfig`'s `apiWeather` TTL). It also
+  refetches on `visibilitychange`, `pageshow` (bfcache) and `focus` — a timer alone is not enough,
+  because a backgrounded tab or home-screen app has its timers frozen, which is exactly the case
+  that goes stale. Without these the strip was fetched once and never again, so every other panel
+  refreshed on the 30 s poll while the forecast silently rotted until a manual reload.
+- `initTooltip` binds to `document` and `window` as well as the strip, so it is guarded to run
+  once — calling it on every refresh would stack a new set of handlers each time.
+- Re-renders when `refreshCloudSunTimes` fires, and on the hour even when the data is still fresh,
+  since the strip is drawn relative to the current hour.
 - Shows 3 hours past + 8 hours ahead. Current slot uses animated Meteocons SVG; others use static.
 - **`isNightHour(slotMs)`** — uses time-of-day (minutes since midnight in browser local time) against sunrise/sunset to determine night; handles multi-day windows correctly.
 - **`selectIcon(point, isNight)`** — priority: WMO `weather_code` (authoritative) → precipitation amounts (safety net) → cloud-only fallback.
