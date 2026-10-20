@@ -632,6 +632,11 @@ background-color each tick. Three things it must keep doing:
   browser chrome at either edge. What the choice decides in standalone is only the overscroll
   rubber-band colour (the translucent status bar shows real page pixels, not a tint), and
   sampling the bottom there made a pull-down at the top flash a bottom-of-ramp colour.
+  The mirror problem — pulling past the *bottom* showed a band of the top colour — has no
+  colour-sampling fix, because iOS fills the bounce area with this one flat colour: switching
+  it only while the page was pulled past its end was tried and did nothing on device. The
+  installed app therefore has no rubber-band at all (`overscroll-behavior-y: none` under
+  `@media (display-mode: standalone)`); a Safari tab still bounces.
   The top-edge sample is additionally offset by `env(safe-area-inset-top)`, surfaced to JS
   as the `--safe-area-top` custom property because `env()` cannot be read directly. Without
   it the installed app shows a seam: iOS paints the status bar flat from this colour while
