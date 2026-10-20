@@ -389,8 +389,8 @@ function createChart(canvasElement, state) {
                     scenario:      state.scenario,
                     isMobile:      state.isMobile,
                     showNow:       state.showNow,
-                    maxLabelColor: state.config.maxNodeColor,
-                    minLabelColor: state.config.minNodeColor,
+                    maxLabelColor: state.config.maxLabelColor ?? state.config.maxNodeColor,
+                    minLabelColor: state.config.minLabelColor ?? state.config.minNodeColor,
                 }
             }
         },
@@ -555,8 +555,8 @@ function updateChart(chart, state) {
     p.scenario      = state.scenario;
     p.isMobile      = state.isMobile;
     p.showNow       = state.showNow;
-    p.maxLabelColor = state.config.maxNodeColor;
-    p.minLabelColor = state.config.minNodeColor;
+    p.maxLabelColor = state.config.maxLabelColor ?? state.config.maxNodeColor;
+    p.minLabelColor = state.config.minLabelColor ?? state.config.minNodeColor;
 
     chart.update('none');
 }

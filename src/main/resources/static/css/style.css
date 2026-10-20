@@ -891,6 +891,10 @@ h3 {
    added by JS (risk-saturated, risk-likely, risk-possible, risk-unlikely).
 ========================================================= */
 .dew-status-badge {
+    /* A <button> — keep the div-era look: inherit the type, align left. */
+    appearance: none;
+    font-family: inherit;
+    text-align: left;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -920,6 +924,12 @@ h3 {
 
 .dew-status-badge:active {
     transform: scale(0.97);
+}
+
+.dew-status-badge:focus-visible,
+.humidity-wetness-line .wetness-status-badge:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
 }
 
 /* Status dot — colour follows the parent risk class via currentColor. */
@@ -2846,6 +2856,11 @@ h3 {
    STATUS CIRCLE  (replaces the "i" info icon)
 ========================================================= */
 .status-circle {
+    /* A <button>, so it is reachable by keyboard; these reset its native look. */
+    appearance: none;
+    padding: 0;
+    border: 0;
+    position: relative;
     width: 10px;
     height: 10px;
     border-radius: 50%;
@@ -2854,6 +2869,21 @@ h3 {
     cursor: pointer;
     transition: transform 0.15s var(--ease-standard), box-shadow 0.15s var(--ease-standard);
     box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
+}
+
+/* The dot stays 10px, but a finger needs more than that: an invisible ~34px
+   hit area around it. Nothing else sits within 12px of the dot in the card
+   header, so it cannot steal a neighbour's tap. */
+.status-circle::after {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    border-radius: 50%;
+}
+
+.status-circle:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 3px;
 }
 
 .status-circle:hover {
@@ -3209,8 +3239,13 @@ h3 {
         justify-content: center;
     }
 
-    .wind-left            { padding-right: 10px; }
+    /* The two columns were equal halves, but the left only holds "4.6 m/s" —
+       so the right got ~35-45px for a direction line that needs ~75, and
+       clipped "(240°)" at the card edge. The left now takes only what it
+       needs, and the direction line may wrap rather than clip. */
+    .wind-left            { padding-right: 10px; flex: 0 1 auto; }
     .wind-right           { padding-left: 10px; }
+    .wind-direction-line  { flex-wrap: wrap; gap: 0 4px; }
     .wind-direction-arrow { font-size: 0.75rem; }
     .wind-direction-label { font-size: 0.75rem; }
     .wind-direction-deg   { font-size: 0.5rem; }

@@ -149,6 +149,11 @@ export const METRIC_CONFIG = {
         fillMid:       null,
         maxNodeColor:  '#0d9488',
         minNodeColor:  '#d6d3d1',
+        // Optional per-metric override for the H / L *text* (pins keep the
+        // node colour). The dark teal pin reads on the line, but as a letter
+        // it was the faintest label on the chart, over its own teal fill —
+        // this is the scale's own 40 % stop.
+        maxLabelColor: '#2dd4bf',
         innerBorder:   '#ccfbf1',
         closeThreshold: 2,
     },

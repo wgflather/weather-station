@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weather-dashboard-shell-v25';
+const CACHE_NAME = 'weather-dashboard-shell-v26';
 
 const STATIC_PREFIXES = ['/css/', '/js/', '/img/', '/icons/'];
 const STATIC_EXACT = ['/manifest.json', '/favicon.ico'];

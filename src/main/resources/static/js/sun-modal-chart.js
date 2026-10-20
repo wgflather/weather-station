@@ -152,6 +152,10 @@ const PAD_BOTTOM = 28;   // room for the time axis
 // near the bottom, and the label would otherwise land on the time axis.
 const HORIZON_LABEL_OFFSET  = 16;
 const LABEL_MAX_BELOW_PLOT  = 6;
+// Gap between a rise/set dot and its label, which hangs off the day side; and
+// roughly one HH:MM at 11px, so a label near the plot edge stays inside it.
+const EVENT_LABEL_NUDGE = 4;
+const EVENT_LABEL_W     = 52;
 
 function clamp01(v) {
     return Math.max(0, Math.min(1, v));
@@ -420,8 +424,6 @@ function buildSvg() {
     const { horizonY, yOf } = altitudeScale({ maxAlt, minAlt, top: plotT, bottom: plotB });
 
     const xOf = (ms) => plotL + clamp01((ms - startMs) / (endMs - startMs)) * plotW;
-    // Keep marker labels clear of the plot edges (half an HH:MM at 11px).
-    const clampLabelX = (x) => Math.max(plotL + 26, Math.min(plotR - 26, x));
 
     chart.scale = { W, H, startMs, endMs, plotL, plotR, plotW, plotT, plotB, horizonY, xOf, yOf };
 
@@ -483,14 +485,22 @@ function buildSvg() {
     // hidden in polar conditions via null times.
     const riseSetTint = sunEventMarkerColor(0);
     const riseSetLabelY = Math.min(horizonY + HORIZON_LABEL_OFFSET, plotB + LABEL_MAX_BELOW_PLOT);
-    const horizonEvent = (iso) => {
+    // Each label hangs off the *day* side of its crossing — right of sunrise,
+    // left of sunset. On the 1:1 scale the trough falls away steeply on the
+    // night side, so a centred label had the curve running through its edge;
+    // below the horizon on the day side there is only fill.
+    const horizonEvent = (iso, side) => {
         if (!iso) return '';
         const ms = Date.parse(iso);
         if (isNaN(ms)) return '';
         const x = xOf(ms);
+        const labelX = side === 'rise'
+            ? Math.min(x + EVENT_LABEL_NUDGE, plotR - EVENT_LABEL_W)
+            : Math.max(x - EVENT_LABEL_NUDGE, plotL + EVENT_LABEL_W);
+        const anchor = side === 'rise' ? 'start' : 'end';
         return `<circle class="sun-chart-event" cx="${x.toFixed(1)}" cy="${horizonY.toFixed(1)}" r="2.5"
                         fill="${riseSetTint}"/>
-                <text class="sun-chart-text" x="${clampLabelX(x).toFixed(1)}" y="${riseSetLabelY.toFixed(1)}" text-anchor="middle">${fmtTime(iso)}</text>`;
+                <text class="sun-chart-text" x="${labelX.toFixed(1)}" y="${riseSetLabelY.toFixed(1)}" text-anchor="${anchor}">${fmtTime(iso)}</text>`;
     };
 
     let noonSvg = '';
@@ -540,8 +550,8 @@ function buildSvg() {
             ${depthSvg}
             <path class="sun-chart-line" d="${lineD}" fill="none" stroke="url(#sun-modal-grad)"/>
             ${axisSvg}
-            ${horizonEvent(sun.rise)}
-            ${horizonEvent(sun.set)}
+            ${horizonEvent(sun.rise, 'rise')}
+            ${horizonEvent(sun.set, 'set')}
             ${noonSvg}
             <g class="sun-chart-cursor" visibility="hidden">
                 <line y1="${plotT}" y2="${plotB}" x1="0" x2="0"/>

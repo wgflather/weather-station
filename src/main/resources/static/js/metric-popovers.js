@@ -358,6 +358,15 @@ if (globalPopup) {
     };
     window.addEventListener('scroll', reposition, { passive: true });
     window.addEventListener('resize', reposition);
+
+    // The triggers are buttons, so a keyboard user can open a popover — and
+    // needs a way back out that is not a mouse click. Focus returns to the
+    // trigger, the same as the health popover does.
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || !globalPopup.classList.contains('open')) return;
+        globalPopup.classList.remove('open');
+        globalPopup._sourceEl?.focus?.();
+    });
 }
 
 /** Binds the status circles and the dew / wetness badges. */

@@ -71,8 +71,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 </head>
-<div id="global-popup" class="details-popup"></div>
 <body th:with="d=${dashboard}">
+<div id="global-popup" class="details-popup"></div>
 
 <div class="safari-top-anchor"></div>
 <div class="safari-bottom-anchor"></div>
@@ -163,7 +163,7 @@
                 <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.5a4 4 0 1 0 4 0v-8.5a2 2 0 0 0 -4 0v8.5"/><path d="M10 9h4"/></svg>
                 <span>Temperature</span>
             </h3>
-            <span class="status-circle"></span>
+            <button class="status-circle" type="button" aria-label="Temperature reading details"></button>
             <div class="details-popup"></div>
         </div>
         <div class="unified-content">
@@ -192,7 +192,7 @@
                         <span class="dew-sub">Dew point <span class="dew-sub-val" id="dew-td">--</span>°</span>
                     </div>
                 </div>
-                <div class="dew-status-badge" id="dew-status">Caution</div>
+                <button class="dew-status-badge" id="dew-status" type="button" aria-label="Condensation risk details"><span class="dew-badge-text">--</span></button>
             </div>
         </div>
     </div>
@@ -203,7 +203,7 @@
                 <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h8.5a2.5 2.5 0 1 0 -2.34 -3.24"/><path d="M3 12h15.5a2.5 2.5 0 1 1 -2.34 3.24"/><path d="M4 16h5.5a2.5 2.5 0 1 1 -2.34 3.24"/></svg>
                 <span>Wind</span>
             </h3>
-            <span class="status-circle"></span>
+            <button class="status-circle" type="button" aria-label="Wind reading details"></button>
             <div class="details-popup"></div>
         </div>
         <div class="metric-content wind-metric-content">
@@ -235,7 +235,7 @@
                 <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M13.41 10.59l2.59 -2.59"/><path d="M7 12a5 5 0 0 1 5 -5"/></svg>
                 <span>Pressure</span>
             </h3>
-            <span class="status-circle"></span>
+            <button class="status-circle" type="button" aria-label="Pressure reading details"></button>
             <div class="details-popup"></div>
         </div>
         <div class="metric-content">
@@ -252,7 +252,7 @@
                 <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.502 19.423c2.602 2.105 6.395 2.105 8.996 0c2.602 -2.105 3.262 -5.708 1.566 -8.546l-4.89 -7.26c-.42 -.625 -1.287 -.803 -1.936 -.397a1.376 1.376 0 0 0 -.41 .397l-4.893 7.26c-1.695 2.838 -1.035 6.441 1.567 8.546z"/></svg>
                 <span>Humidity</span>
             </h3>
-            <span class="status-circle"></span>
+            <button class="status-circle" type="button" aria-label="Humidity reading details"></button>
             <div class="details-popup"></div>
         </div>
         <div class="metric-content">
@@ -276,7 +276,7 @@
                 <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/></svg>
                 <span>UV Index</span>
             </h3>
-            <span class="status-circle"></span>
+            <button class="status-circle" type="button" aria-label="UV index reading details"></button>
             <div class="details-popup"></div>
         </div>
         <div class="metric-content">

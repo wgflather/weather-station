@@ -48,17 +48,19 @@ function renderTemperatureTrend(trendResult) {
 
     el.className = '';
 
+    // "°/h" rather than a bare "/h": one character buys the unit. (Pressure's
+    // trend keeps "/h" — its "Slowly falling" label sits right beside it.)
     if (direction === 'UP') {
         el.classList.add('trend-up');
         el.innerHTML = `
             <span class="trend-arrow">↑</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}°/h</span>
         `;
     } else if (direction === 'DOWN') {
         el.classList.add('trend-down');
         el.innerHTML = `
             <span class="trend-arrow">↓</span>
-            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}/h</span>
+            <span class="trend-val">${Math.abs(changeValue).toFixed(1)}°/h</span>
         `;
     } else {
         el.classList.add('trend-stable');
@@ -161,10 +163,8 @@ function renderDewPointStatus(humidity, isMixedDew = false) {
 }
 
 // Neutral "no reading" state — bare badge class and a `--`, matching the
-// wetness badge and the rest of the card's placeholders. (The template ships
-// "Caution" as the pre-render text; once a poll lands with no dew data this
-// replaces it, since a risk word with nothing behind it is the same problem in
-// smaller form.) Clearing `_dewRisk` also disables the badge's popover:
+// wetness badge and the rest of the card's placeholders, and the template's
+// own pre-render text. Clearing `_dewRisk` also disables the badge's popover:
 // metric-popovers.js only opens it when a risk is stashed, so a click can no
 // longer surface a stale explanation.
 function resetDewBadge(badgeEl) {
@@ -217,8 +217,11 @@ function renderWind(wind) {
 
     if (wind.direction != null) {
         if (arrowEl) {
+            // `direction` is where the wind comes FROM (the meteorological
+            // convention, and what "WSW" names). The arrow points the way it
+            // blows, as most weather apps draw it, hence the half turn.
             arrowEl.textContent = '↑';
-            arrowEl.style.transform = `rotate(${wind.direction}deg)`;
+            arrowEl.style.transform = `rotate(${(wind.direction + 180) % 360}deg)`;
         }
         if (labelEl) labelEl.textContent = wind.directionLabel ?? '--';
         if (degEl)   degEl.textContent   = Math.round(wind.direction);
