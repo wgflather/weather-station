@@ -1,4 +1,8 @@
-const CACHE_NAME = 'weather-dashboard-shell-v30';
+// Filled in by Maven at build time (see <resources> in pom.xml), so every deploy
+// gets a fresh cache name and the activate handler below drops the old one —
+// no manual bump. Served straight from src/ (an IDE run without a Maven build),
+// the placeholder stays literal: still a valid, stable cache name.
+const CACHE_NAME = 'weather-dashboard-shell-@build.time@';
 
 const STATIC_PREFIXES = ['/css/', '/js/', '/img/', '/icons/'];
 const STATIC_EXACT = ['/manifest.json', '/favicon.ico'];

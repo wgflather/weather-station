@@ -457,8 +457,18 @@ circular mask or floats undersized everywhere else. ImageMagick alone cannot ras
 **The service worker caches the static shell only** — `/css/`, `/js/`, `/img/`, `/icons/`,
 the manifest and the favicon, stale-while-revalidate. It deliberately never intercepts
 `/api/**` or the HTML: the dashboard polls live data every 30 s, and a cached API response
-would show a stale reading for a whole cycle. `CACHE_NAME` must be bumped on any shell
-change, or a returning client serves the previous CSS/JS for one more load.
+would show a stale reading for a whole cycle.
+
+**`CACHE_NAME` is stamped by the build — do not bump it by hand.** `sw.js` holds
+`weather-dashboard-shell-@build.time@`, and `pom.xml` filters that one file (Boot's `@…@`
+delimiter) with a UTC `yyyyMMdd-HHmm` timestamp, so every packaged build gets a new cache name
+and the activate handler drops the old cache. Without a fresh name a returning client serves
+the previous CSS/JS for one more load; the manual bump this replaced was easy to forget. The
+cost is that a deploy with no frontend change still makes clients refetch the shell once.
+Declaring `<resources>` replaces the Boot parent's list, which is why its two
+`application*.yml` entries are repeated there — keep them if that block is edited. Served
+unbuilt (an IDE run straight from `src/`), the placeholder stays literal, which is still a
+valid name.
 
 Two iOS-standalone-only behaviours, both easy to undo by accident:
 

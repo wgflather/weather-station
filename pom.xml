@@ -36,6 +36,11 @@
     </scm>
     <properties>
         <java.version>25</java.version>
+        <!-- Stamps the service worker's cache name (static/sw.js) on every build.
+             maven.build.timestamp is not visible to resource filtering directly,
+             so it is copied into a property of our own. UTC. -->
+        <maven.build.timestamp.format>yyyyMMdd-HHmm</maven.build.timestamp.format>
+        <build.time>${maven.build.timestamp}</build.time>
     </properties>
     <dependencies>
         <dependency>
@@ -261,6 +266,33 @@
     </repositories>
 
     <build>
+        <!-- Declaring <resources> replaces spring-boot-starter-parent's list, so its
+             two entries are repeated as they are. The one addition: static/sw.js is
+             filtered too (Boot's @…@ delimiter), so its cache name carries the build
+             time and every deploy invalidates the cached CSS/JS without anyone having
+             to remember to bump it. Only sw.js — filtering all of static/ would put
+             every '@' in the frontend at risk. -->
+        <resources>
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/application*.yml</include>
+                    <include>**/application*.yaml</include>
+                    <include>**/application*.properties</include>
+                    <include>static/sw.js</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <excludes>
+                    <exclude>**/application*.yml</exclude>
+                    <exclude>**/application*.yaml</exclude>
+                    <exclude>**/application*.properties</exclude>
+                    <exclude>static/sw.js</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
