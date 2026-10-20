@@ -496,7 +496,8 @@ Two iOS-standalone-only behaviours, both easy to undo by accident:
 | File | Role |
 |---|---|
 | `sky-background.js` | Altitude-driven page gradient, browser-chrome tint, and the dynamic/static background preference. Owns `getStarAltitude()` |
-| `sky-colors.js` | Sky/sun colour ramps shared by `sky-background.js`, `sun-curve.js` and `sun-modal-chart.js` |
+| `sky-colors.js` | Sky/sun colour ramps shared by `sky-background.js`, `sun-curve.js` and `sun-modal-chart.js`, plus `altitudeScale` — the one-px-per-degree altitude → y mapping both sun arcs use |
+| `sky-picker.js` | The static-background picker: a schematic sun arc over the whole palette range (−18° to +50°) that the reader drags the sun along. Pure UI — reports altitudes; `sky-background.js` stores and applies them |
 | `star-field.js` | Atmospheric star field canvas + CSS-animated highlights |
 | `sun-curve.js` | Sun card's daily-arc SVG, its markers, and the sun/moon countdown heroes |
 | `moon-canvas.js` | Moon phase canvas renderer |
@@ -551,7 +552,7 @@ The page background gradient is driven by the current sun altitude, updated on e
 - **`computeSkyColors(altDeg)`** — linearly interpolates between bracketing anchors.
 - **`applySkyColors(colors, snap)`** — writes to CSS custom properties on `:root`. The `snap` flag bypasses the 12 s CSS transition for instant switches.
 - **`@property`** typed custom properties (`--bg-grad-top`, `--bg-grad-bottom`, `--card-bg`, etc.) enable CSS color interpolation between values.
-- **Background preference** (dynamic / static preset) is persisted in `localStorage` as `bgPreference`. Static mode uses a fixed anchor; dynamic mode follows live sun altitude. `getStarAltitude()` reads the preference to supply the correct effective altitude to the star field, and `moonAmbientFor()` uses it so a pinned preset also tints the moon disk.
+- **Background preference** is persisted in `localStorage` as `bgPreference`: `{ mode: 'dynamic' }`, or `{ mode: 'static', altitude, x }` chosen on the sky picker, so a static sky can be any colour dynamic mode shows (`x` only remembers whether the sun was left on the morning or evening half). The old `{ anchorIndex }` form from the six-preset picker is converted on load by `loadBgPreference()`. `getStarAltitude()` reads the preference to supply the correct effective altitude to the star field, and `moonAmbientFor()` uses it so a pinned sky also tints the moon disk.
 
 #### Browser chrome tint — why it is `<html>`'s background-color
 

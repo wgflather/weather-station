@@ -2515,8 +2515,13 @@ h3 {
     gap: 6px;
 }
 
-/* "Dynamic" option — horizontal full-width row */
+/* "Dynamic" option — horizontal full-width row. A <button>: these reset it. */
 .bg-swatch[data-mode="dynamic"] {
+    appearance: none;
+    font: inherit;
+    color: inherit;
+    width: 100%;
+    text-align: left;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -2542,31 +2547,12 @@ h3 {
     font-weight: var(--fw-value);
 }
 
-/* Preset grid — 3 columns */
-.bg-preset-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-}
-
-.bg-swatch[data-mode="static"] {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 4px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s var(--ease-standard);
-}
-.bg-swatch[data-mode="static"]:hover { background: rgba(255, 255, 255, 0.08); }
-
 .bg-swatch-circle {
     width: 36px;
     height: 36px;
     border-radius: 50%;
     border: 1.5px solid rgba(255, 255, 255, 0.18);
-    transition: box-shadow 0.15s var(--ease-standard);
+    flex-shrink: 0;
 }
 .bg-swatch-dynamic-circle {
     /* Night → sunset → golden → midday cycle */
@@ -2576,20 +2562,65 @@ h3 {
         rgb(62,  90, 142),
         rgb(25,  95, 175));
 }
-.bg-swatch[data-mode="static"].active .bg-swatch-circle {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95),
-                0 0 0 3.5px rgba(255, 255, 255, 0.25);
+
+.bg-picker-hint {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    margin-top: 6px;
 }
 
-.bg-swatch-label {
-    font-size: 0.60rem;
-    font-weight: var(--fw-label);
-    color: var(--text-muted);
-    white-space: nowrap;
+/* =========================================================
+   SKY PICKER — drag the sun along the arc (sky-picker.js)
+========================================================= */
+.sky-picker-svg {
+    display: block;
+    width: 100%;
+    /* Same ratio as the viewBox, so the sun marker stays round. */
+    aspect-ratio: 200 / 84;
+    border-radius: 8px;
+    border: 1px solid var(--divider);
+    cursor: grab;
+    /* A drag on a phone must move the sun, not scroll the page. */
+    touch-action: none;
 }
-.bg-swatch[data-mode="static"].active .bg-swatch-label {
-    color: var(--text-primary);
-    font-weight: var(--fw-value);
+.sky-picker-svg:active { cursor: grabbing; }
+/* Chrome outlines a focusable SVG on *any* focus, mouse included — so every
+   drag left a blue ring. Keyboard focus keeps the ring below. */
+.sky-picker-svg:focus:not(:focus-visible) { outline: none; }
+.sky-picker-svg:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
+}
+
+.sky-picker-horizon {
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+}
+
+.sky-picker-curve {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.75);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+
+.sky-picker-dot {
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.5;
+}
+
+/* Dynamic mode: the marker shows where the real sun is, not a choice. */
+.sky-picker-marker.following { opacity: 0.55; }
+.sky-picker-marker.following .sky-picker-dot { stroke-dasharray: 2 2; }
+
+.sky-picker-readout {
+    margin-top: 6px;
+    font-size: 0.68rem;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
 }
 
 /* =========================================================

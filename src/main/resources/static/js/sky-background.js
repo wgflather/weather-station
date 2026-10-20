@@ -18,6 +18,7 @@ import {
     rgbHex,
 } from './sky-colors.js';
 import { closeAllPopovers } from './metric-popovers.js';
+import { createSkyPicker, xForAltitude, ALT_MIN } from './sky-picker.js';
 
 // Supplied by initBgPreference; see the module comment.
 let getSunAltitude = () => null;
@@ -165,12 +166,12 @@ function computeSkyColors(altitudeDeg) {
 }
 
 // Returns the altitude the *displayed* sky corresponds to. When the user has
-// pinned a static background preset, the actual sun altitude is irrelevant — a
-// midday preset at night must not show stars, and a night preset at noon should
+// pinned a static background, the actual sun altitude is irrelevant — a
+// midday sky at night must not show stars, and a night sky at noon should
 // show them. Dynamic mode always uses the real sun altitude.
 export function getStarAltitude(sunAltDeg) {
     const pref = loadBgPreference();
-    if (pref.mode === 'static') return SKY_ANCHORS[pref.anchorIndex]?.alt ?? null;
+    if (pref.mode === 'static') return pref.altitude;
     return sunAltDeg;
 }
 
@@ -358,22 +359,27 @@ export function renderSkyBackground(sunAltitudeDeg) {
 }
 
 // ==========================================
-// ==========================================
 // BACKGROUND PREFERENCE
 // ==========================================
-
-const PRESET_ANCHORS = [
-    { label: 'Night',    idx: 0 },
-    { label: 'Twilight', idx: 2 },
-    { label: 'Sunset',   idx: 3 },
-    { label: 'Golden',   idx: 4 },
-    { label: 'Morning',  idx: 5 },
-    { label: 'Midday',   idx: 6 },
-];
+//
+// Stored as { mode: 'dynamic' } or { mode: 'static', altitude, x }: a static
+// background is chosen by sun altitude on the picker's arc (sky-picker.js), so
+// it can be any colour dynamic mode shows. `x` only remembers which side of
+// the arc the sun was left on — morning or evening give the same colours.
+//
+// It used to be { mode: 'static', anchorIndex } into six fixed presets;
+// loadBgPreference converts that to the anchor's altitude, so a saved choice
+// survives the change.
 
 export function loadBgPreference() {
-    try { return JSON.parse(localStorage.getItem('bgPreference') || 'null') ?? { mode: 'dynamic' }; }
-    catch { return { mode: 'dynamic' }; }
+    let pref;
+    try { pref = JSON.parse(localStorage.getItem('bgPreference') || 'null'); } catch { pref = null; }
+    if (pref?.mode !== 'static') return { mode: 'dynamic' };
+    if (typeof pref.altitude === 'number') return pref;
+    const anchor = SKY_ANCHORS[pref.anchorIndex];
+    return anchor
+        ? { mode: 'static', altitude: anchor.alt, x: xForAltitude(anchor.alt) }
+        : { mode: 'dynamic' };
 }
 
 function saveBgPreference(pref) {
@@ -383,8 +389,7 @@ function saveBgPreference(pref) {
 function applyBgPreference(pref) {
     saveBgPreference(pref);
     if (pref.mode === 'static') {
-        const a = SKY_ANCHORS[pref.anchorIndex];
-        applySkyColors(buildSkyState(a, a, 0), true);
+        applySkyColors(computeSkyColors(pref.altitude), true);
     } else {
         // Snap back to the current sun altitude so the transition is instant.
         skyBackgroundPrimed = false;
@@ -397,65 +402,73 @@ function applyBgPreference(pref) {
     onApplied?.();
 }
 
-function updateSwatchActive(pref) {
-    document.querySelectorAll('.bg-swatch').forEach(el => {
-        const active = pref.mode === el.dataset.mode &&
-            (pref.mode === 'dynamic' || String(pref.anchorIndex) === el.dataset.anchor);
-        el.classList.toggle('active', active);
-    });
-}
-
 export function initBgPreference({ getSunAltitude: gsa, onApplied: cb } = {}) {
     getSunAltitude = gsa ?? getSunAltitude;
     onApplied      = cb ?? onApplied;
     // Apply saved static preference before the first astronomy poll arrives.
     const pref = loadBgPreference();
-    if (pref.mode === 'static' && pref.anchorIndex != null) {
-        const a = SKY_ANCHORS[pref.anchorIndex];
-        applySkyColors(buildSkyState(a, a, 0), true);
-    }
+    if (pref.mode === 'static') applySkyColors(computeSkyColors(pref.altitude), true);
 
     const swatchesEl = document.getElementById('bg-pref-swatches');
     if (!swatchesEl) return;
 
-    // Dynamic option (full-width horizontal row)
-    let html = `<div class="bg-swatch" data-mode="dynamic" title="Changes with sun position">
-        <div class="bg-swatch-circle bg-swatch-dynamic-circle"></div>
-        <span class="bg-swatch-label">Dynamic — follows sun</span>
-    </div><div class="bg-preset-grid">`;
+    swatchesEl.innerHTML = `
+        <button type="button" class="bg-swatch" data-mode="dynamic" title="Changes with sun position">
+            <span class="bg-swatch-circle bg-swatch-dynamic-circle"></span>
+            <span class="bg-swatch-label">Dynamic — follows sun</span>
+        </button>
+        <div class="bg-picker-hint">Or drag the sun to fix the sky</div>
+        <div class="sky-picker"></div>`;
 
-    for (const preset of PRESET_ANCHORS) {
-        const a   = SKY_ANCHORS[preset.idx];
-        const top = `rgb(${a.top[0]},${a.top[1]},${a.top[2]})`;
-        const bot = `rgb(${a.bottom[0]},${a.bottom[1]},${a.bottom[2]})`;
-        html += `<div class="bg-swatch" data-mode="static" data-anchor="${preset.idx}" title="${preset.label}">
-            <div class="bg-swatch-circle" style="background:linear-gradient(to bottom,${top},${bot})"></div>
-            <span class="bg-swatch-label">${preset.label}</span>
-        </div>`;
-    }
-    html += '</div>';
+    const dynamicBtn = swatchesEl.querySelector('[data-mode="dynamic"]');
 
-    swatchesEl.innerHTML = html;
-    updateSwatchActive(pref);
+    const choose = (altitude, x) => {
+        applyBgPreference({ mode: 'static', altitude, x });
+        dynamicBtn.classList.remove('active');
+    };
+    const picker = createSkyPicker(swatchesEl.querySelector('.sky-picker'), {
+        // Every frame of a drag repaints the page, so the reader sees the
+        // background they are choosing rather than a thumbnail of it.
+        onInput:  choose,
+        onCommit: choose,
+    });
 
-    swatchesEl.addEventListener('click', e => {
-        const swatch = e.target.closest('.bg-swatch');
-        if (!swatch) return;
-        const newPref = swatch.dataset.mode === 'static'
-            ? { mode: 'static', anchorIndex: Number(swatch.dataset.anchor) }
-            : { mode: 'dynamic' };
-        applyBgPreference(newPref);
-        updateSwatchActive(newPref);
+    // In dynamic mode the sun sits, dimmed, where the real sun is — on the
+    // morning or evening half by the clock — so the picker always shows the
+    // sky currently on screen, and grabbing it starts from there.
+    const syncPicker = () => {
+        const p = loadBgPreference();
+        dynamicBtn.classList.toggle('active', p.mode === 'dynamic');
+        if (p.mode === 'static') {
+            picker.set({ x: p.x ?? xForAltitude(p.altitude) });
+        } else {
+            const alt  = getSunAltitude() ?? ALT_MIN;
+            const side = new Date().getHours() < 12 ? 'rise' : 'set';
+            picker.set({ x: xForAltitude(alt, side), following: true });
+        }
+    };
+    syncPicker();
+
+    dynamicBtn.addEventListener('click', () => {
+        applyBgPreference({ mode: 'dynamic' });
+        syncPicker();
     });
 
     const btn     = document.getElementById('bg-pref-btn');
     const popover = document.getElementById('bg-pref-popover');
     if (!btn || !popover) return;
 
+    // Interacting inside the popover must not count as an outside click: a drag
+    // that ends anywhere still fires a click, which would close it mid-choice.
+    popover.addEventListener('click', e => e.stopPropagation());
+
     btn.addEventListener('click', e => {
         e.stopPropagation();
         const opening = !popover.classList.contains('open');
-        if (opening) closeAllPopovers('bgpref');
+        if (opening) {
+            closeAllPopovers('bgpref');
+            syncPicker();
+        }
         popover.classList.toggle('open', opening);
         btn.setAttribute('aria-expanded', String(opening));
         popover.setAttribute('aria-hidden', String(!opening));

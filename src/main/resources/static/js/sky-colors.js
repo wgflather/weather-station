@@ -214,20 +214,30 @@ export function sunEventMarkerColor(altitude) {
 // sky regardless of the page's dynamic/static background preference (the moon
 // disc's daylight wash, the sun modal chart's curve).
 export function skyBottomRgbAt(altitudeDeg) {
+    return skyAnchorRgbAt(altitudeDeg, 'bottom');
+}
+
+// The matching top-of-sky colour — what the page gradient starts from. The
+// background picker needs both ends to preview a whole background.
+export function skyTopRgbAt(altitudeDeg) {
+    return skyAnchorRgbAt(altitudeDeg, 'top');
+}
+
+function skyAnchorRgbAt(altitudeDeg, key) {
     if (altitudeDeg == null) return null;
     const first = SKY_ANCHORS[0];
     const last  = SKY_ANCHORS[SKY_ANCHORS.length - 1];
-    if (altitudeDeg <= first.alt) return first.bottom.slice();
-    if (altitudeDeg >= last.alt)  return last.bottom.slice();
+    if (altitudeDeg <= first.alt) return first[key].slice();
+    if (altitudeDeg >= last.alt)  return last[key].slice();
     for (let i = 0; i < SKY_ANCHORS.length - 1; i++) {
         const lo = SKY_ANCHORS[i];
         const hi = SKY_ANCHORS[i + 1];
         if (altitudeDeg >= lo.alt && altitudeDeg <= hi.alt) {
             const t = (altitudeDeg - lo.alt) / (hi.alt - lo.alt);
-            return lerpTriplet(lo.bottom, hi.bottom, t);
+            return lerpTriplet(lo[key], hi[key], t);
         }
     }
-    return last.bottom.slice();
+    return last[key].slice();
 }
 
 // ---- RGB triplet formatting ----------------------------------------------
