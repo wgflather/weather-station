@@ -17,6 +17,21 @@
 ========================================================= */
 const LABEL_PADDING = 2;
 
+// H / L text is a lighter tint of its pin's colour, the way the temperature
+// card sets Min / Max in pale blue and peach rather than the saturated pin
+// hues. The saturated colours suit a dot but not a letter: the temperature
+// low's #3b82f6 is the same mid-blue as the daytime sky behind it. Pins keep
+// the full colour; only the text is lifted.
+const LABEL_TINT = 0.25;
+
+function labelTint(color) {
+    const m = /^#([0-9a-f]{6})$/i.exec(color ?? '');
+    if (!m) return color;
+    const n = parseInt(m[1], 16);
+    const lift = (c) => Math.round(c + (255 - c) * LABEL_TINT);
+    return `rgb(${lift(n >> 16)}, ${lift((n >> 8) & 255)}, ${lift(n & 255)})`;
+}
+
 // Estimate the on-screen box a label will occupy
 export function measureLabel(ctx, text, font) {
     ctx.font = font;
@@ -221,9 +236,9 @@ const minMaxLabelsPlugin = {
         const maxIsNow = validMinMax && maxIndex === latestIndex;
 
         const { ctx, chartArea } = chart;
-        const hlFont   = isMobile ? '700 8px Figtree' : '700 13px Figtree';
-        const nowFont  = isMobile ? '700 8px Figtree' : '700 12px Figtree';
-        const gap      = isMobile ? 9 : 16;
+        const hlFont   = isMobile ? '700 10px Figtree' : '700 13px Figtree';
+        const nowFont  = isMobile ? '700 10px Figtree' : '700 12px Figtree';
+        const gap      = isMobile ? 11 : 16;
         const fixedGap = isMobile ? 14 : 16;
 
         let visible;
@@ -426,9 +441,18 @@ const minMaxLabelsPlugin = {
         ctx.save();
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
+        // A soft dark glow behind every glyph. The card is a 9 % white veil
+        // over the live sky, so the backdrop runs from night navy to pale
+        // daytime blue, and the label colours span both ends (white "Now",
+        // pale pressure, deep-blue temperature low) — no fill colour reads
+        // against all of it. Diffuse rather than a hard outline: nothing else
+        // in the UI is stroked, while soft glows are the chart's own language
+        // (see the line glow in weather-chart.js).
+        ctx.shadowColor = 'rgba(8, 13, 30, 0.55)';
+        ctx.shadowBlur  = 6;
         labels.forEach(label => {
             ctx.font      = label.font;
-            ctx.fillStyle = label.color;
+            ctx.fillStyle = labelTint(label.color);
             ctx.fillText(label.text, label.x, label.y);
         });
         ctx.restore();

@@ -18,6 +18,11 @@ import { installPointerHandlers, externalTooltipHandler } from './chart-interact
 
 const chartInstances = new Map();
 
+/** "10-min avg", or "hourly avg" — what one point on the chart is an average of. */
+function bucketLabel(resolutionMinutes) {
+    return resolutionMinutes >= 60 ? 'hourly avg' : `${resolutionMinutes}-min avg`;
+}
+
 
 /* =========================================================
    CHART STATE
@@ -348,16 +353,21 @@ function createChart(canvasElement, state) {
                                 return ' No data recorded';
                             }
 
+                            // H and L mark the extreme *bucket average*, not the extreme
+                            // reading — so they sit below the temperature card's Max and
+                            // above its Min, which come from raw rows. Saying so here is
+                            // what stops the two looking like they disagree.
                             let suffix = '';
                             if (st.validMinMax) {
-                                const idx = context.dataIndex;
+                                const idx    = context.dataIndex;
+                                const bucket = bucketLabel(st.resolutionMinutes);
                                 if (st.scenario === 'triple'
                                     && (idx === st.maxIndex || idx === st.minIndex || idx === st.latestIndex)) {
-                                    suffix = ' (Max/Min Peak)';
+                                    suffix = ` (High & low · ${bucket})`;
                                 } else if (idx === st.maxIndex) {
-                                    suffix = ' (Today Highest)';
+                                    suffix = ` (High · ${bucket})`;
                                 } else if (idx === st.minIndex) {
-                                    suffix = ' (Today Lowest)';
+                                    suffix = ` (Low · ${bucket})`;
                                 }
                             }
 
