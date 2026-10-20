@@ -3299,12 +3299,15 @@ h3 {
         justify-content: center;
     }
 
-    /* The two columns were equal halves, but the left only holds "4.6 m/s" —
-       so the right got ~35-45px for a direction line that needs ~75, and
-       clipped "(240°)" at the card edge. The left now takes only what it
-       needs, and the direction line may wrap rather than clip. */
-    .wind-left            { padding-right: 10px; flex: 0 1 auto; }
-    .wind-right           { padding-left: 10px; }
+    /* Equal halves, as on desktop, with the direction line allowed to wrap
+       rather than clip "(240°)" at the card edge. The speed column briefly
+       shrank to its content instead, to keep that line on one row — which on
+       an iPhone 14 left "4.3" 34px of a 126px card, pinned to the divider.
+       Wrapping costs one line on the right; the speed gets its space back.
+       min-width keeps the number whole on the narrowest phones, where half
+       the card is less than it. */
+    .wind-left            { padding-right: 10px; flex: 1 1 0; min-width: max-content; }
+    .wind-right           { padding-left: 10px;  flex: 1 1 0; }
     .wind-direction-line  { flex-wrap: wrap; gap: 0 4px; }
     .wind-direction-arrow { font-size: 0.75rem; }
     .wind-direction-label { font-size: 0.75rem; }
