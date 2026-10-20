@@ -208,6 +208,29 @@ export function resolveCollisionScenario(metric, chartPoints, minIndex, maxIndex
     return 'none';
 }
 
+// "Now" for a stale sensor sits on the now line, not on a reading, so it is
+// set in the dashed bridge's slate rather than the white of the live pin: it
+// names a time, and has no value of its own to vouch for.
+const NOW_DETACHED_COLOR = '#94a3b8';
+
+// The "Now" label. Live, it hangs off the latest reading's pin. Stale
+// (`nowDetached`, set by weather-chart.js when the dashed trailing bridge is
+// drawn), it moves to where that bridge meets the now line — the latest pin
+// stays where it is, marking where the data ends.
+function buildNowLabel(chart, nowEl, preferAbove, gap, font) {
+    const st = chart.$state;
+    const base = { key: 'now', text: 'Now', font, gap, ...measureLabel(chart.ctx, 'Now', font) };
+    if (!st?.nowDetached) {
+        return { ...base, point: nowEl, color: '#ffffff', preferAbove };
+    }
+    const { x, y } = chart.scales;
+    const point = {
+        x: x.getPixelForValue(st.today),
+        y: y.getPixelForValue(st.chartPoints[st.latestIndex].y),
+    };
+    return { ...base, point, color: NOW_DETACHED_COLOR, preferAbove: true };
+}
+
 const minMaxLabelsPlugin = {
     id: 'minMaxLabels',
 
@@ -269,6 +292,15 @@ const minMaxLabelsPlugin = {
             placeFixedOffsetLabel(lLabel, chartArea);
             visible = [hLabel, lLabel];
 
+            // Live, the pin itself is "now" and goes unlabelled here. Stale,
+            // now is somewhere else on the axis and has to say so.
+            if (showNow && chart.$state?.nowDetached) {
+                const nowLabel = buildNowLabel(chart, nowEl, true, gap, nowFont);
+                placeLabel(nowLabel, chartArea);
+                resolveLabelOverlaps([nowLabel, hLabel, lLabel], chartArea);
+                visible.push(nowLabel);
+            }
+
         } else if (scenario === 'maxAbsorbed') {
             // H collapses onto "Now" — ring Now in H's color, pin "H" 14px
             // above it, and render "L" + "Now" normally
@@ -292,12 +324,11 @@ const minMaxLabelsPlugin = {
             placeLabel(lLabel, chartArea);
 
             if (showNow) {
-                const nowLabel = {
-                    key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
-                    gap, preferAbove: false, ...measureLabel(ctx, 'Now', nowFont),
-                };
+                const nowLabel = buildNowLabel(chart, nowEl, false, gap, nowFont);
                 placeLabel(nowLabel, chartArea);
-                resolveLabelOverlaps([nowLabel, lLabel], chartArea);
+                // Detached, "Now" is no longer stacked on the H pin by design,
+                // so it can run into H as well as L.
+                resolveLabelOverlaps(chart.$state?.nowDetached ? [nowLabel, lLabel, hLabel] : [nowLabel, lLabel], chartArea);
                 visible = [hLabel, nowLabel, lLabel];
             } else {
                 visible = [hLabel, lLabel];
@@ -326,12 +357,9 @@ const minMaxLabelsPlugin = {
             placeLabel(hLabel, chartArea);
 
             if (showNow) {
-                const nowLabel = {
-                    key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
-                    gap, preferAbove: true, ...measureLabel(ctx, 'Now', nowFont),
-                };
+                const nowLabel = buildNowLabel(chart, nowEl, true, gap, nowFont);
                 placeLabel(nowLabel, chartArea);
-                resolveLabelOverlaps([nowLabel, hLabel], chartArea);
+                resolveLabelOverlaps(chart.$state?.nowDetached ? [nowLabel, hLabel, lLabel] : [nowLabel, hLabel], chartArea);
                 visible = [lLabel, nowLabel, hLabel];
             } else {
                 visible = [lLabel, hLabel];
@@ -394,11 +422,7 @@ const minMaxLabelsPlugin = {
             if (nowEl && showNow) {
                 // When "Now" lands on the same point as H, put "Now" on the
                 // opposite side so both labels sit cleanly above/below the pin
-                candidates.push({
-                    key: 'now', point: nowEl, text: 'Now', color: '#ffffff', font: nowFont,
-                    gap, preferAbove: !maxIsNow,
-                    ...measureLabel(ctx, 'Now', nowFont),
-                });
+                candidates.push(buildNowLabel(chart, nowEl, !maxIsNow, gap, nowFont));
             }
 
             candidates.forEach(label => placeLabel(label, chartArea));

@@ -12,11 +12,19 @@ import { clampAxisBounds } from './chart-metrics.js';
 /* =========================================================
    GAP DETECTION — inserts null sentinels into main dataset
 ========================================================= */
+// How far apart two buckets may be before the line breaks into a gap. Also
+// decides when the chart's "Now" label leaves the last reading for the now
+// line (weather-chart.js), so the label moves exactly when the dashed
+// trailing bridge appears.
+export function gapThresholdMs(resolutionMinutes) {
+    return resolutionMinutes * 60 * 1000 * 2.5;
+}
+
 export function insertGapNulls(rawPoints, resolutionMinutes) {
     if (rawPoints.length < 2) return rawPoints;
 
     const result       = [];
-    const gapThreshold = resolutionMinutes * 60 * 1000 * 2.5;
+    const gapThreshold = gapThresholdMs(resolutionMinutes);
 
     for (let i = 0; i < rawPoints.length; i++) {
         result.push(rawPoints[i]);
@@ -44,7 +52,7 @@ export function insertGapNulls(rawPoints, resolutionMinutes) {
 export function extractGapSegments(rawPoints, resolutionMinutes, startRange, now) {
     if (!rawPoints.length) return [];
 
-    const gapThreshold = resolutionMinutes * 60 * 1000 * 2.5;
+    const gapThreshold = gapThresholdMs(resolutionMinutes);
     const segments     = [];
 
     // Leading gap: start of day -> first reading

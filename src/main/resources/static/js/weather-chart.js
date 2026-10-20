@@ -11,6 +11,7 @@ import {
     getDynamicYBounds,
     getMinMaxPoints,
     hasEnoughDataDuration,
+    gapThresholdMs,
 } from './chart-series.js';
 // Imported for its side effect too: registers the 'minMaxLabels' plugin.
 import { measureLabel, resolveCollisionScenario } from './chart-labels.js';
@@ -113,6 +114,13 @@ function computeChartState(backendData, metric, resolutionMinutes, options = {})
         if (apiNowIdx !== -1) latestIndex = apiNowIdx;
     }
 
+    // Stale sensor: the last reading is far enough behind now that a dashed
+    // bridge runs from it to the now line. "Now" then belongs on that line —
+    // left on the last reading it named a point hours old as the present.
+    const latestPoint = chartPoints[latestIndex];
+    const nowDetached = showNow && !apiMode && latestPoint?.y != null
+        && today.getTime() - latestPoint.x.getTime() > gapThresholdMs(resolutionMinutes);
+
     const scenario = resolveCollisionScenario(
         metric, chartPoints, minIndex, maxIndex, latestIndex,
         validMinMax, resolutionMinutes, config
@@ -123,7 +131,7 @@ function computeChartState(backendData, metric, resolutionMinutes, options = {})
         today, startRange, endRange,
         xUnit, xTickStep,
         chartPoints, gapPoints, yBounds,
-        minIndex, maxIndex, latestIndex,
+        minIndex, maxIndex, latestIndex, nowDetached,
         showMinMax, validMinMax, scenario,
     };
 }
