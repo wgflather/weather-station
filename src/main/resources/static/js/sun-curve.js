@@ -7,39 +7,28 @@
 // dashboard state. The altitude -> y geometry comes from sky-colors.js so the
 // card and the sun modal chart plot the same shape.
 
-import { altitudeCurveY, sunAppearanceAt, sunEventMarkerColor, rgbString, rgbaString } from './sky-colors.js';
+import { altitudeScale, sunAppearanceAt, sunEventMarkerColor, rgbString, rgbaString } from './sky-colors.js';
 import { formatTimeOfDay, formatDuration } from './time-format.js';
 
 // SVG viewBox dimensions for the daily-arc curve. preserveAspectRatio is
 // 'none' on the element so width stretches with the card while height
 // stays at 70px. Marker / label positioning uses these same logical
-// units (HORIZON_Y_VB is in viewBox y, but since the SVG is 70px tall
-// with a 70-unit-tall viewBox, the y values double as pixel offsets
-// inside the wrapper).
+// units (viewBox y, but since the SVG is 70px tall with a 70-unit-tall
+// viewBox, the y values double as pixel offsets inside the wrapper).
 const CURVE_W_VB = 300;
-const CURVE_H_VB = 70;
-// Horizon sits 60% down so the daytime arc gets ~1.5× the vertical room
-// of the night dip — matches what people expect (day is the part that
-// matters; the trough below is context).
-const CURVE_HORIZON_Y = 42;
-const CURVE_ABOVE_PADDING = 0.88;
-// Below-horizon depth is intentionally shallow (0.25) so the trough reads
-// as a gentle suggestion of nighttime rather than a sharp V-shape.
-const CURVE_BELOW_PADDING = 0.25;
+// Room above the noon marker, and the lowest the trough may reach — the
+// wrapper is 62px tall, and the SVG overflowing it would run into the card's
+// bottom padding.
+const CURVE_TOP_Y    = 6;
+const CURVE_BOTTOM_Y = 60;
+// The horizon may sit no lower than this: rise/set labels hang 12px below it
+// and still have to fit the card. On a day with a shallow night the cap binds
+// and the whole curve scales down with it, so the 1:1 ratio is kept.
+const CURVE_MAX_HORIZON_Y = 42;
 
 // Scale memoised from the daily render so the per-tick "now" marker
 // reposition doesn't rescan the points list.
 let sunCurveScale = null;
-
-function altitudeToY(altDeg, maxAlt, minAlt) {
-    return altitudeCurveY(altDeg, {
-        maxAlt,
-        minAlt,
-        horizonY:     CURVE_HORIZON_Y,
-        aboveExtent:  CURVE_HORIZON_Y * CURVE_ABOVE_PADDING,
-        belowExtent: (CURVE_H_VB - CURVE_HORIZON_Y) * CURVE_BELOW_PADDING,
-    });
-}
 
 function timeToXPercent(isoTime, startMs, endMs) {
     const ms = new Date(isoTime).getTime();
@@ -65,7 +54,20 @@ export function renderSunCurve(sun) {
     const startMs = new Date(points[0].time).getTime();
     const endMs   = new Date(points[points.length - 1].time).getTime();
 
-    sunCurveScale = { maxAlt, minAlt, startMs, endMs };
+    const { horizonY, yOf } = altitudeScale({
+        maxAlt,
+        minAlt,
+        top:         CURVE_TOP_Y,
+        bottom:      CURVE_BOTTOM_Y,
+        maxHorizonY: CURVE_MAX_HORIZON_Y,
+    });
+    sunCurveScale = { yOf, horizonY, startMs, endMs };
+
+    const horizon = svg.querySelector('.astro-curve-horizon');
+    if (horizon) {
+        horizon.setAttribute('y1', horizonY.toFixed(1));
+        horizon.setAttribute('y2', horizonY.toFixed(1));
+    }
 
     // Path is sampled every ~10 minutes (embedded curve is 1-min
     // resolution; ~144 segments draw a smooth arc at card size without
@@ -75,15 +77,15 @@ export function renderSunCurve(sun) {
     let pathD = '';
     for (let i = 0; i < N; i += step) {
         const x = (i / (N - 1)) * CURVE_W_VB;
-        const y = altitudeToY(points[i].altitude, maxAlt, minAlt);
+        const y = yOf(points[i].altitude);
         pathD += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
     }
-    pathD += 'L' + CURVE_W_VB + ',' + altitudeToY(points[N - 1].altitude, maxAlt, minAlt).toFixed(1);
+    pathD += 'L' + CURVE_W_VB + ',' + yOf(points[N - 1].altitude).toFixed(1);
     svg.querySelector('.astro-curve-path').setAttribute('d', pathD);
 
     // Rise / noon / set markers + their time labels. The viewBox y range
-    // [0, 70] equals the SVG's rendered pixel height, so altitudeToY's
-    // output doubles as a top offset in pixels relative to the wrapper.
+    // [0, 70] equals the SVG's rendered pixel height, so yOf's output
+    // doubles as a top offset in pixels relative to the wrapper.
     placeSunMarker('sun-marker-rise', 'sun-label-rise', sun.rise, 0);
     placeSunMarker('sun-marker-set',  'sun-label-set',  sun.set,  0);
     placeSunMarker(
@@ -108,9 +110,9 @@ function placeSunMarker(markerId, labelId, isoTime, altitudeDeg) {
         return;
     }
 
-    const { maxAlt, minAlt, startMs, endMs } = sunCurveScale;
+    const { yOf, horizonY, startMs, endMs } = sunCurveScale;
     const xPercent = timeToXPercent(isoTime, startMs, endMs);
-    const yPx = altitudeToY(altitudeDeg, maxAlt, minAlt);
+    const yPx = yOf(altitudeDeg);
 
     marker.style.display = '';
     marker.style.left = `${xPercent}%`;
@@ -121,12 +123,14 @@ function placeSunMarker(markerId, labelId, isoTime, altitudeDeg) {
     // reference point — the full-saturation sun belongs to the "now" marker.
     marker.style.background = sunEventMarkerColor(altitudeDeg);
 
-    // Label sits LABEL_OFFSET_PX below the marker's centre. The tick
-    // ::before pseudo-element bridges the gap visually.
+    // All three labels share one row just under the horizon. Hanging the noon
+    // label under its own marker no longer works on the 1:1 scale: a low
+    // winter arc is only ~20px tall, and the label landed on the horizon line.
+    // Rise/set sit on the horizon anyway, so this only moves noon.
     label.style.display = '';
     label.textContent   = formatTimeOfDay(isoTime);
     label.style.left    = `${xPercent}%`;
-    label.style.top     = `${yPx + LABEL_OFFSET_PX}px`;
+    label.style.top     = `${Math.max(yPx, horizonY) + LABEL_OFFSET_PX}px`;
 }
 
 export function updateSunNowMarker(currentAltitude) {
@@ -136,11 +140,11 @@ export function updateSunNowMarker(currentAltitude) {
         el.style.display = 'none';
         return;
     }
-    const { maxAlt, minAlt, startMs, endMs } = sunCurveScale;
+    const { yOf, startMs, endMs } = sunCurveScale;
     const t = Math.max(0, Math.min(1, (Date.now() - startMs) / (endMs - startMs)));
     el.style.display = '';
     el.style.left = `${(t * 100).toFixed(2)}%`;
-    el.style.top  = `${altitudeToY(currentAltitude, maxAlt, minAlt)}px`;
+    el.style.top  = `${yOf(currentAltitude)}px`;
 
     applySunMarkerAppearance(el, currentAltitude);
 }

@@ -1,8 +1,8 @@
 // Shared sun-altitude model. Single source of truth for the live page
 // background (fetch-data.js) and anything else that wants to render "the
 // color of the sky right now" — e.g. the sun modal chart's curve. Also
-// holds the altitude → y geometry both daily arcs plot with, so the card
-// and the modal chart draw the same shape.
+// holds the altitude → y scale both daily arcs plot with, so the card and
+// the modal chart draw the same shape.
 //
 // Anchor table: each row defines, for a given sun altitude (degrees), the
 // top/bottom sky gradient colors plus the card surface and accent (border +
@@ -66,35 +66,27 @@ export function skyBrightnessForAltitude(altitudeDeg) {
 // DAILY ARC GEOMETRY
 // ==========================================
 
-// Smooth stand-in for Math.abs: equals |x| away from zero, but rounds through
-// zero instead of forming a point. `knee` sets how wide that rounding is.
-function softAbs(x, knee) {
-    return Math.sqrt(x * x + knee * knee) - knee;
-}
-
-// Degrees of altitude the horizon crossing is rounded over.
-const CURVE_KNEE_DEG = 7;
-
 /**
- * Maps a sun altitude to a y coordinate on the daily arc — shared by the sun
- * card and the modal chart so both plot the same shape.
+ * The altitude -> y mapping both daily arcs plot with: one linear scale, the
+ * same number of pixels per degree above and below the horizon, so a 30° noon
+ * and a −50° midnight are drawn at their true proportions.
  *
- * The day arc deliberately gets much more vertical room than the night
- * trough (the arc is the point; the trough is context). Drawn as two
- * straight lines meeting at the horizon, that difference is a ~5x slope jump
- * at exactly 0°, which renders as a visible corner where the curve crosses
- * the horizon — obvious when zoomed in or on a small screen. Blending the
- * two slopes through softAbs keeps both far-field gradients intact but
- * rounds the join, so the curve reads as one smooth arc.
+ * It used to give the day arc several times the room of the night trough, which
+ * read well but misstated the sun's position — a −50° night looked shallower
+ * than a 30° noon. The horizon now sits wherever the day's range puts it.
+ *
+ * `maxHorizonY` caps how far down the horizon may sit, for a caller that needs
+ * room below it (the card hangs its rise/set labels there). When the cap binds,
+ * the whole scale shrinks rather than the trough alone, so the ratio holds.
+ * Callers guarantee maxAlt > 0 > minAlt.
  */
-export function altitudeCurveY(altDeg, { maxAlt, minAlt, horizonY, aboveExtent, belowExtent }) {
-    // Steepness of the trough relative to the arc. Away from the horizon the
-    // blend below resolves to exactly these two linear slopes.
-    const ratio = (belowExtent / Math.abs(minAlt)) / (aboveExtent / maxAlt);
-    const shape = (a) => 0.5 * (1 + ratio) * a + 0.5 * (1 - ratio) * softAbs(a, CURVE_KNEE_DEG);
-    // Normalised so the peak still lands exactly on aboveExtent despite the
-    // rounding shaving a little off the shape function.
-    return horizonY - (aboveExtent / shape(maxAlt)) * shape(altDeg);
+export function altitudeScale({ maxAlt, minAlt, top, bottom, maxHorizonY = bottom }) {
+    const pxPerDeg = Math.min(
+        (maxHorizonY - top) / maxAlt,
+        (bottom - top) / (maxAlt - minAlt),
+    );
+    const horizonY = top + maxAlt * pxPerDeg;
+    return { horizonY, yOf: (altDeg) => horizonY - altDeg * pxPerDeg };
 }
 
 // ==========================================

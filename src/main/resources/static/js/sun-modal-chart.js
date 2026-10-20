@@ -23,7 +23,7 @@
 //   destroySunModalChart()
 //       — idempotent teardown; must run before rebuilds and on modal close.
 
-import { skyBottomRgbAt, sunAppearanceAt, sunEventMarkerColor, altitudeCurveY } from './sky-colors.js';
+import { skyBottomRgbAt, sunAppearanceAt, sunEventMarkerColor, altitudeScale } from './sky-colors.js';
 
 const rgbCss = ([r, g, b]) => `rgb(${r}, ${g}, ${b})`;
 
@@ -147,12 +147,11 @@ function buildGradientStops(sun, startMs, endMs) {
 const PAD_X      = 8;
 const PAD_TOP    = 34;   // headroom for the peak label chip above the curve
 const PAD_BOTTOM = 28;   // room for the time axis
-// Same vertical philosophy as the card curve: horizon 60% down, daytime arc
-// slightly padded — but a deeper night trough (0.60 vs the card's 0.25) so
-// the −18° depth line has honest meaning at modal size.
-const HORIZON_FRACTION = 0.60;
-const ABOVE_PADDING    = 0.88;
-const BELOW_PADDING    = 0.60;
+// Rise/set labels hang this far below the horizon, but never lower than
+// LABEL_MAX_BELOW_PLOT past the plot — on a shallow-night day the horizon sits
+// near the bottom, and the label would otherwise land on the time axis.
+const HORIZON_LABEL_OFFSET  = 16;
+const LABEL_MAX_BELOW_PLOT  = 6;
 
 function clamp01(v) {
     return Math.max(0, Math.min(1, v));
@@ -416,16 +415,11 @@ function buildSvg() {
     const plotW = plotR - plotL;
     const plotT = PAD_TOP;
     const plotB = H - PAD_BOTTOM;
-    const horizonY = plotT + (plotB - plotT) * HORIZON_FRACTION;
+    // Same 1:1 scale as the card: the peak touches plotT, the trough plotB,
+    // and the horizon falls wherever the day's range puts it.
+    const { horizonY, yOf } = altitudeScale({ maxAlt, minAlt, top: plotT, bottom: plotB });
 
     const xOf = (ms) => plotL + clamp01((ms - startMs) / (endMs - startMs)) * plotW;
-    const yOf = (alt) => altitudeCurveY(alt, {
-        maxAlt,
-        minAlt,
-        horizonY,
-        aboveExtent: (horizonY - plotT) * ABOVE_PADDING,
-        belowExtent: (plotB - horizonY) * BELOW_PADDING,
-    });
     // Keep marker labels clear of the plot edges (half an HH:MM at 11px).
     const clampLabelX = (x) => Math.max(plotL + 26, Math.min(plotR - 26, x));
 
@@ -488,6 +482,7 @@ function buildSvg() {
     // through sunEventMarkerColor) so the two charts share one language;
     // hidden in polar conditions via null times.
     const riseSetTint = sunEventMarkerColor(0);
+    const riseSetLabelY = Math.min(horizonY + HORIZON_LABEL_OFFSET, plotB + LABEL_MAX_BELOW_PLOT);
     const horizonEvent = (iso) => {
         if (!iso) return '';
         const ms = Date.parse(iso);
@@ -495,7 +490,7 @@ function buildSvg() {
         const x = xOf(ms);
         return `<circle class="sun-chart-event" cx="${x.toFixed(1)}" cy="${horizonY.toFixed(1)}" r="2.5"
                         fill="${riseSetTint}"/>
-                <text class="sun-chart-text" x="${clampLabelX(x).toFixed(1)}" y="${(horizonY + 16).toFixed(1)}" text-anchor="middle">${fmtTime(iso)}</text>`;
+                <text class="sun-chart-text" x="${clampLabelX(x).toFixed(1)}" y="${riseSetLabelY.toFixed(1)}" text-anchor="middle">${fmtTime(iso)}</text>`;
     };
 
     let noonSvg = '';
