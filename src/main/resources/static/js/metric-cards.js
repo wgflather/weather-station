@@ -25,7 +25,7 @@ import {
     SURFACE_WETNESS_CONFIG,
     UV_CSS,
 } from './dashboard-constants.js';
-import { populatePopup, setStatusCircleColor } from './metric-popovers.js';
+import { populatePopup, setStatusCircleColor, healthColor } from './metric-popovers.js';
 
 // ==========================================
 // TEMPERATURE
@@ -179,13 +179,16 @@ function resetDewBadge(badgeEl) {
 // SURFACE WETNESS LINE (inside humidity card)
 // ==========================================
 
-function renderSurfaceWetness(wetness) {
+function renderSurfaceWetness(wetness, dataStatus) {
     const badgeEl = document.getElementById('wetness-badge');
     const textEl  = document.getElementById('wetness-status-text');
+    const dotEl   = badgeEl?.querySelector('.wetness-status-dot');
 
     if (!badgeEl) return;
 
     badgeEl._wetnessData = wetness ?? null;
+    badgeEl._dataStatus  = dataStatus ?? null;
+    if (dotEl) dotEl.style.background = '';
 
     const status = wetness?.surfaceWetnessStatus;
 
@@ -198,8 +201,24 @@ function renderSurfaceWetness(wetness) {
     }
 
     const config = SURFACE_WETNESS_CONFIG[status] ?? SURFACE_WETNESS_CONFIG.DRY;
-    badgeEl.className  = `wetness-status-badge ${config.cssClass}`;
     textEl.textContent = config.label;
+
+    // The dot sits where every other card has its status circle, so it is
+    // read as one: a green "Dry" over a reading hours old looked healthy
+    // while every card around it glowed orange. When the reading is stale or
+    // flagged, the dot takes the circle's colour and the word goes neutral —
+    // it is still the last status measured, just no longer vouched for.
+    const quality  = wetness?.dataDetails?.quality;
+    const external = wetness?.dataDetails?.dataProvider === 'EXTERNAL_API';
+    const stale    = !external && dataStatus && dataStatus !== 'LIVE';
+    const faulty   = quality && quality !== 'OK' && quality !== 'NOT_CONFIGURED';
+    if (stale || faulty) {
+        badgeEl.className = 'wetness-status-badge wetness-unverified';
+        if (dotEl) dotEl.style.background = healthColor(quality, external ? null : dataStatus);
+        return;
+    }
+
+    badgeEl.className = `wetness-status-badge ${config.cssClass}`;
 }
 
 // ==========================================
@@ -307,7 +326,7 @@ export function renderMetrics(dto, dataStatus) {
     renderTemperature(temp);
     renderPressure(pressure);
     renderHumidity(humidity, isMixedDew);
-    renderSurfaceWetness(wetness);
+    renderSurfaceWetness(wetness, dataStatus);
     renderWind(wind);
     renderUvIndex(uv);
 

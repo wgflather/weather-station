@@ -78,23 +78,15 @@ function formatArrivedAt(value) {
     return value ?? '--';
 }
 
-// `cardId` is only used to locate this metric's slice of the shared quality
-// payload; it is optional so the other popup builders can keep calling this
-// without one.
-function buildPopupHTML(details, dataStatus, cardId) {
-    if (details.dataProvider === 'EXTERNAL_API') {
-        // API-backed cards are independent of MQTT sensor freshness — see
-        // buildApiPopupHTML. Open-Meteo values never pass through
-        // DataQualityValidator either, so there is no quality history to show.
-        return buildApiPopupHTML(details);
-    }
-
-    const qColor    = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
+// The "Data Freshness" block shown under a sensor reading whenever the feed is
+// behind. Shared by the status-circle popovers and the wetness badge's, so a
+// stale wetness reading explains itself the same way the cards' readings do.
+function freshnessSectionHTML(dataStatus, arrivedAt) {
+    if (!dataStatus || dataStatus === 'LIVE') return '';
     const dsColor   = DATA_STATUS_COLORS[dataStatus] ?? '#6b7280';
     const dsInfo    = DATA_STATUS_INFO[dataStatus];
-    const timeSince = formatTimeSince(details.arrivedAt);
-
-    const freshnessSection = (dataStatus && dataStatus !== 'LIVE') ? `
+    const timeSince = formatTimeSince(arrivedAt);
+    return `
         <div class="popup-divider"></div>
         <div class="popup-heading" style="margin-top:8px;">Data Freshness</div>
         <div class="popup-row">
@@ -110,7 +102,22 @@ function buildPopupHTML(details, dataStatus, cardId) {
             <span class="popup-key">Note</span>
             <span class="popup-val" style="text-align:left; line-height:1.5; font-weight:400;">${dsInfo?.description ?? ''}</span>
         </div>
-    ` : '';
+    `;
+}
+
+// `cardId` is only used to locate this metric's slice of the shared quality
+// payload; it is optional so the other popup builders can keep calling this
+// without one.
+function buildPopupHTML(details, dataStatus, cardId) {
+    if (details.dataProvider === 'EXTERNAL_API') {
+        // API-backed cards are independent of MQTT sensor freshness — see
+        // buildApiPopupHTML. Open-Meteo values never pass through
+        // DataQualityValidator either, so there is no quality history to show.
+        return buildApiPopupHTML(details);
+    }
+
+    const qColor           = DATA_QUALITY_COLORS[details.quality] ?? DATA_QUALITY_COLORS.MISSING;
+    const freshnessSection = freshnessSectionHTML(dataStatus, details.arrivedAt);
 
     return `
         <div class="popup-heading">${details.metricName ?? '--'} — Last Measurement</div>
@@ -195,6 +202,19 @@ function buildDewRiskPopupHTML(risk, isMixed = false) {
     `;
 }
 
+/**
+ * The status circle's colour for a sensor reading: whichever of freshness and
+ * quality is worse. Exported for the wetness badge, which has no circle of its
+ * own but must not show a healthy colour over a stale or faulty reading.
+ */
+export function healthColor(quality, dataStatus) {
+    const qSev = QUALITY_SEVERITY[quality]   ?? 0;
+    const dSev = STATUS_SEVERITY[dataStatus] ?? 0;
+    return (dSev >= qSev)
+        ? (DATA_STATUS_COLORS[dataStatus] ?? DATA_QUALITY_COLORS.MISSING)
+        : (DATA_QUALITY_COLORS[quality]   ?? DATA_QUALITY_COLORS.MISSING);
+}
+
 export function setStatusCircleColor(circleEl, quality, dataStatus, dataProvider) {
     if (!circleEl) return;
 
@@ -222,11 +242,7 @@ export function setStatusCircleColor(circleEl, quality, dataStatus, dataProvider
         return;
     }
 
-    const qSev  = QUALITY_SEVERITY[quality]   ?? 0;
-    const dSev  = STATUS_SEVERITY[dataStatus] ?? 0;
-    const color = (dSev >= qSev)
-        ? (DATA_STATUS_COLORS[dataStatus]  ?? DATA_QUALITY_COLORS.MISSING)
-        : (DATA_QUALITY_COLORS[quality]    ?? DATA_QUALITY_COLORS.MISSING);
+    const color = healthColor(quality, dataStatus);
 
     circleEl.style.backgroundColor = color;
     circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
@@ -303,7 +319,7 @@ function initDewRiskBadge() {
     });
 }
 
-function buildWetnessPopupHTML(wetness) {
+function buildWetnessPopupHTML(wetness, dataStatus) {
     const status  = wetness?.surfaceWetnessStatus;
     const details = wetness?.dataDetails;
     const config  = SURFACE_WETNESS_CONFIG[status] ?? SURFACE_WETNESS_CONFIG.DRY;
@@ -328,6 +344,7 @@ function buildWetnessPopupHTML(wetness) {
             <span class="popup-key">Measured</span>
             <span class="popup-val">${formatArrivedAt(details?.arrivedAt)}</span>
         </div>
+        ${details?.dataProvider === 'EXTERNAL_API' ? '' : freshnessSectionHTML(dataStatus, details?.arrivedAt)}
     `;
 }
 
@@ -342,7 +359,7 @@ function initWetnessBadge() {
                      && globalPopup._sourceEl === badgeEl;
 
         globalPopup.classList.remove('open');
-        if (!isOpen && wetness) openPopup(buildWetnessPopupHTML(wetness), badgeEl);
+        if (!isOpen && wetness) openPopup(buildWetnessPopupHTML(wetness, badgeEl._dataStatus), badgeEl);
     });
 }
 

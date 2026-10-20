@@ -1110,6 +1110,9 @@ h3 {
 .humidity-wetness-line .wetness-damp   { color: #facc15; }
 .humidity-wetness-line .wetness-wet    { color: #38bdf8; }
 .humidity-wetness-line .wetness-soaked { color: #818cf8; }
+/* Stale or flagged reading: the dot is coloured inline with the card status
+   circle's colour (metric-cards.js); the word stays neutral. */
+.humidity-wetness-line .wetness-unverified { color: var(--text-secondary); }
 
 .humidity_block .main-value {
     margin-bottom: 0;
