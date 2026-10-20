@@ -3377,10 +3377,54 @@ h3 {
         min-height: var(--today-card-h, 120px);
     }
 
-    .card-header {
-        padding-bottom: 8px;
-        margin-bottom: 8px;
+    /* Card chrome on phones. Measured at 390px, the header row took 41px —
+       a third of the half-width cards (41 of 110px on humidity and UV) — and
+       20px side padding spent 40 of a 168px card before any content. At 320px
+       the titles truncated: "PRESS…", "HUMID…", "UV IN…". The row only holds
+       13px text and a 15px icon, so its 24px floor and the gaps around the
+       divider come down, the titles lose some size and tracking so they read
+       as labels rather than headlines, and the side padding drops to 14px. */
+    .unified-card {
+        padding-left: 14px;
+        padding-right: 14px;
     }
+
+    .card-header,
+    .sun_block .card-header,
+    .moon_block .card-header {
+        min-height: 18px;
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
+
+    .card-header h3 {
+        font-size: 0.76rem;
+        letter-spacing: 0.4px;
+        gap: 6px;
+    }
+
+    .card-icon {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+/* Smallest phones (320px class). Two headers still ran out of room:
+   - the chart's controls took 223 of its 250px, cutting "TODAY" to "T…" —
+     the metric dropdown alone is 117px, sized to "Surface Wetness" — so the
+     header wraps and the title takes its own line instead;
+   - the moon header's title, "41%" and chevron needed 101 of 105px, leaving
+     "MOON41%" with no gap — so the card icons go: they are decoration, and
+     dropping them frees ~20px in every header. */
+@media (max-width: 340px) {
+    .chart_block .chart-header {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+
+    .card-icon { display: none; }
+
+    .card-header { gap: 6px; }
 }
 
 @media (max-width: 420px) {
