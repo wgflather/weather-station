@@ -259,7 +259,9 @@ function createChart(canvasElement, state) {
         options: {
             responsive:          true,
             maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
+            // See readingOrGap in chart-interaction.js — 'index' paired gap and
+            // reading points by array position, which do not line up.
+            interaction: { intersect: false, mode: 'readingOrGap' },
 
             animations: {
                 tension: {

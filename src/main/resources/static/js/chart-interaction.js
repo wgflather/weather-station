@@ -35,6 +35,46 @@ Chart.register({
 });
 
 /* =========================================================
+   WHICH ITEM THE POINTER IS ON
+   The 24-hour chart has two datasets that do not share indices: the
+   readings, and the dashed gap bridges (three points per gap — start, end,
+   null separator). Chart.js's 'index' mode found the nearest item and then
+   took the *same index* from every dataset, so hovering the end of a gap
+   (gap point 1) also selected reading 1 — 00:10 — highlighting a point at
+   the far left and putting its value in the "Missing data" tooltip.
+   Here a pointer inside a gap's span gets that gap, anywhere else the
+   reading nearest in x; never both.
+========================================================= */
+Chart.Interaction.modes.readingOrGap = function (chart, e) {
+    const x = e.x;
+    const readings = chart.getDatasetMeta(0);
+    const gaps     = chart.getDatasetMeta(1);
+    const gapData  = chart.data.datasets[1]?.data ?? [];
+
+    // A span is two consecutive non-null gap points; the nulls between
+    // segments keep one gap's end from pairing with the next one's start.
+    for (let i = 0; i < gapData.length - 1; i++) {
+        if (gapData[i]?.y == null || gapData[i + 1]?.y == null) continue;
+        const x0 = gaps.data[i].x;
+        const x1 = gaps.data[i + 1].x;
+        if (x > x0 && x < x1) {
+            const index = x - x0 < x1 - x ? i : i + 1;
+            return [{ element: gaps.data[index], datasetIndex: 1, index }];
+        }
+    }
+
+    const data = chart.data.datasets[0].data;
+    let best = -1;
+    let bestDist = Infinity;
+    readings.data.forEach((el, i) => {
+        if (data[i]?.y == null) return;
+        const d = Math.abs(el.x - x);
+        if (d < bestDist) { bestDist = d; best = i; }
+    });
+    return best === -1 ? [] : [{ element: readings.data[best], datasetIndex: 0, index: best }];
+};
+
+/* =========================================================
    EXTERNAL HTML TOOLTIP
    Rendered outside the canvas. With a mouse it floats just above
    the hovered point (flipping below near the top edge). On touch
