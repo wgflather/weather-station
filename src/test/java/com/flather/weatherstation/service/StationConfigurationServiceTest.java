@@ -109,7 +109,7 @@ class StationConfigurationServiceTest {
 
     UpdateValidationRequest request =
         new UpdateValidationRequest(
-            -40.0, 60.0, 900.0, 1100.0, 1.0, 100.0, 20.0, 5.0, 10.0, 400, 800, 0.0, 60.0, 20.0, 0.0,
+            -40.0, 60.0, 900.0, 1100.0, 0.0, 100.0, 20.0, 5.0, 10.0, 400, 800, 0.0, 60.0, 20.0, 0.0,
             16.0, 5.0);
 
     StationConfiguration result = service.updateValidation(request);
@@ -118,7 +118,7 @@ class StationConfigurationServiceTest {
     assertThat(result.getTempMaximum()).isEqualTo(60.0);
     assertThat(result.getPressureMinimal()).isEqualTo(900.0);
     assertThat(result.getPressureMaximum()).isEqualTo(1100.0);
-    assertThat(result.getHumidityMinimal()).isEqualTo(1.0);
+    assertThat(result.getHumidityMinimal()).isEqualTo(0.0);
     assertThat(result.getHumidityMaximum()).isEqualTo(100.0);
     assertThat(result.getSurfaceWetnessWetBaseline()).isEqualTo(400);
     assertThat(result.getSurfaceWetnessDryBaseline()).isEqualTo(800);

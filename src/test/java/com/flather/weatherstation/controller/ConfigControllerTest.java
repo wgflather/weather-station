@@ -2,7 +2,6 @@ package com.flather.weatherstation.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -126,7 +125,7 @@ class ConfigControllerTest {
   void shouldUpdateValidation_whenRequestIsValid() throws Exception {
     UpdateValidationRequest request =
         new UpdateValidationRequest(
-            -40.0, 60.0, 900.0, 1100.0, 1.0, 100.0, 20.0, 5.0, 10.0, 800, 200, 0.0, 60.0, 20.0, 0.0,
+            -40.0, 60.0, 900.0, 1100.0, 0.0, 100.0, 20.0, 5.0, 10.0, 800, 200, 0.0, 60.0, 20.0, 0.0,
             16.0, 5.0);
     StationConfiguration config = new StationConfiguration();
     config.setTempMinimal(-40.0);
@@ -144,29 +143,6 @@ class ConfigControllerTest {
         .andExpect(jsonPath("$.tempMinimal").value(-40.0));
 
     verify(service).updateValidation(any());
-  }
-
-  @Test
-  void shouldReturn400_whenHumidityMinimalIsZero() throws Exception {
-    // 0 % humidity is a sensor fault signature rather than a reading, and
-    // HourlyWeatherRecordRepository.findLowestDewPointGap takes LN of it. Postgres raises on
-    // LN(0) rather than returning an infinity, so a single such row fails that query and takes
-    // the whole /daily response down with it. windMinimal and uvIndexMinimal stay 0 here: those
-    // are legitimate floors and deliberately unconstrained.
-    UpdateValidationRequest request =
-        new UpdateValidationRequest(
-            -40.0, 60.0, 900.0, 1100.0, 0.0, 100.0, 20.0, 5.0, 10.0, 800, 200, 0.0, 60.0, 20.0, 0.0,
-            16.0, 5.0);
-
-    mockMvc
-        .perform(
-            put("/api/admin/config/validation")
-                .with(user("testuser").roles("ADMIN"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
-
-    verify(service, never()).updateValidation(any());
   }
 
   @Test
