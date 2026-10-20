@@ -186,13 +186,21 @@ function positionTooltip(slotEl) {
 }
 
 function initTooltip(strip) {
-    // Desktop hover
-    strip.addEventListener('mouseenter', e => {
+    // Desktop hover — a real mouse only. These were mouseenter/mouseleave,
+    // which a touch screen emulates on tap, *before* the click: the first tap
+    // opened the tooltip here, then the click handler below saw that slot
+    // already open and toggled it shut. Net effect, the first tap did nothing
+    // but lift the icon, and only a second tap (no fresh mouseenter, since iOS
+    // still considered the slot hovered) opened it. Pointer events say which
+    // device it was, so a tap now only ever takes the click path.
+    strip.addEventListener('pointerenter', e => {
+        if (e.pointerType !== 'mouse') return;
         const slot = e.target.closest('.cloud-slot');
         if (slot?._fcPoint) showTooltip(slot, slot._fcPoint);
     }, true);
 
-    strip.addEventListener('mouseleave', e => {
+    strip.addEventListener('pointerleave', e => {
+        if (e.pointerType !== 'mouse') return;
         if (!e.target.closest('.cloud-slot')) return;
         hideTooltip();
     }, true);

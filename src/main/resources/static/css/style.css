@@ -460,8 +460,13 @@ body {
 .cloud-slot.future  { opacity: 0.65; }
 .cloud-slot.current { opacity: 1.00; }
 
-.cloud-slot:hover {
-    transform: translateY(-2px);
+/* Real hover only. On touch, iOS applies :hover on the first tap and keeps it,
+   so a tapped slot stayed lifted — which read as "selected" while the tooltip
+   it was meant to open was nowhere (see initTooltip in cloud-forecast.js). */
+@media (hover: hover) {
+    .cloud-slot:hover {
+        transform: translateY(-2px);
+    }
 }
 
 .cloud-slot:active {
