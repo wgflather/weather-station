@@ -1,5 +1,7 @@
 // Meteocons animated SVG weather icons, MIT license (https://meteocons.com/)
 
+import { uiZoom } from './ui-zoom.js';
+
 const METEOCONS_VERSION = '3.0.0-next.10';
 const ICON_ANIMATED = `https://cdn.meteocons.com/${METEOCONS_VERSION}/svg/fill/`;
 const ICON_STATIC   = `https://cdn.meteocons.com/${METEOCONS_VERSION}/svg-static/fill/`;
@@ -162,10 +164,12 @@ function hideTooltip() {
     _tooltipSlot = null;
 }
 
+// Solved in viewport px, written in CSS px — see ui-zoom.js.
 function positionTooltip(slotEl) {
+    const z   = uiZoom();
     const r   = slotEl.getBoundingClientRect();
-    const tw  = fcTooltip.offsetWidth;
-    const th  = fcTooltip.offsetHeight;
+    const tw  = fcTooltip.offsetWidth  * z;
+    const th  = fcTooltip.offsetHeight * z;
     const gap = 8;
 
     let left = r.left + r.width / 2 - tw / 2;
@@ -177,8 +181,8 @@ function positionTooltip(slotEl) {
     // Clamp horizontally
     left = Math.max(gap, Math.min(left, window.innerWidth - tw - gap));
 
-    fcTooltip.style.left = `${Math.round(left)}px`;
-    fcTooltip.style.top  = `${Math.round(top)}px`;
+    fcTooltip.style.left = `${Math.round(left / z)}px`;
+    fcTooltip.style.top  = `${Math.round(top / z)}px`;
 }
 
 function initTooltip(strip) {

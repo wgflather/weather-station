@@ -213,6 +213,33 @@ html {
     background-repeat: no-repeat;
 }
 
+/* =========================================================
+   UI SCALE ON LARGE DESKTOP SCREENS
+   The dashboard is sized in fixed px inside an 820px column, so on a big
+   monitor it stayed laptop-sized with acres of sky around it — readers were
+   setting 110-125 % browser zoom by hand. This does the same automatically.
+
+   `zoom` rather than a larger root font-size because ~1000 of the stylesheet's
+   lengths (and the charts' canvas fonts) are px: a rem bump would grow the
+   text and leave the cards, charts and spacing behind.
+
+   Mouse/trackpad only: by width alone an iPad in landscape (1024-1366px)
+   would be scaled too. The dashboard only — the admin pages position their
+   own popups without the conversions this needs.
+
+   Two consequences, both handled where they arise:
+     - Viewport units inside <body> are multiplied by the zoom, so a modal
+       sized 100dvh came out 1.25 screens tall. Those lengths divide by
+       --ui-zoom.
+     - Screen measurements (getBoundingClientRect, clientX) are zoomed but
+       style positions are not; ui-zoom.js converts between the two.
+========================================================= */
+:root { --ui-zoom: 1; }
+@media (pointer: fine) and (min-width: 1000px) { :root { --ui-zoom: 1.1;  } }
+@media (pointer: fine) and (min-width: 1900px) { :root { --ui-zoom: 1.25; } }
+
+body.dashboard { zoom: var(--ui-zoom); }
+
 
 body {
     font-family: 'Figtree', sans-serif;
@@ -1822,6 +1849,8 @@ h3 {
     width: 100%;
     height: 100vh;
     height: 100dvh;
+    /* Viewport units are scaled by body zoom — see UI SCALE. */
+    height: calc(100dvh / var(--ui-zoom));
     z-index: 1000;
     display: none;
     align-items: center;
@@ -3464,6 +3493,8 @@ h3 {
     width: 100%;
     height: 100vh;
     height: 100dvh;
+    /* Viewport units are scaled by body zoom — see UI SCALE. */
+    height: calc(100dvh / var(--ui-zoom));
     z-index: 1000;
     display: none;
     align-items: center;

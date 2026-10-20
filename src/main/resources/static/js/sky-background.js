@@ -19,6 +19,7 @@ import {
 } from './sky-colors.js';
 import { closeAllPopovers } from './metric-popovers.js';
 import { createSkyPicker, xForAltitude, ALT_MIN } from './sky-picker.js';
+import { toCssPx } from './ui-zoom.js';
 
 // Supplied by initBgPreference; see the module comment.
 let getSunAltitude = () => null;
@@ -474,8 +475,8 @@ export function initBgPreference({ getSunAltitude: gsa, onApplied: cb } = {}) {
         popover.setAttribute('aria-hidden', String(!opening));
         if (opening) {
             const rect = btn.getBoundingClientRect();
-            popover.style.top   = `${rect.bottom + 6}px`;
-            popover.style.right = `${window.innerWidth - rect.right}px`;
+            popover.style.top   = `${toCssPx(rect.bottom + 6)}px`;
+            popover.style.right = `${toCssPx(window.innerWidth - rect.right)}px`;
             popover.style.left  = 'auto';
         }
     });

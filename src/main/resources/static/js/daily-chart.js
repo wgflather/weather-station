@@ -27,6 +27,7 @@
 import { getTooltipEl, setTooltipContent } from './chart-tooltip.js';
 import { installPointerHandlers } from './chart-interaction.js';
 import { unitFor } from './metric-units.js';
+import { uiZoom } from './ui-zoom.js';
 import {
     COLOR_SCALES, METRIC_CONFIG, scaleToRgbString, createDynamicGradient, clampAxisBounds,
 } from './chart-metrics.js';
@@ -150,21 +151,25 @@ function makeTooltipHandler(minPoints, maxPoints, unit) {
 
         setTooltipContent(el, [title], [{ html: rows.join('') }]);
 
-        // Position relative to viewport (tooltip is position: fixed).
+        // Position relative to viewport (tooltip is position: fixed). Solved in
+        // viewport px — the caret is in chart CSS px, which body zoom scales —
+        // and written back in CSS px; see ui-zoom.js.
+        const z    = uiZoom();
         const rect = chart.canvas.getBoundingClientRect();
-        const cx   = rect.left + tooltip.caretX;
-        const cy   = rect.top  + tooltip.caretY;
+        const cx   = rect.left + tooltip.caretX * z;
+        const cy   = rect.top  + tooltip.caretY * z;
+        const put  = (prop, px) => { el.style[prop] = `${px / z}px`; };
 
         el.style.opacity = '1';
-        el.style.left    = `${cx + 14}px`;
-        el.style.top     = `${cy - 32}px`;
+        put('left', cx + 14);
+        put('top',  cy - 32);
 
         // Clamp on next frame when dimensions are known.
         requestAnimationFrame(() => {
             const er = el.getBoundingClientRect();
-            if (er.right  > window.innerWidth  - 8) el.style.left = `${cx - er.width - 14}px`;
-            if (er.top    < 8)                       el.style.top  = `${cy + 14}px`;
-            if (er.bottom > window.innerHeight - 8)  el.style.top  = `${cy - er.height - 6}px`;
+            if (er.right  > window.innerWidth  - 8) put('left', cx - er.width - 14);
+            if (er.top    < 8)                       put('top',  cy + 14);
+            if (er.bottom > window.innerHeight - 8)  put('top',  cy - er.height - 6);
         });
     };
 }

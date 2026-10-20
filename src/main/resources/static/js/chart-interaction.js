@@ -9,6 +9,30 @@
 // where it sits.
 
 import { getTooltipEl, setTooltipContent, hideTooltip } from './chart-tooltip.js';
+import { uiZoom } from './ui-zoom.js';
+
+/* =========================================================
+   POINTER POSITION UNDER BODY ZOOM
+   Chart.js turns a pointer event into chart coordinates from its offset
+   into the canvas, which is in viewport px — and then uses it as chart CSS
+   px. Under body zoom (ui-zoom.js) the two differ, so the hovered point
+   drifted right with distance from the left edge: at 1.1, point 50 hovered
+   as 56. Registered globally, so both the 24-hour chart and the history
+   chart get it; the in-area flag is recomputed from the corrected position.
+========================================================= */
+Chart.register({
+    id: 'uiZoomEvents',
+    beforeEvent(chart, args) {
+        const z = uiZoom();
+        if (z === 1) return;
+        const e = args.event;
+        if (e.x == null || e.y == null) return;
+        e.x /= z;
+        e.y /= z;
+        const a = chart.chartArea;
+        if (a) args.inChartArea = e.x >= a.left && e.x <= a.right && e.y >= a.top && e.y <= a.bottom;
+    },
+});
 
 /* =========================================================
    EXTERNAL HTML TOOLTIP
@@ -107,14 +131,22 @@ export function externalTooltipHandler(context) {
         setTooltipContent(el, tooltip.title || [], bodies);
     }
 
+    // Placement is solved in viewport px. The canvas rect and the tooltip's
+    // own rect already are; Chart.js's caret and chartArea are in the chart's
+    // CSS px, which body zoom scales — see ui-zoom.js.
+    const z = uiZoom();
     const canvasRect = chart.canvas.getBoundingClientRect();
-    const { chartArea } = chart;
+    const chartArea  = {
+        top:   chart.chartArea.top   * z,
+        left:  chart.chartArea.left  * z,
+        right: chart.chartArea.right * z,
+    };
 
     el.style.opacity = '1';
     const elRect = el.getBoundingClientRect();
 
-    const caretX = canvasRect.left + tooltip.caretX;
-    const caretY = canvasRect.top  + tooltip.caretY;
+    const caretX = canvasRect.left + tooltip.caretX * z;
+    const caretY = canvasRect.top  + tooltip.caretY * z;
 
     let top, minLeft, maxLeft;
     if (lastInteractionWasTouch) {
@@ -127,7 +159,7 @@ export function externalTooltipHandler(context) {
         maxLeft = blockRect.right - elRect.width - 8;
     } else {
         // Mouse: float above the point; flip below only near the top edge.
-        const spaceAbove = tooltip.caretY - chartArea.top;
+        const spaceAbove = tooltip.caretY * z - chartArea.top;
         top = (spaceAbove >= elRect.height + TOOLTIP_GAP)
             ? caretY - elRect.height - TOOLTIP_GAP
             : caretY + TOOLTIP_GAP;
@@ -137,6 +169,6 @@ export function externalTooltipHandler(context) {
 
     const left = Math.min(Math.max(caretX - elRect.width / 2, minLeft), maxLeft);
 
-    el.style.top  = `${top}px`;
-    el.style.left = `${left}px`;
+    el.style.top  = `${top / z}px`;
+    el.style.left = `${left / z}px`;
 }

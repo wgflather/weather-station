@@ -678,9 +678,11 @@ function applyScrub() {
     const { points, scale, els } = chart;
     const rect = els.svg.getBoundingClientRect();
     if (!rect.width) return;
-    // ViewBox units equal CSS pixels at render width, so the pointer offset
-    // maps straight into chart coordinates.
-    const frac = clamp01((chart.pendingScrubX - rect.left - scale.plotL) / scale.plotW);
+    // Pointer offset into viewBox units through the rendered width, which is
+    // in viewport px — so it holds under body zoom, where one viewBox unit is
+    // more than one screen pixel.
+    const vbX  = (chart.pendingScrubX - rect.left) * (scale.W / rect.width);
+    const frac = clamp01((vbX - scale.plotL) / scale.plotW);
     // Curve points are uniformly spaced in time — snap by index.
     const point = points[Math.round(frac * (points.length - 1))];
     const x = scale.xOf(Date.parse(point.time));

@@ -14,6 +14,7 @@ import {
     STATUS_DOT_GLOW,
 } from './dashboard-constants.js';
 import { closeAllPopovers } from './metric-popovers.js';
+import { toCssPx } from './ui-zoom.js';
 
 // Formats a lag duration (minutes) for the System Health popover. Bare
 // minute counts get unreadable once a sensor has been offline for a while
@@ -97,10 +98,11 @@ export function initHealthPopover() {
         popover.setAttribute('aria-hidden', String(!opening));
 
         if (opening) {
-            // Position below the button, right-aligned to it.
+            // Position below the button, right-aligned to it. Measured in
+            // viewport px, written in CSS px — see ui-zoom.js.
             const rect = btn.getBoundingClientRect();
-            popover.style.top   = `${rect.bottom + 6}px`;
-            popover.style.right = `${window.innerWidth - rect.right}px`;
+            popover.style.top   = `${toCssPx(rect.bottom + 6)}px`;
+            popover.style.right = `${toCssPx(window.innerWidth - rect.right)}px`;
             popover.style.left  = 'auto';
         }
     });

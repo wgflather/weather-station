@@ -16,6 +16,8 @@
 // — the history button among them — and Enter opened a second modal. The trap
 // below closes that path; the depth counter keeps the lock correct regardless.
 
+import { toCssPx } from './ui-zoom.js';
+
 // Innermost modal last. Depth is `stack.length`, so the lock and the trap can
 // never disagree about how many modals are open.
 const stack = [];
@@ -33,7 +35,8 @@ function applyLock() {
     const body = document.body;
     body.style.overflow = 'hidden';
     body.style.position = 'fixed';
-    body.style.top      = `-${savedScrollY}px`;
+    // scrollY is in viewport px; body's own offsets are scaled by its zoom.
+    body.style.top      = `-${toCssPx(savedScrollY)}px`;
     body.style.left     = '0';
     body.style.right    = '0';
     body.style.width    = '100%';

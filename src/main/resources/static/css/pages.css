@@ -2086,14 +2086,14 @@ button.hist-summary-card:hover .hist-summary-context {
 .history-chart-card .chart-container {
     position: relative;
     width: 100%;
-    height: clamp(180px, 30vh, 320px);
+    height: clamp(180px, calc(30vh / var(--ui-zoom)), 320px);
 }
 
 /* Below this the 30vh floor is doing nothing and the chart is competing with the cards
    for a few hundred pixels; give it a share rather than a fixed 180. */
 @media (max-height: 560px) {
     .history-chart-card .chart-container {
-        height: clamp(130px, 42vh, 200px);
+        height: clamp(130px, calc(42vh / var(--ui-zoom)), 200px);
     }
 }
 

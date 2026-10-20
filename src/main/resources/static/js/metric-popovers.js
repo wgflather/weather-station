@@ -10,6 +10,7 @@
 // can participate.
 
 import { qualityStripSlot, hydrateQualityStrip } from './quality-strip.js';
+import { uiZoom } from './ui-zoom.js';
 import {
     DATA_QUALITY_COLORS,
     DATA_QUALITY_LABELS,
@@ -231,10 +232,14 @@ export function setStatusCircleColor(circleEl, quality, dataStatus, dataProvider
     circleEl.style.boxShadow       = `0 0 0 2px ${color}33`;
     circleEl.classList.toggle('pulsing', quality === 'OK' && (!dataStatus || dataStatus === 'LIVE'));
 }
+// Solved in viewport px (the anchor rect and innerWidth are), so the popup's
+// offset size is scaled up to match and the result scaled back down for the
+// style — see ui-zoom.js.
 function positionPopup(anchor) {
+    const z      = uiZoom();
     const r      = anchor.getBoundingClientRect();
-    const popupW = globalPopup.offsetWidth  || 220;
-    const popupH = globalPopup.offsetHeight || 140;
+    const popupW = (globalPopup.offsetWidth  || 220) * z;
+    const popupH = (globalPopup.offsetHeight || 140) * z;
     const margin = 8;
     const vw     = window.innerWidth;
     const vh     = window.innerHeight;
@@ -249,8 +254,8 @@ function positionPopup(anchor) {
     if (top  + popupH > vh - margin) top  = r.top - popupH - margin;
     if (top  < margin)               top  = margin;
 
-    globalPopup.style.top  = `${Math.round(top)}px`;
-    globalPopup.style.left = `${Math.round(left)}px`;
+    globalPopup.style.top  = `${Math.round(top / z)}px`;
+    globalPopup.style.left = `${Math.round(left / z)}px`;
 }
 
 function openPopup(html, anchor) {

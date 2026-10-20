@@ -505,6 +505,7 @@ Two iOS-standalone-only behaviours, both easy to undo by accident:
 | `sun-modal-chart.js` | Sun modal SVG chart: whole-day altitude curve with twilight gradient, label chips, scrubbing |
 | `cloud-forecast.js` | Hourly cloud/weather forecast strip; icon selection; tooltip |
 | `time-format.js` | Shared time-of-day and duration formatters |
+| `ui-zoom.js` | `uiZoom()` / `toCssPx()` — conversion between viewport px and CSS px under the desktop body zoom (see "UI scale on large screens") |
 
 **Charts**
 
@@ -543,6 +544,36 @@ Modules that need to talk to each other use `window.*` since they load independe
 | `window.refreshCloudSunTimes(riseIso, setIso)` | `cloud-forecast.js` | `fetch-data.js` (calls it after astronomy loads) | Re-renders strip with correct day/night icons |
 | `window.getCurrentCloudCover()` | `cloud-forecast.js` | `star-field.js` | Cloud cover multiplier for star opacity |
 | `window.setStarFieldModalDim(bool)` | `fetch-data.js` (re-exports from `star-field.js`) | `history-modal.js` | Dims stars while any modal is open |
+
+### UI scale on large screens
+
+The dashboard is sized in fixed px inside an 820px column, so on a big monitor it stayed
+laptop-sized. `body.dashboard` carries `zoom: var(--ui-zoom)`: 1.1 from 1000px and 1.25 from
+1900px of window width, **mouse/trackpad only** (`pointer: fine`) so a landscape iPad is not
+scaled. `zoom` rather than a larger root font-size because ~1000 of the stylesheet's lengths
+are px and a rem bump would grow the text alone. The admin pages are deliberately not zoomed.
+
+Under zoom there are two kinds of pixel, and mixing them is the bug to expect:
+
+- **Screen measurements are zoomed** — `getBoundingClientRect()`, `clientX/Y`, `innerWidth`.
+- **Style positions, `offsetWidth` and Chart.js coordinates (`caretX`, `chartArea`) are not.**
+
+So any code that measures something on screen and places a fixed element there converts with
+`ui-zoom.js` (solve in viewport px, divide by `uiZoom()` when writing the style). Every popover,
+both chart tooltips, the forecast tooltip, the modal scroll lock and the sun-modal scrubbing do
+this. Three things needed more than that:
+
+- **Chart.js maps pointer events wrongly under zoom** — it takes the pointer's viewport-px
+  offset into the canvas as chart px, so the hovered point drifted right with distance (at 1.1,
+  point 50 hovered as 56). A global `uiZoomEvents` plugin in `chart-interaction.js` rescales
+  each event in `beforeEvent`, covering both charts.
+- **flatpickr positions its calendar the same broken way**, so the history modal passes its own
+  `position` function.
+- **Viewport units inside `<body>` are multiplied by the zoom** — a `100dvh` modal came out 1.25
+  screens tall — so those lengths divide by `--ui-zoom` (both modals, the history chart height).
+
+Verified in Chrome only. Safari has supported `zoom` far longer, historically with different
+measurement semantics, so a Safari check on a large screen is the open item.
 
 ### Sky background system (`sky-background.js`)
 

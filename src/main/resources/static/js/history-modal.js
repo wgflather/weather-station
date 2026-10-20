@@ -5,6 +5,7 @@ import { formatTimeOfDay } from './time-format.js';
 import { formatMetricValue } from './metric-units.js';
 import { renderSummaryCards, clearSummaryCards } from './summary-cards.js';
 import { enterModal, exitModal } from './modal-shell.js';
+import { uiZoom } from './ui-zoom.js';
 
 /* =========================================================
    HISTORY MODAL
@@ -309,6 +310,33 @@ async function initDatePicker() {
         // Append inside the modal so flatpickr's position math runs within the
         // fixed stacking context, avoiding the viewport jump on first open.
         appendTo:    document.getElementById('hist-modal'),
+        // Our own placement instead of flatpickr's. Its maths takes the input's
+        // on-screen rect and writes it straight into style.top/left, which body
+        // zoom then scales again — at 1.1 the calendar opened 27px below the
+        // input and 47px to its right. Solved in viewport px and written in CSS
+        // px (ui-zoom.js). The calendar's containing block is the fixed
+        // #hist-modal, which sits at the viewport origin, so no offset is needed.
+        // On phones CSS !important rules place it; onOpen covers the first frame.
+        position: (instance) => {
+            if (window.innerWidth <= 600) return;
+            const cal   = instance.calendarContainer;
+            const z     = uiZoom();
+            const input = instance._positionElement ?? instance.input;
+            const ir    = input.getBoundingClientRect();
+            const calW  = cal.offsetWidth  * z;
+            const calH  = cal.offsetHeight * z;
+            const GAP   = 2;
+
+            const below = ir.bottom + GAP + calH <= window.innerHeight;
+            const top   = below ? ir.bottom + GAP : ir.top - GAP - calH;
+            const left  = Math.min(ir.left, window.innerWidth - calW - 8);
+
+            cal.classList.toggle('arrowTop',    below);
+            cal.classList.toggle('arrowBottom', !below);
+            cal.style.top   = `${top / z}px`;
+            cal.style.left  = `${Math.max(8, left) / z}px`;
+            cal.style.right = 'auto';
+        },
         onOpen: (_s, _str, instance) => {
             // On mobile, flatpickr's JS-calculated position (near the input) is
             // overridden by CSS !important rules, but there's a single paint frame
