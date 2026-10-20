@@ -113,10 +113,14 @@ services:
 **Port already in use.** Set `APP_PORT` (and `MQTT_HOST_PORT` in full-stack mode)
 in `.env`; both are host-side only and change nothing inside the container.
 
-**App exits with `Could not resolve placeholder 'user.username'`.** It found no
-config: the `config/` directory is missing, empty, or the file is named for a
-profile that is not active. Docker silently creates an empty directory if it does
-not exist, so a typo in the path looks identical to a missing file.
+**App exits with `APPLICATION FAILED TO START` — `Failed to configure a DataSource`,
+`Reason: Failed to determine a suitable driver class`.** It found no config: the
+`config/` directory is missing, empty, or the file is named for a profile that is
+not active. The datasource is the first thing Spring needs, so that is the error a
+missing file produces, even though nothing is wrong with the database. Docker
+silently creates an empty directory if it does not exist, so a typo in the path
+looks identical to a missing file. A file that *is* read but lacks the `user:`
+block fails later, with `Could not resolve placeholder 'user.username'`.
 
 **Config file unreadable.** The container runs as root by default, so host file
 permissions are not normally an issue. If you override with `user:` in compose,
