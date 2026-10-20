@@ -67,11 +67,15 @@ export const PRESSURE_TREND_CONFIG = {
     FALLING_FAST: { arrow: '↓', label: 'Rapidly falling', color: '#60a5fa' },
 };
 
+// Badge text is the risk word alone: the badge sits under "Dew Point Spread",
+// which already says what is at risk, and the full "Condensation Possible"
+// truncated on phones to "CONDENSATION …" — losing the one word that mattered.
+// The popover title (DEW_POINT_RISK_INFO) keeps the full phrase.
 export const DEW_POINT_RISK_CONFIG = {
-    SATURATED:   { label: 'Condensation Imminent', cssClass: 'risk-saturated' },
-    VERY_LIKELY: { label: 'Condensation Likely',   cssClass: 'risk-likely'    },
-    POSSIBLE:    { label: 'Condensation Possible', cssClass: 'risk-possible'  },
-    UNLIKELY:    { label: 'Condensation Unlikely', cssClass: 'risk-unlikely'  },
+    SATURATED:   { label: 'Imminent', cssClass: 'risk-saturated' },
+    VERY_LIKELY: { label: 'Likely',   cssClass: 'risk-likely'    },
+    POSSIBLE:    { label: 'Possible', cssClass: 'risk-possible'  },
+    UNLIKELY:    { label: 'Unlikely', cssClass: 'risk-unlikely'  },
 };
 
 export const SURFACE_WETNESS_CONFIG = {

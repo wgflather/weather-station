@@ -1,7 +1,8 @@
 // metric-cards.js
 //
-// The five sensor metric cards on the dashboard — temperature, pressure,
-// humidity (with dew point and the surface-wetness badge), wind and UV — plus
+// The five sensor metric cards on the dashboard — temperature (with the dew
+// point and its spread), pressure, humidity (with the surface-wetness line),
+// wind and UV — plus
 // the "~ stale" hints that sit beside their values.
 //
 // Pure presentation: renderMetrics() takes the live dashboard DTO and writes
@@ -100,6 +101,7 @@ function renderPressureTrend(pressureTrend, changeValue) {
 
 // ==========================================
 // HUMIDITY + DEW POINT
+// (the dew point is shown in the temperature card, beside its spread)
 // ==========================================
 
 function renderHumidity(humidity, isMixedDew = false) {
@@ -110,19 +112,11 @@ function renderHumidity(humidity, isMixedDew = false) {
         document.getElementById('humidity-val').textContent = humVal;
     }
 
-    const dewEl = document.getElementById('humidity-dew-val');
-    if (dewEl) {
-        dewEl.textContent = humidity.dewPoint != null
-            ? `${isMixedDew ? '~' : ''}${humidity.dewPoint.toFixed(1)}°C`
-            : '--°C';
-    }
-
     renderDewPointStatus(humidity, isMixedDew);
 }
 
 function renderDewPointStatus(humidity, isMixedDew = false) {
     const spreadValEl = document.getElementById('dew-spread-val');
-    const dewTEl      = document.getElementById('dew-t');
     const dewTdEl     = document.getElementById('dew-td');
     const badgeEl     = document.getElementById('dew-status');
 
@@ -136,11 +130,10 @@ function renderDewPointStatus(humidity, isMixedDew = false) {
 
     if (dewPoint == null || temp == null) {
         // Clear every field, not just the spread. A sensor that drops out
-        // mid-session would otherwise leave the last good T / Td and the risk
-        // badge on screen beside a blank spread — the card would go on
+        // mid-session would otherwise leave the last good dew point and the
+        // risk badge on screen beside a blank spread — the card would go on
         // asserting a condensation risk from a reading that no longer exists.
         spreadValEl.textContent = '--°';
-        if (dewTEl)  dewTEl.textContent  = '--';
         if (dewTdEl) dewTdEl.textContent = '--';
         resetDewBadge(badgeEl);
         return;
@@ -149,8 +142,7 @@ function renderDewPointStatus(humidity, isMixedDew = false) {
     const spread = parseFloat((temp - dewPoint).toFixed(1));
 
     spreadValEl.textContent = `${isMixedDew ? '~' : ''}${spread.toFixed(1)}°`;
-    if (dewTEl)  dewTEl.textContent  = temp.toFixed(1);
-    if (dewTdEl) dewTdEl.textContent = dewPoint.toFixed(1);
+    if (dewTdEl) dewTdEl.textContent = `${isMixedDew ? '~' : ''}${dewPoint.toFixed(1)}`;
 
     if (!badgeEl) return;
     // A reading with no risk classification clears the badge for the same
@@ -184,7 +176,7 @@ function resetDewBadge(badgeEl) {
 }
 
 // ==========================================
-// SURFACE WETNESS BADGE (inside humidity card)
+// SURFACE WETNESS LINE (inside humidity card)
 // ==========================================
 
 function renderSurfaceWetness(wetness) {
@@ -198,7 +190,9 @@ function renderSurfaceWetness(wetness) {
     const status = wetness?.surfaceWetnessStatus;
 
     if (!status) {
-        badgeEl.className  = 'wetness-status-badge wetness-dry';
+        // Neutral, like the dew badge's "no reading" state — a green dot
+        // beside "--" would still read as "Dry".
+        badgeEl.className  = 'wetness-status-badge';
         textEl.textContent = '--';
         return;
     }

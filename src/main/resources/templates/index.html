@@ -121,12 +121,6 @@
     <div class="cloud-strip-wrapper">
         <div class="cloud-strip" id="cloud-strip" aria-label="Hourly cloud forecast"></div>
     </div>
-    <div class="cloud-strip-footer">
-        <div class="wetness-status-badge wetness-dry" id="wetness-badge">
-            <span class="wetness-status-dot"></span>
-            <span id="wetness-status-text">Dry</span>
-        </div>
-    </div>
 </div>
 
 <div class="bg-pref-popover" id="bg-pref-popover" aria-hidden="true">
@@ -195,7 +189,7 @@
                     <span class="dew-title">Dew Point Spread</span>
                     <div class="dew-values">
                         <span class="dew-main" id="dew-spread-val">--°</span>
-                        <span class="dew-sub">T: <span id="dew-t">--</span>° · Td: <span id="dew-td">--</span>°</span>
+                        <span class="dew-sub">Dew point <span class="dew-sub-val" id="dew-td">--</span>°</span>
                     </div>
                 </div>
                 <div class="dew-status-badge" id="dew-status">Caution</div>
@@ -265,9 +259,13 @@
             <div class="main-value">
                 <span id="humidity-val"></span><span class="unit">%</span>
             </div>
-            <div class="humidity-dew-line">
-                <span class="dew-label">Dew point:</span>
-                <span class="dew-value" id="humidity-dew-val">--°C</span>
+            <div class="humidity-wetness-line">
+                <span class="wetness-line-label">Surface:</span>
+                <button class="wetness-status-badge" id="wetness-badge" type="button"
+                        aria-label="Surface wetness details">
+                    <span class="wetness-status-dot"></span>
+                    <span id="wetness-status-text">--</span>
+                </button>
             </div>
         </div>
     </div>

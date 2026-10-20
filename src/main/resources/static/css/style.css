@@ -865,14 +865,24 @@ h3 {
     flex-shrink: 0;          /* never compress the value */
 }
 
-/* T / Td helper readout — least important number in the card. */
+/* The dew point itself, beside its spread. It used to be a "T: · Td:"
+   readout at 0.7rem and below, which repeated the card's own temperature
+   and left the dew point the hardest number on the dashboard to read. The
+   label stays quiet; the value gets the weight. */
 .dew-sub {
-    font-size: 0.7rem;       /* slightly smaller so it fits */
-    color: var(--text-muted);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
     font-weight: var(--fw-regular);
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dew-sub-val {
+    color: var(--text-strong);
+    font-weight: var(--fw-label);
 }
 
 /* =========================================================
@@ -994,27 +1004,56 @@ h3 {
     text-align: right;
 }
 
-.humidity-dew-line {
+/* Surface wetness, as one quiet line under the humidity value — the same
+   footprint the dew point line had here, so the card does not grow. It used
+   to be a pill under the forecast strip, where it read as part of the
+   forecast. Wetness is a local reading about moisture, so it sits with
+   humidity. */
+.humidity-wetness-line {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: center;
     gap: 5px;
     margin-top: 6px;
 }
 
-.humidity-dew-line .dew-label {
+.wetness-line-label {
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-secondary);
-    text-transform: none;
-    letter-spacing: 0;
 }
 
-.humidity-dew-line .dew-value {
+/* The badge, stripped of its pill: just the dot and the status word in the
+   status colour. Still a button — it opens the wetness popover. */
+.humidity-wetness-line .wetness-status-badge {
+    font: inherit;
     font-size: 0.8rem;
     font-weight: var(--fw-label);
+    text-transform: none;
+    letter-spacing: 0;
+    gap: 5px;
+    padding: 1px 6px;
+    margin: 0 -6px;  /* hover tint gets padding without shifting the text */
+    border: none;
+    border-radius: 6px;
+    background: none;
     color: var(--text-secondary);
 }
+
+.humidity-wetness-line .wetness-status-badge:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.humidity-wetness-line .wetness-status-dot {
+    width: 7px;
+    height: 7px;
+}
+
+/* State colours win over the neutral "no reading" colour above. */
+.humidity-wetness-line .wetness-dry    { color: #4ade80; }
+.humidity-wetness-line .wetness-damp   { color: #facc15; }
+.humidity-wetness-line .wetness-wet    { color: #38bdf8; }
+.humidity-wetness-line .wetness-soaked { color: #818cf8; }
 
 .humidity_block .main-value {
     margin-bottom: 0;
@@ -2804,22 +2843,6 @@ h3 {
 .uv-extreme   { color: #c084fc; }
 
 /* =========================================================
-   WETNESS BADGE in cloud-strip-footer — scaled to match astro button
-========================================================= */
-.cloud-strip-footer .wetness-status-badge {
-    font-size: 0.62rem;
-    font-weight: var(--fw-label);
-    padding: 2px 8px 2px 6px;
-    gap: 5px;
-    border-radius: 20px;
-}
-
-.cloud-strip-footer .wetness-status-dot {
-    width: 6px;
-    height: 6px;
-}
-
-/* =========================================================
    STATUS CIRCLE  (replaces the "i" info icon)
 ========================================================= */
 .status-circle {
@@ -3120,7 +3143,7 @@ h3 {
         padding-right: 12px;
     }
     .dew-main { font-size: 1.15rem; }
-    .dew-sub  { font-size: 0.62rem; }
+    .dew-sub  { font-size: 0.74rem; }
     #temp-trend .trend-arrow { font-size: 0.7rem; }
     #temp-trend .trend-val   { font-size: 0.6rem; }
 
@@ -3205,7 +3228,7 @@ h3 {
     }
 
     .dew-sub {
-        font-size: 0.6rem;
+        font-size: 0.72rem;
     }
 
     /* wider section + smaller badge text so the full label fits */
@@ -3268,12 +3291,16 @@ h3 {
     }
 
     .dew-sub {
-        font-size: 0.58rem;
-        letter-spacing: -0.2px; /* tighten character spacing slightly */
+        font-size: 0.7rem;
     }
 
+    /* The base rule never wraps, but at this width "6.0°  Dew point -12.4°"
+       has no room to spare — measured 4px short at 320px with an ordinary
+       value. Letting the dew point drop under the spread only when it does
+       not fit beats an ellipsis eating the number. */
     .dew-values {
-        gap: 5px;
+        gap: 0 5px;
+        flex-wrap: wrap;
     }
 }
 
@@ -3291,12 +3318,11 @@ h3 {
     }
 
     .dew-sub {
-        font-size: 0.55rem;
-        letter-spacing: -0.3px;
+        font-size: 0.68rem;
     }
 
     .dew-values {
-        gap: 4px;
+        gap: 0 4px;
     }
 
     .dew-point-section {
@@ -3557,16 +3583,6 @@ h3 {
     .hist-modal-title  { font-size: 0.85rem; }
     .hist-modal-topbar { padding: 6px 12px; }
     .hist-modal-body   { padding: 10px 12px; gap: 8px; }
-}
-
-/* =========================================================
-   ASTRO FORECAST BUTTON (below forecast strip)
-========================================================= */
-.cloud-strip-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 5px;
 }
 
 /* =========================================================
