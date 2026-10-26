@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # A docs-only push would still rebuild the image, and the build stamps a fresh
+    # service-worker cache name, so clients refetch the shell and an auto-updating
+    # host restarts the app for a README change. Path filters do not apply to tag
+    # pushes, so releases always build. Pull requests keep running their checks.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "img/**"
   pull_request:
     branches: [main]
   workflow_dispatch:
