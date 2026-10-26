@@ -16,6 +16,7 @@ import {
 // Imported for its side effect too: registers the 'minMaxLabels' plugin.
 import { measureLabel, resolveCollisionScenario } from './chart-labels.js';
 import { installPointerHandlers, externalTooltipHandler } from './chart-interaction.js';
+import { formatTimeOfDay } from './time-format.js';
 
 const chartInstances = new Map();
 
@@ -133,6 +134,8 @@ function computeChartState(backendData, metric, resolutionMinutes, options = {})
         chartPoints, gapPoints, yBounds,
         minIndex, maxIndex, latestIndex, nowDetached,
         showMinMax, validMinMax, scenario,
+        // { rise: Date, set: Date } — history's single day only; see nightShading.
+        daylight: options.daylight ?? null,
     };
 }
 
@@ -459,6 +462,37 @@ function createChart(canvasElement, state) {
                     ctx.lineWidth   = 1;
                     ctx.setLineDash([4, 4]);
                     ctx.stroke();
+                    ctx.restore();
+                }
+            },
+
+            // ── Night shading ───────────────────────────────
+            // The history modal's period rows name sunrise and sunset; without
+            // these on the chart the reader maps "07:15 – 17:37" onto the x-axis
+            // by eye. Night is tinted, daylight left clear, and each boundary
+            // carries its time at the top of the plot.
+            {
+                id: 'nightShading',
+                beforeDatasetsDraw(chart) {
+                    const dl = chart.$state.daylight;
+                    if (!dl?.rise || !dl?.set) return;
+                    const { ctx, chartArea: a, scales: { x } } = chart;
+                    const clampX = v => Math.min(Math.max(v, a.left), a.right);
+                    const riseX  = clampX(x.getPixelForValue(dl.rise));
+                    const setX   = clampX(x.getPixelForValue(dl.set));
+
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(99, 102, 241, 0.10)';
+                    ctx.fillRect(a.left, a.top, riseX - a.left, a.bottom - a.top);
+                    ctx.fillRect(setX, a.top, a.right - setX, a.bottom - a.top);
+
+                    ctx.font         = chart.$state.isMobile ? '600 9px Figtree' : '600 10px Figtree';
+                    ctx.textBaseline = 'top';
+                    ctx.fillStyle    = 'rgba(253, 224, 140, 0.75)';
+                    // Each label sits on the daylight side of its boundary, so the
+                    // two point inward and never run off the plot.
+                    if (riseX > a.left)  { ctx.textAlign = 'left';  ctx.fillText(formatTimeOfDay(dl.rise), riseX + 4, a.top + 4); }
+                    if (setX  < a.right) { ctx.textAlign = 'right'; ctx.fillText(formatTimeOfDay(dl.set),  setX - 4,  a.top + 4); }
                     ctx.restore();
                 }
             },

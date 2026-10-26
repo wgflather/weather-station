@@ -1636,125 +1636,189 @@ span.flatpickr-weekday {
     border-color: rgba(150, 200, 255, 0.3);
 }
 
-/* Period breakdown — All day / Daylight / Night, one row per period.
-   The rows are the toggles: clicking one hides that period here and, in the
-   multi-day view, drops its series from the chart. Making the data the control
-   avoids a second strip of chrome above an already busy card. */
+/* Single-day period summary (day-periods.js) — one row per period, each a
+   low–high bar on a scale shared by all three rows, with a tick at the average.
+   Rows are independent grids with fixed-width number columns rather than one
+   shared grid: `display: contents` rows would align without fixed widths, but
+   lose the row's own opacity and its group role in Safari. 6ch fits the
+   widest value any metric produces ("1013.2", "-12.5") in tabular figures —
+   and `ch` resolves against the row's font-size, which is therefore set to the
+   value size. Left at the inherited 16px it made each number column ~50px and
+   squeezed the bar to ~40px on a phone. */
 .hist-periods {
     padding: 4px 0 12px;
-    max-width: 420px;
-}
-
-/* Head and rows share one explicit column template rather than subgrid, so the
-   period names stay aligned even where subgrid is unsupported. */
-.hist-periods-head,
-.hist-period-row {
-    display: grid;
-    /* First column is sized for the widest thing it holds — the "06:14 → 20:31"
-       caption — not for the period names, which are shorter. */
-    grid-template-columns: 106px repeat(3, minmax(0, 1fr));
-    column-gap: 10px;
 }
 
 .hist-periods-head {
-    padding: 0 6px 3px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 6px;
 }
 
-.hist-periods-head span {
+.hist-periods-metric {
+    font-size: 0.68rem;
+    font-weight: var(--fw-label);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hist-periods-unit { text-transform: none; }
+
+.hist-periods-coverage {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Blackouts: say how much of the day is behind the numbers. */
+.hist-periods-coverage.is-partial { color: #fcd34d; }
+
+.hist-periods-cols,
+.hist-period-row {
+    display: grid;
+    grid-template-columns: 132px 6ch minmax(0, 1fr) 6ch 6ch;
+    column-gap: 10px;
+    align-items: center;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.hist-periods-cols span {
     font-size: 0.6rem;
     font-weight: var(--fw-label);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    text-align: right;
     opacity: 0.75;
 }
 
+.hist-col-range { grid-column: 2 / 5; text-align: center; }
+.hist-col-avg   { text-align: right; }
+
 .hist-period-row {
-    /* Buttons shrink-to-fit, which would make the row grid narrower than the
-       header grid and knock the columns out of alignment. */
-    width: 100%;
-    align-items: center;
-    padding: 4px 6px 4px 0;
-    margin: 0;
-    background: none;
-    border: 0;
-    border-radius: 6px;
-    font: inherit;
-    text-align: left;
+    padding: 5px 0;
     transition: opacity 0.15s var(--ease-standard);
 }
-
-
 
 .hist-period-name {
     display: flex;
     align-items: center;
     gap: 7px;
-    font-size: 0.72rem;
+    min-width: 0;
+    font-size: 0.74rem;
     font-weight: var(--fw-label);
     color: var(--text-secondary);
-    white-space: nowrap;
 }
 
 .hist-period-label {
     display: flex;
     flex-direction: column;
     line-height: 1.25;
+    min-width: 0;
 }
 
-/* The hours a period actually covered. Only the single-day view sets it — across a
-   range every day has its own sunrise — and it matters most on Night, which now runs
-   from the previous evening and would otherwise read as if it sat inside this date. */
+/* The hours a period covered, plus its coverage when it is partial. */
 .hist-period-window {
     font-size: 0.62rem;
     font-weight: var(--fw-regular);
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.2px;
+    white-space: nowrap;
 }
 
-/* Filled while the period is shown, hollow once it is hidden — the swatch
-   doubles as the legend key for the chart line. */
+/* Night starts on the previous evening — off this date's chart. */
+.hist-period-prev { opacity: 0.7; }
+
+.hist-period-partial { color: #fcd34d; }
+
+/* Night's range reached past this date's own readings (day-periods.js) — about a
+   third of dates. One line on desktop; on a phone the "high & low" form may wrap. */
+.hist-period-note {
+    font-size: 0.6rem;
+    font-weight: var(--fw-regular);
+    font-style: italic;
+    color: var(--text-muted);
+    line-height: 1.2;
+}
+
 .hist-period-dot {
     width: 8px;
     height: 8px;
     flex: none;
     border-radius: 50%;
-    border: 1.5px solid var(--period-color, var(--text-muted));
     background: var(--period-color, var(--text-muted));
-    transition: background 0.15s var(--ease-standard);
 }
 
 .hist-period-val {
-    font-size: 0.76rem;
+    font-size: 1em;
     font-weight: var(--fw-value);
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    white-space: nowrap;
+}
+
+.hist-period-low  { text-align: right; color: var(--text-secondary); }
+.hist-period-high { text-align: left;  color: var(--text-secondary); }
+.hist-period-avg  { text-align: right; }
+
+.hist-period-track {
+    position: relative;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.hist-period-bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 4px;
+    background: var(--period-color, var(--text-muted));
+    opacity: 0.7;
+}
+
+.hist-period-tick {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--text-strong, #fff);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.45);
+}
+
+.hist-period-none {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    color: var(--text-muted);
 }
 
 /* No data for this period on this date — the row stays, because its absence is
    itself information: dates rolled up before the day/night split have All day alone. */
-.hist-period-row.is-unavailable { opacity: 0.3; }
-
-.hist-period-row.is-unavailable .hist-period-dot {
-    background: transparent;
-    border-color: var(--text-muted);
-}
+.hist-period-row.is-unavailable { opacity: 0.4; }
+.hist-period-row.is-unavailable .hist-period-track { background: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
     .hist-period-row,
-    .hist-period-dot,
     .hist-legend-item { transition: none; }
 }
 
 @media (max-width: 480px) {
-    .hist-periods-head,
-    .hist-period-row { grid-template-columns: 92px repeat(3, minmax(0, 1fr)); column-gap: 6px; }
-    .hist-period-name   { font-size: 0.68rem; }
-    .hist-period-val    { font-size: 0.71rem; }
-    .hist-period-window { font-size: 0.58rem; letter-spacing: 0; }
+    .hist-periods-cols,
+    .hist-period-row    { grid-template-columns: 96px 6ch minmax(0, 1fr) 6ch 6ch; column-gap: 6px; font-size: 0.7rem; }
+    .hist-period-name   { font-size: 0.68rem; gap: 5px; }
+    .hist-period-window { font-size: 0.56rem; }
+    /* "07:15–17:37 · 7/11 h" does not fit 96px — the flag takes its own line. */
+    .hist-period-sep     { display: none; }
+    .hist-period-partial { display: block; }
 }
 
 /* =========================================================

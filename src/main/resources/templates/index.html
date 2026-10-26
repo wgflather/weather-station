@@ -433,29 +433,8 @@
                         <button class="history-metric-tab" data-metric="surfaceWetness">Wetness</button>
                     </div>
                 </div>
-                <div class="hist-periods" id="hist-periods" role="group" aria-label="Show or hide periods">
-                    <div class="hist-periods-head" aria-hidden="true">
-                        <span></span><span>Avg</span><span>High</span><span>Low</span>
-                    </div>
-                    <div class="hist-period-row" data-period="fullDay">
-                        <span class="hist-period-name"><i class="hist-period-dot"></i><span class="hist-period-label"><span>All day</span><span class="hist-period-window" hidden></span></span></span>
-                        <span class="hist-period-val" data-stat="avg">–</span>
-                        <span class="hist-period-val" data-stat="high">–</span>
-                        <span class="hist-period-val" data-stat="low">–</span>
-                    </div>
-                    <div class="hist-period-row" data-period="day">
-                        <span class="hist-period-name"><i class="hist-period-dot"></i><span class="hist-period-label"><span>Daylight</span><span class="hist-period-window" hidden></span></span></span>
-                        <span class="hist-period-val" data-stat="avg">–</span>
-                        <span class="hist-period-val" data-stat="high">–</span>
-                        <span class="hist-period-val" data-stat="low">–</span>
-                    </div>
-                    <div class="hist-period-row" data-period="night">
-                        <span class="hist-period-name"><i class="hist-period-dot"></i><span class="hist-period-label"><span>Night</span><span class="hist-period-window" hidden></span></span></span>
-                        <span class="hist-period-val" data-stat="avg">–</span>
-                        <span class="hist-period-val" data-stat="high">–</span>
-                        <span class="hist-period-val" data-stat="low">–</span>
-                    </div>
-                </div>
+                <!-- Built by day-periods.js on every single-day load. -->
+                <div class="hist-periods" id="hist-periods" role="group" aria-label="Day summary by period"></div>
                 <div class="hist-summary-cards" id="hist-summary-cards" hidden></div>
                 <div class="chart-container">
                     <canvas id="hist-modal-chart"></canvas>
@@ -464,6 +443,10 @@
                 <p class="hist-chart-note" id="hist-chart-note" hidden>
                     <span><i class="hist-note-line"></i>Line — period average</span>
                     <span><i class="hist-note-band"></i>Band — that day's recorded high and low</span>
+                </p>
+                <p class="hist-chart-note" id="hist-day-note" hidden>
+                    <span><i class="hist-note-line"></i>Line — hourly average</span>
+                    <span>Low / High above — single readings, so they reach past the line</span>
                 </p>
                 <p class="history-chart-empty" id="hist-chart-empty" hidden>No chart data for this period</p>
             </div>

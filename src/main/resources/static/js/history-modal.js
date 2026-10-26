@@ -1,17 +1,15 @@
 import { renderWeatherChart } from './weather-chart.js';
 import { renderDailyChart, periodColor, DEFAULT_PERIODS } from './daily-chart.js';
 import { createAvailableDates, isoDateKey } from './available-dates.js';
-import { formatTimeOfDay } from './time-format.js';
-import { formatMetricValue } from './metric-units.js';
 import { renderSummaryCards, clearSummaryCards } from './summary-cards.js';
+import { renderDayPeriods, clearDayPeriods, hourCoverage } from './day-periods.js';
 import { enterModal, exitModal } from './modal-shell.js';
 import { uiZoom } from './ui-zoom.js';
 
 /* =========================================================
    HISTORY MODAL
-   Single-day views: hourly chart + day stats bar.
-   Multi-day views (7 / 14 / 30): daily chart + period stats bar.
-   Both views share the same Avg / High / Low bar above the chart.
+   Single-day view: hourly chart + per-period range bars (day-periods.js).
+   Multi-day views (7 / 14 / 30 / month): daily chart + summary cards.
 ========================================================= */
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -82,68 +80,12 @@ const availablePeriods = new Set();
 let lastSummaries = null;
 let lastRange     = null;
 
-function periodRow(period) {
-    return document.querySelector(`.hist-period-row[data-period="${period}"]`);
-}
-
 /** Avg / high / low for one period block, or null when it holds nothing for this metric. */
 function statsFor(block, metric) {
     if (!block) return null;
     const avg = block[metric + 'Avg'], high = block[metric + 'Max'], low = block[metric + 'Min'];
     if (avg == null && high == null && low == null) return null;
     return { avg, high, low };
-}
-
-function resetPeriods() {
-    for (const period of PERIODS) {
-        const row = periodRow(period);
-        if (!row) continue;
-        row.classList.remove('is-unavailable');
-        row.querySelectorAll('.hist-period-val').forEach(el => { el.textContent = '–'; });
-        const caption = row.querySelector('.hist-period-window');
-        if (caption) { caption.textContent = ''; caption.hidden = true; }
-    }
-}
-
-/**
- * Paint the three rows. A period with no data in range is disabled rather than
- * hidden — a missing Daylight row is itself information (dates rolled up before
- * the day/night split have an All day row alone).
- *
- * `windows` carries the sunrise/sunset boundaries each period was measured over,
- * keyed like the rows. It is only meaningful for a single date — across a range
- * every day has its own sunrise — so callers pass null for the multi-day views
- * and the captions stay off.
- */
-function renderPeriods(byPeriod, metric, windows = null) {
-    for (const period of PERIODS) {
-        const row = periodRow(period);
-        if (!row) continue;
-
-        // Night runs from the previous evening to this morning, so the caption is the
-        // only thing on screen that says which hours a Night row actually covers.
-        const window = windows?.[period];
-        const caption = row.querySelector('.hist-period-window');
-        if (caption) {
-            caption.textContent = window
-                ? `${formatTimeOfDay(window.start)} → ${formatTimeOfDay(window.end)}`
-                : '';
-            caption.hidden = !window;
-        }
-
-        // The swatch is the chart's legend key, so it tracks the line colour —
-        // which for All day follows the selected metric.
-        row.style.setProperty('--period-color', periodColor(period));
-
-        const stats = byPeriod[period];
-        setAvailability(period, !!stats);
-        row.classList.toggle('is-unavailable', !stats);
-
-        const cell = (name) => row.querySelector(`.hist-period-val[data-stat="${name}"]`);
-        for (const [name, value] of [['avg', stats?.avg], ['high', stats?.high], ['low', stats?.low]]) {
-            cell(name).textContent = formatMetricValue(value, metric);
-        }
-    }
 }
 
 /**
@@ -362,56 +304,76 @@ async function initDatePicker() {
     }));
 }
 
-// ── Single-day stats bar (from daily summary API) ─────────────────────────────
-async function loadDaySummaryStats(dateStr, metric) {
-    try {
-        const res = await fetch(`/api/weather/history/daily/summary?date=${dateStr}`);
-        if (!res.ok) return;
-        const summary = await res.json();
-        // The single-day chart is hourly, so the periods are a reading aid here only —
-        // there is no per-period series to toggle on a chart of one day's own hours.
-        // This is also the only view where the windows mean anything, so it is the one
-        // that captions them.
-        renderPeriods(
-            {
+// ── Single day: period summary + hourly chart ────────────────────────────────
+async function fetchDayPoints(dateStr, metric) {
+    const res = await fetch(`/api/weather/history/chart/day?date=${dateStr}&metric=${metric}`);
+    if (!res.ok) throw new Error(res.status);
+    const dto = await res.json();
+    return (dto.chartPoints || []).map(p => ({ hour: p.hour, hourlyValue: p.hourlyValue }));
+}
+
+/**
+ * One load for the whole single-day view, because the summary and the chart now
+ * describe each other: the summary's windows shade the chart's night hours, and the
+ * chart's points decide which periods the summary flags as partial.
+ *
+ * The previous day's points are fetched as well, for coverage only — Night runs from
+ * that day's sunset, so whether it was recorded cannot be read off this date's chart.
+ * If that request fails Night simply goes unflagged; it is not worth failing the view.
+ */
+async function loadSingleDay(dateStr, metric) {
+    const emptyEl   = document.getElementById('hist-chart-empty');
+    const canvas    = document.getElementById('hist-modal-chart');
+    const noteEl    = document.getElementById('hist-day-note');
+    const container = document.getElementById('hist-periods');
+
+    const [summary, points, prevPoints] = await Promise.all([
+        fetch(`/api/weather/history/daily/summary?date=${dateStr}`)
+            .then(r => (r.ok ? r.json() : null)).catch(() => null),
+        fetchDayPoints(dateStr, metric).catch(() => null),
+        fetchDayPoints(subtractDays(dateStr, 1), metric).catch(() => null),
+    ]);
+
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dayStart  = new Date(y, m - 1, d);
+    const dayEnd    = new Date(y, m - 1, d + 1);
+
+    if (summary) {
+        const windows = { day: summary.dayPeriod, night: summary.nightPeriod };
+        renderDayPeriods(container, {
+            metric,
+            stats: {
                 fullDay: statsFor(summary.fullDay, metric),
                 day:     statsFor(summary.day,     metric),
                 night:   statsFor(summary.night,   metric),
             },
-            metric,
-            { day: summary.dayPeriod, night: summary.nightPeriod },
-        );
-    } catch { /* rows stay at "–" */ }
-}
+            windows,
+            coverage: points ? {
+                fullDay: hourCoverage(points, { start: dayStart, end: dayEnd }),
+                day:     hourCoverage(points, windows.day),
+                night:   prevPoints ? hourCoverage([...prevPoints, ...points], windows.night) : null,
+            } : {},
+        });
+    }
 
-// ── Single-day chart ──────────────────────────────────────────────────────────
-async function loadDayChart(dateStr, metric) {
-    const emptyEl = document.getElementById('hist-chart-empty');
-    const canvas  = document.getElementById('hist-modal-chart');
-
-    try {
-        const res = await fetch(`/api/weather/history/chart/day?date=${dateStr}&metric=${metric}`);
-        if (!res.ok) throw new Error(res.status);
-        const dto    = await res.json();
-        const points = (dto.chartPoints || []).map(p => ({ hour: p.hour, hourlyValue: p.hourlyValue }));
-
-        if (points.length === 0) {
-            canvas.hidden  = true;
-            emptyEl.hidden = false;
-        } else {
-            canvas.hidden  = false;
-            emptyEl.hidden = true;
-            const [y, m, d] = dateStr.split('-').map(Number);
-            renderWeatherChart(points, metric, 60, {
-                canvasId: 'hist-modal-chart',
-                showNow:  false,
-                refDate:  new Date(y, m - 1, d),
-            });
-        }
-    } catch {
+    if (!points?.length) {
         canvas.hidden  = true;
         emptyEl.hidden = false;
+        noteEl.hidden  = true;
+        return;
     }
+
+    canvas.hidden  = false;
+    emptyEl.hidden = true;
+    noteEl.hidden  = false;
+    renderWeatherChart(points, metric, 60, {
+        canvasId: 'hist-modal-chart',
+        showNow:  false,
+        refDate:  dayStart,
+        daylight: summary?.dayPeriod
+            ? { rise: new Date(summary.dayPeriod.start), set: new Date(summary.dayPeriod.end) }
+            : null,
+    });
 }
 
 /**
@@ -567,7 +529,7 @@ async function loadRange(days) {
     const pickerWrapper = document.getElementById('hist-picker-wrapper');
     const dateInput     = document.getElementById('hist-date-input');
 
-    resetPeriods();
+    clearDayPeriods(document.getElementById('hist-periods'));
     availablePeriods.clear();
 
     // Dropped before each load so a toggle can never redraw the previous range's data.
@@ -593,14 +555,13 @@ async function loadRange(days) {
     document.getElementById('hist-legend').hidden = singleDay;
     // The band only exists on the multi-day chart, so its caption goes with it.
     document.getElementById('hist-chart-note').hidden = singleDay;
+    // And the hourly chart's caption with that one; loadSingleDay shows it once there is a chart.
+    document.getElementById('hist-day-note').hidden = true;
     if (singleDay) clearSummaryCards(document.getElementById('hist-summary-cards'));
 
     if (singleDay) {
         chartTitle.textContent = 'Hourly';
-        await Promise.all([
-            loadDaySummaryStats(currentDate, currentMetric),
-            loadDayChart(currentDate, currentMetric),
-        ]);
+        await loadSingleDay(currentDate, currentMetric);
     } else if (monthView) {
         if (!currentMonth) {
             hideChartChrome();

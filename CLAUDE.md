@@ -536,6 +536,7 @@ Two iOS-standalone-only behaviours, both easy to undo by accident:
 | File | Role |
 |---|---|
 | `history-modal.js` | History chart modal. Three views behind one row of tabs: a single day (date picker), a rolling range ending yesterday (7 / 14 / 30), and one calendar month (month picker) |
+| `day-periods.js` | The single-day view's period summary: one low–high bar per period on a shared scale, an average tick, and hour coverage (see "The single-day view" below) |
 | `summary-cards.js` | The history modal's stat cards — formats the values in `/daily`'s `summary` block. Picks a caption from which context fields arrived (date / date range / time window / date + hour), not from `kind`, and takes a card's unit from `unitMetric` when it differs from the tab's. A card naming a single date renders as a `<button>` carrying `data-date`; the modal opens that day from it |
 | `metric-units.js` | The one place a metric's display unit is written down; used by the modal, its cards and the daily chart |
 | `available-dates.js` | Factory for the flatpickr "only enable days that have data" pickers; shared with `database-view.js`. Also serves `loadAvailableMonths()`, which the history modal's month picker is built from |
@@ -769,6 +770,49 @@ Chart.js and its date-fns adapter come from the CDN as globals — none of these
 **Charting a metric for the first time means adding it to three separate per-metric tables**, and only two of them fail visibly: `METRIC_CONFIG` and `COLOR_SCALES` in `chart-metrics.js` both fall back to temperature (`?? METRIC_CONFIG.temperature`), so a missing entry renders the wrong colours rather than erroring — while a missing `COLLISION_STATE` entry used to throw `Cannot set properties of undefined` and leave the previous chart on the canvas, which reads as "the tab didn't switch". `collisionStateFor()` now creates the entry on demand, so the omission is no longer fatal; the entry must still be *stored* rather than defaulted, or the hysteresis above is defeated. The multi-day chart used to be a fourth table, `DAILY_CFG` in `daily-chart.js`, whose colours contradicted all three of these — daily humidity was emerald while the 24-h chart's is slate-to-blue, which also collapsed the teal-vs-blue separation wetness was given on purpose. It now imports `COLOR_SCALES` and `METRIC_CONFIG` and holds no hex values of its own, so these three tables are the whole set of *required* ones.
 
 `AXIS_LIMITS` in the same file is a fourth, but an **opt-in** one where absence is the meaningful default: only metrics with a physical bound appear (humidity and surface wetness 0–100 %, wind and UV floored at 0, wind direction 0–360), and temperature and pressure are deliberately missing rather than given an invented range.
+
+### The single-day view
+
+One date gets a period summary above an hourly chart, loaded together by `loadSingleDay`
+because each now describes the other.
+
+**The summary is range bars, not a table.** It was a 3x3 grid of avg / high / low, and two of
+All day's three numbers always repeated another row (its high is Daylight's or Night's, its
+low likewise), every cell repeated the unit, and comparing day with night meant reading nine
+near-identical strings. `day-periods.js` draws each period as a low–high bar on a scale
+**shared by all three rows**, with a tick at the average, so a colder night visibly sits further
+left. The unit is written once, in the header. The scale is the rows' combined low to high with
+**no padding**, so All day normally fills its track — a 4 % pad once left a gap at both ends of
+every bar, which read as missing data.
+
+All day fails to fill only when Night outruns it: Night starts the previous sunset, so a warm
+evening before a cooler day (Oct 14: Night high 14.0, the date's own high 12.0) puts Night's bar
+past All day's. The Night row then says "high: prev evening" (or low, or both) — on 5 of 16
+mid-October dates, so it is routine rather than an edge case. That is an exact inference, not a heuristic — Night's hours on this date are inside All day too, so a
+Night extreme beyond All day's can only have come from the previous evening.
+
+**Coverage is shown because blackouts are routine here.** The header says "18 / 24 h recorded"
+(amber below 80 %), and a Daylight or Night row whose window is less than 80 % recorded carries
+"7/11 h". Without it a day that lost its warmest three hours still printed a confident
+"Daylight avg". Counted client-side from the chart's own hourly points via `hourCoverage`, so
+the flag agrees with the gaps drawn below; the rollup stores no reading count. Night needs the
+**previous day's** points too, since it starts that evening — `loadSingleDay` fetches them, and
+if that request fails Night goes unflagged rather than failing the view. The expected count is
+the hours actually between the window's ends, so a DST day reads "/ 25 h", correctly.
+
+**The chart shades night** (`daylight` option on `renderWeatherChart`, the `nightShading`
+plugin) and labels sunrise and sunset at the top of the plot, so the rows' windows can be
+found on the x-axis. Only the single-day history chart passes it.
+
+**The rows and the chart's H / L disagree, and the caption says why.** Rows carry the stored
+single-reading extremes; the line is hourly averages, which flatten the peak — 15.6 in the row
+against an H near 15.0 on Oct 23. `#hist-day-note` ("Line — hourly average · Low / High above —
+single readings") states it rather than leaving the reader to wonder which is wrong.
+
+Layout trap: the number columns are sized in `ch`, which resolves against the **row's**
+font-size — so the row carries the value size. Left at the inherited 16px each column came out
+~50px and squeezed the bar to ~40px on a phone. On phones the partial flag also drops to its own
+line, because "07:15–17:37 · 7/11 h" does not fit the 96px name column.
 
 ### The daily chart's band, and what it is allowed to annotate
 
