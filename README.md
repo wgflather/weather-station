@@ -42,10 +42,32 @@ Built for **one station in one place**. It is a personal project, not a product.
 
 ## How it works
 
-```
-your sensor  ──MQTT──▶  Weather Station  ──▶  PostgreSQL
-                              │
-Open-Meteo  ─────────────────▶│──▶  dashboard in your browser
+```mermaid
+flowchart LR
+    sensor["Your sensor"] -- MQTT --> broker["MQTT broker"]
+    broker --> ingest
+
+    subgraph app ["Weather Station"]
+        ingest["Check & label<br/>each reading"]
+        recent["Recent readings<br/>(in memory)"]
+        raw[("Raw readings<br/>last 29 days")]
+        rollup[("Hourly & daily<br/>summaries")]
+        astro["Sun & moon<br/>calculated locally"]
+        api["Open-Meteo client<br/>cached 20 min"]
+
+        ingest --> recent
+        ingest --> raw
+        raw -- "every night" --> rollup
+    end
+
+    meteo["Open-Meteo"] --> api
+
+    recent --> live["Live dashboard<br/>refreshes every 30 s"]
+    raw --> live
+    astro --> live
+    api -- "forecast & any metric<br/>without a sensor" --> live
+    rollup --> history["History view"]
+    raw --> history
 ```
 
 Readings arrive over MQTT and are checked before they are stored — a value far
@@ -141,7 +163,9 @@ Worth knowing before you rely on it:
 Running from source, building, testing and database migrations:
 **[Development](docs/development.md)**.
 
-Architecture, module layout and internals: `CLAUDE.md`.
+Getting your bearings in the backend — request paths, scheduled jobs, caches and where each
+rule lives: **[Backend map](docs/backend-map.md)**. Architecture, module layout and the reasoning
+behind it: `CLAUDE.md`.
 
 ## Tech stack
 

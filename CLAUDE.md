@@ -25,6 +25,8 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 
 ## Backend
 
+`docs/backend-map.md` is the one-page orientation — request paths, scheduled jobs, caches, where each rule lives. Keep it in step when one of those changes; the detail and the *why* stay here.
+
 ### Controllers (`controller/`)
 
 | Controller | Base path | Purpose |
