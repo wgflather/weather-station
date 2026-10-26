@@ -701,6 +701,30 @@ starless.
 - Modal dim: `setStarFieldModalDim(true/false)` drops to 22% instantly (bypasses the 18 s opacity transition).
 - Respects `prefers-reduced-motion`.
 
+### Link state — is the page current at all?
+
+The server's `LIVE`/`STALE`/`OFFLINE` describes the *sensor*, as of the moment it was fetched.
+Nothing on screen used to change when the server itself stopped answering, or when the page
+came back from a frozen background tab: the header kept pulsing green "Live" over readings and a
+chart hours old, under a clock that was current. `fetch-data.js` now keeps the client's own view
+of the link, measured on the client clock from the last live poll that *succeeded*:
+
+| State | Condition | Header |
+|---|---|---|
+| `ok` | a live poll succeeded within `LINK_STALE_MS` (75 s) and the last attempt did not fail | the server's verdict, as before |
+| `syncing` | nothing recent, a request in flight (boot, resume) | hollow grey ring, blinking, "Updating…" |
+| `lost` | nothing recent and the last attempt failed | hollow grey ring, "No connection" |
+
+While not `ok`, `body.link-unverified` dims the metric cards and the 24-h chart, and the popover's
+Server / Last Contact rows say why. Dimming targets each card's *children*, not the card: opacity
+on a `backdrop-filter` element's ancestor makes it a backdrop root and drops the frosted blur.
+
+Three things keep it honest: the live fetch has a 10 s timeout (a hung request would otherwise
+sit in `syncing` forever), a 5 s watchdog re-judges the link between polls, and returning to the
+page (`visibilitychange`, `pageshow` from bfcache, `online`) re-judges it immediately and, when not
+`ok`, polls live *and restarts the chart scheduler* — whose next timer can otherwise be a whole
+bucket away. A successful poll also retries `loadDaily` if the boot-time load failed.
+
 ### Cloud forecast strip (`cloud-forecast.js`)
 
 - Fetches `/api/forecast/clouds` on boot, then re-checks every 60 s and refetches once the data

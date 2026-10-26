@@ -5,7 +5,8 @@
 // record count.
 //
 // Pure presentation — renderSystemHealth() takes the systemHealth slice of the
-// live dashboard DTO and writes it out; fetch-data.js polls and calls in.
+// live dashboard DTO and writes it out, renderConnection() takes whether the
+// server is currently answering at all; fetch-data.js polls and calls both.
 // initHealthPopover() wires the dot's click/Escape handling once at boot.
 
 import {
@@ -47,9 +48,79 @@ function describeSensorStatus(systemHealth) {
         : { popoverText: 'OFFLINE', labelText: 'MQTT Offline' };
 }
 
+// The server's verdict above only describes the moment it was fetched. If the
+// server stops answering, or the page sat frozen in a background tab, that
+// verdict stays on screen — a pulsing green "Live" over readings hours old.
+// So the client keeps its own view of the link, and while it is not 'ok' the
+// header shows that instead of the server's last word:
+//   ok      — a live poll succeeded recently
+//   syncing — nothing recent, a request is in flight (boot, or just resumed)
+//   lost    — nothing recent and the last attempt failed
+const LINK_STYLE = {
+    syncing: { label: 'Updating…',     server: 'Reconnecting…' },
+    lost:    { label: 'No connection', server: 'Unreachable'   },
+};
+const LINK_COLOR = '#94a3b8';
+
+let lastHealth = null;
+let link       = { state: null, lastOkAt: null };   // null: first report always paints
+
 export function renderSystemHealth(systemHealth) {
     if (!systemHealth) return;
+    lastHealth = systemHealth;
+    paint();
+}
 
+export function renderConnection(state, lastOkAt) {
+    if (state === link.state && lastOkAt === link.lastOkAt) {
+        paintLastContact();   // only the "ago" text moves
+        return;
+    }
+    link = { state, lastOkAt };
+    paint();
+}
+
+function paint() {
+    // Cards and chart dim while their values are unverified — styled in
+    // style.css under body.link-unverified.
+    document.body.classList.toggle('link-unverified', link.state !== 'ok');
+
+    const serverEl = document.getElementById('serverStatus');
+    if (serverEl) {
+        serverEl.textContent = link.state === 'ok' ? 'Connected' : LINK_STYLE[link.state].server;
+        serverEl.style.color = link.state === 'ok' ? DATA_STATUS_COLORS.LIVE : LINK_COLOR;
+    }
+    paintLastContact();
+
+    if (lastHealth) paintHealth(lastHealth);
+    if (link.state !== 'ok') paintLinkHeader();
+}
+
+function paintLastContact() {
+    const el = document.getElementById('lastContact');
+    if (!el) return;
+    if (!link.lastOkAt) { el.textContent = 'never'; return; }
+    const minutes = Math.floor((Date.now() - link.lastOkAt) / 60000);
+    el.textContent = minutes < 1 ? 'just now' : `${formatLagMinutes(minutes)} ago`;
+}
+
+// A hollow grey ring: no verdict, rather than a colour that claims one.
+function paintLinkHeader() {
+    const dot = document.getElementById('health-dot');
+    if (dot) {
+        dot.style.backgroundColor = 'transparent';
+        dot.style.boxShadow = `inset 0 0 0 2px ${LINK_COLOR}`;
+        dot.classList.remove('pulsing');
+        dot.classList.toggle('syncing', link.state === 'syncing');
+    }
+    const label = document.getElementById('health-status-label');
+    if (label) {
+        label.textContent = LINK_STYLE[link.state].label;
+        label.style.color = LINK_COLOR;
+    }
+}
+
+function paintHealth(systemHealth) {
     const statusDetail = describeSensorStatus(systemHealth);
 
     document.getElementById('status').textContent       = statusDetail.popoverText;
@@ -76,6 +147,7 @@ export function renderSystemHealth(systemHealth) {
         dot.style.backgroundColor = color;
         dot.style.boxShadow = `0 0 7px 2px ${STATUS_DOT_GLOW[systemHealth.status] ?? 'rgba(107,114,128,0.4)'}`;
         dot.classList.toggle('pulsing', systemHealth.status === 'LIVE');
+        dot.classList.remove('syncing');
     }
     const label = document.getElementById('health-status-label');
     if (label) {

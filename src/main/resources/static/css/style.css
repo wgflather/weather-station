@@ -2504,6 +2504,35 @@ h3 {
     animation: pulse-live 2.5s ease-in-out infinite;
 }
 
+/* The link to the server is down or being re-established (system-health.js) */
+.status-dot.syncing {
+    animation: link-syncing 1.2s ease-in-out infinite;
+}
+
+@keyframes link-syncing {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+/* While the page cannot confirm its data is current — server unreachable, or
+   just back from a frozen background tab — the readings and chart recede, so
+   values hours old do not look as authoritative as live ones. Dims each card's
+   children rather than the card: opacity on the card itself would make it a
+   backdrop root and drop the frosted blur. */
+.metrics-grid .unified-card > *,
+.chart-container {
+    transition: opacity 0.4s var(--ease-standard);
+}
+
+body.link-unverified .metrics-grid .unified-card > *,
+body.link-unverified .chart-container {
+    opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-dot.syncing { animation: none; }
+}
+
 /* =========================================================
    BACKGROUND PREFERENCE BUTTON + POPOVER
 ========================================================= */

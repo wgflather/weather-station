@@ -5,7 +5,7 @@ import { drawMoon } from './moon-canvas.js';
 import { initAstroModal, refreshAstroModal, patchAstroModalLive } from './astro-modal.js';
 import { initMetricPopovers } from './metric-popovers.js';
 import { renderMetrics } from './metric-cards.js';
-import { renderSystemHealth, initHealthPopover } from './system-health.js';
+import { renderSystemHealth, renderConnection, initHealthPopover } from './system-health.js';
 import {
     renderSunCurve,
     updateSunNowMarker,
@@ -138,8 +138,14 @@ async function fetchDashboardDaily() {
     return daily;
 }
 
+// A request the server never answers would otherwise hold the link in
+// 'syncing' indefinitely, so it is bounded and counts as a failure.
+const LIVE_TIMEOUT_MS = 10000;
+
 async function fetchDashboardLive() {
-    const response = await fetch('/api/weather/dashboard/live');
+    const response = await fetch('/api/weather/dashboard/live', {
+        signal: AbortSignal.timeout(LIVE_TIMEOUT_MS),
+    });
     if (!response.ok) throw new Error('Live dashboard fetch failed');
     return await response.json();
 }
@@ -249,16 +255,50 @@ async function loadDaily() {
     }
 }
 
+// ==========================================
+// LINK STATE
+// ==========================================
+
+// Whether what is on screen is current, as distinct from the server's own
+// LIVE/STALE verdict — which describes the sensor, and goes on saying LIVE
+// after the server itself has stopped answering. Measured on the client's
+// clock from the last live poll that succeeded.
+//
+// Two missed 30 s polls plus slack: one slow response must not flicker it.
+const LINK_STALE_MS = 75000;
+
+const link = { lastOkAt: null, failing: false, inFlight: false };
+
+function linkState() {
+    const recent = link.lastOkAt && Date.now() - link.lastOkAt < LINK_STALE_MS;
+    if (recent && !link.failing) return 'ok';
+    // Nothing recent: while a request is out the page may be about to catch
+    // up (boot, or a resume), so it reads as updating rather than lost.
+    if (link.inFlight) return 'syncing';
+    return 'lost';
+}
+
+function refreshLink() {
+    renderConnection(linkState(), link.lastOkAt);
+}
+
 async function updateLive() {
+    link.inFlight = true;
+    refreshLink();
     try {
         const live          = await fetchDashboardLive();
         state.metrics       = live.metrics;
         state.systemHealth  = live.systemHealth;
         state.sunSnapshot   = live.sunSnapshot;
         state.moonSnapshot  = live.moonSnapshot;
+        link.lastOkAt       = Date.now();
+        link.failing        = false;
 
-        // Re-fetch daily events on midnight rollover or runtime timezone change.
-        if (state.dailyKey && live.dailyKey && live.dailyKey !== state.dailyKey) {
+        // Re-fetch daily events on midnight rollover or runtime timezone
+        // change — or when the boot-time load failed because the server was
+        // down, which would otherwise leave the sun and moon cards empty.
+        if (!state.astronomyDaily
+            || (state.dailyKey && live.dailyKey && live.dailyKey !== state.dailyKey)) {
             await loadDaily();
         }
 
@@ -266,7 +306,11 @@ async function updateLive() {
         renderSystemHealth(state.systemHealth);
         renderAstronomyLive(state.sunSnapshot, state.moonSnapshot);
     } catch (error) {
+        link.failing = true;
         console.error('Live dashboard update failed:', error);
+    } finally {
+        link.inFlight = false;
+        refreshLink();
     }
 }
 
@@ -370,20 +414,47 @@ function initEventListeners() {
 // callers catch their own errors today, but a single throw escaping one of
 // them would otherwise stop every future poll — freezing the dashboard on
 // stale values with nothing on screen to say updates had stopped.
+//
+// Returns a function that runs the poll now and restarts the interval from
+// there. A call while a run is in flight is absorbed by that run.
 function startPolling(fn, interval) {
-    let stopped = false;
+    let timer   = null;
+    let running = false;
     async function loop() {
-        if (stopped) return;
+        if (running) return;
+        clearTimeout(timer);
+        running = true;
         try {
             await fn();
         } catch (error) {
             console.error('Poll failed:', error);
         } finally {
-            if (!stopped) setTimeout(loop, interval);
+            running = false;
+            timer = setTimeout(loop, interval);
         }
     }
     loop();
-    return () => stopped = true;
+    return loop;
+}
+
+// A backgrounded tab or a home-screen app has its timers frozen, so on return
+// the page shows whatever it last held — readings and chart hours old under a
+// clock that is current — until the next timer fires, which for the chart can
+// be a whole bucket away. Coming back is therefore a trigger in its own right
+// (the same set cloud-forecast.js listens to). The link is re-judged first, so
+// the stale page is marked as such in the frame before the requests return.
+function initResumeRefresh(pollLiveNow) {
+    const resume = () => {
+        refreshLink();
+        if (linkState() === 'ok') return;
+        pollLiveNow();
+        startChart(state.currentMetric);
+    };
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') resume();
+    });
+    window.addEventListener('pageshow', (e) => { if (e.persisted) resume(); });
+    window.addEventListener('online', resume);
 }
 
 // ==========================================
@@ -416,4 +487,9 @@ initBgPreference({
 initStarField();
 window.setStarFieldModalDim = setStarFieldModalDim;
 loadDaily();
-startPolling(updateLive, 30000);
+const pollLiveNow = startPolling(updateLive, 30000);
+initResumeRefresh(pollLiveNow);
+// Re-judges the link between polls, so a server that stops answering is shown
+// within LINK_STALE_MS rather than whenever a request next happens to settle,
+// and keeps the popover's "last contact" age moving.
+setInterval(refreshLink, 5000);
