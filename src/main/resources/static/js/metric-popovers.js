@@ -54,8 +54,10 @@ function closePopoverEl(popoverId, btnId) {
 
 export function populatePopup(cardId, details, dataStatus) {
     const card = document.getElementById(cardId);
-    if (!card || !details) return;
-    card._popupDetails = details;
+    if (!card) return;
+    // Cleared, not kept, when the metric is missing — the circle would otherwise
+    // open the last reading's details beside a card that now shows "--".
+    card._popupDetails = details ?? null;
     card._dataStatus   = dataStatus ?? null;
 }
 

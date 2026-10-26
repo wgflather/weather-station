@@ -31,12 +31,20 @@ import { populatePopup, setStatusCircleColor, healthColor } from './metric-popov
 // TEMPERATURE
 // ==========================================
 
+// A missing metric clears its card rather than returning early. Early return
+// left the last value standing indefinitely: an API-backed card kept a reading
+// from before an Open-Meteo outage for as long as the outage lasted, with
+// nothing on screen to say it had stopped updating.
 function renderTemperature(temp) {
-    if (!temp) return;
-    document.getElementById('avg-temp').textContent = temp.value ?? '--';
-    document.getElementById('min-temp').textContent = temp.min   ?? '--';
-    document.getElementById('max-temp').textContent = temp.max   ?? '--';
-    renderTemperatureTrend(temp.trendResult);
+    document.getElementById('avg-temp').textContent = temp?.value ?? '--';
+    document.getElementById('min-temp').textContent = temp?.min   ?? '--';
+    document.getElementById('max-temp').textContent = temp?.max   ?? '--';
+    if (temp) {
+        renderTemperatureTrend(temp.trendResult);
+    } else {
+        const el = document.getElementById('temp-trend');
+        if (el) { el.className = ''; el.innerHTML = ''; }
+    }
 }
 
 function renderTemperatureTrend(trendResult) {
@@ -73,8 +81,12 @@ function renderTemperatureTrend(trendResult) {
 // ==========================================
 
 function renderPressure(pressure) {
-    if (!pressure) return;
-    document.getElementById('avg-pressure').textContent = pressure.value ?? '--';
+    document.getElementById('avg-pressure').textContent = pressure?.value ?? '--';
+    if (!pressure) {
+        const el = document.getElementById('pressure-trend');
+        if (el) el.innerHTML = '';
+        return;
+    }
     renderPressureTrend(pressure.pressureTrend, pressure.trendResult?.changeValue);
 }
 
@@ -107,11 +119,9 @@ function renderPressureTrend(pressureTrend, changeValue) {
 // ==========================================
 
 function renderHumidity(humidity, isMixedDew = false) {
-    if (!humidity) return;
-
-    const humVal = humidity.value;
-    if (humVal != null) {
-        document.getElementById('humidity-val').textContent = humVal;
+    const humVal = humidity?.value;
+    if (humVal != null || !humidity) {
+        document.getElementById('humidity-val').textContent = humVal ?? '--';
     }
 
     renderDewPointStatus(humidity, isMixedDew);
@@ -226,15 +236,14 @@ function renderSurfaceWetness(wetness, dataStatus) {
 // ==========================================
 
 function renderWind(wind) {
-    if (!wind) return;
-    document.getElementById('wind-speed').textContent = wind.speed ?? '--';
-    document.getElementById('wind-gusts').textContent = wind.gusts ?? '--';
+    document.getElementById('wind-speed').textContent = wind?.speed ?? '--';
+    document.getElementById('wind-gusts').textContent = wind?.gusts ?? '--';
 
     const arrowEl = document.getElementById('wind-direction-arrow');
     const labelEl = document.getElementById('wind-direction-label');
     const degEl   = document.getElementById('wind-direction-deg');
 
-    if (wind.direction != null) {
+    if (wind?.direction != null) {
         if (arrowEl) {
             // `direction` is where the wind comes FROM (the meteorological
             // convention, and what "WSW" names). The arrow points the way it
@@ -277,34 +286,54 @@ function renderUvIndex(uv) {
 // `dataStatus` is MQTT sensor lag — only ever shown on cards actually backed
 // by the local sensor. API-backed cards get their own provider passed in and
 // are skipped entirely, since sensor lag says nothing about Open-Meteo data.
+//
+// A metric missing from the DTO altogether gets "~ unavailable" instead. The
+// server only omits a sensor-backed metric when the station has no data at all
+// (EMPTY), so outside that a missing metric is an API-backed one Open-Meteo did
+// not answer for — the DTO cannot say so itself, since the provider travels
+// inside the metric that is missing.
 function updateStalenessHints(dataStatus, dto) {
     const isStale = dataStatus && dataStatus !== 'LIVE';
     const HINT_TARGETS = [
-        { selector: '#temperature-card .main-value', provider: dto?.temperature?.dataDetails?.dataProvider },
-        { selector: '#pressure-card .main-value',    provider: dto?.pressure?.dataDetails?.dataProvider },
-        { selector: '#humidity-card .main-value',    provider: dto?.humidity?.dataDetails?.dataProvider },
-        { selector: '#wind-card .main-value',         provider: dto?.wind?.metricDataDetails?.dataProvider },
-        { selector: '#uv-card .main-value',           provider: dto?.uvIndex?.dataDetails?.dataProvider },
+        { selector: '#temperature-card .main-value', metric: dto?.temperature, provider: dto?.temperature?.dataDetails?.dataProvider },
+        { selector: '#pressure-card .main-value',    metric: dto?.pressure,    provider: dto?.pressure?.dataDetails?.dataProvider },
+        { selector: '#humidity-card .main-value',    metric: dto?.humidity,    provider: dto?.humidity?.dataDetails?.dataProvider },
+        // The wind card has no .main-value; until this pointed at the speed's unit
+        // its hint never rendered, the sensor-lag one included.
+        { selector: '#wind-card .wind-speed-unit',    metric: dto?.wind,        provider: dto?.wind?.metricDataDetails?.dataProvider },
+        { selector: '#uv-card .main-value',           metric: dto?.uvIndex,     provider: dto?.uvIndex?.dataDetails?.dataProvider },
     ];
     const HINT_LABELS = { DELAYED: '~ delayed', STALE: '~ stale', OFFLINE: '~ offline', EMPTY: '~ no data' };
     const HINT_COLORS = { DELAYED: '#fcd34d',   STALE: '#f97316',  OFFLINE: '#ef4444',   EMPTY: '#6b7280'   };
 
-    HINT_TARGETS.forEach(({ selector, provider }) => {
+    HINT_TARGETS.forEach(({ selector, metric, provider }) => {
         const target = document.querySelector(selector);
         if (!target) return;
         const parent = target.parentElement;
         let hint = parent.querySelector('.data-stale-hint');
-        if (isStale && provider !== 'EXTERNAL_API') {
-            if (!hint) {
-                hint = document.createElement('span');
-                hint.className = 'data-stale-hint';
-                target.insertAdjacentElement('afterend', hint);
-            }
-            hint.textContent = HINT_LABELS[dataStatus] ?? '~ outdated';
-            hint.style.color = HINT_COLORS[dataStatus] ?? '#6b7280';
-        } else if (hint) {
-            hint.remove();
+
+        let text = null, color = null, title = '';
+        if (!metric && dataStatus !== 'EMPTY') {
+            text  = '~ unavailable';
+            color = '#94a3b8';
+            title = 'Open-Meteo is unreachable';
+        } else if (isStale && provider !== 'EXTERNAL_API') {
+            text  = HINT_LABELS[dataStatus] ?? '~ outdated';
+            color = HINT_COLORS[dataStatus] ?? '#6b7280';
         }
+
+        if (!text) {
+            hint?.remove();
+            return;
+        }
+        if (!hint) {
+            hint = document.createElement('span');
+            hint.className = 'data-stale-hint';
+            target.insertAdjacentElement('afterend', hint);
+        }
+        hint.textContent = text;
+        hint.style.color = color;
+        hint.title       = title;
     });
 }
 
@@ -341,6 +370,19 @@ export function renderMetrics(dto, dataStatus) {
     setStatusCircleColor(document.querySelector('#humidity-card .status-circle'),    humidity?.dataDetails?.quality,   dataStatus, humidity?.dataDetails?.dataProvider);
     setStatusCircleColor(document.querySelector('#wind-card .status-circle'),        wind?.metricDataDetails?.quality, dataStatus, wind?.metricDataDetails?.dataProvider);
     setStatusCircleColor(document.querySelector('#uv-card .status-circle'),          uv?.dataDetails?.quality,         dataStatus, uv?.dataDetails?.dataProvider);
+
+    // After setStatusCircleColor: with no details it would rank the sensor's
+    // status alone and paint a green "Live" circle on a card showing "--".
+    const MISSING_COLOR = '#94a3b8';
+    [['temperature-card', temp], ['pressure-card', pressure], ['humidity-card', humidity],
+     ['wind-card', wind], ['uv-card', uv]].forEach(([cardId, metric]) => {
+        if (metric || dataStatus === 'EMPTY') return;
+        const circle = document.querySelector(`#${cardId} .status-circle`);
+        if (!circle) return;
+        circle.style.backgroundColor = MISSING_COLOR;
+        circle.style.boxShadow       = `0 0 0 2px ${MISSING_COLOR}33`;
+        circle.classList.remove('pulsing');
+    });
 
     updateStalenessHints(dataStatus, dto);
 }

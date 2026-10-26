@@ -1,6 +1,7 @@
 package com.flather.weatherstation.dto.dashboard;
 
 import com.flather.weatherstation.domain.constant.DataStatus;
+import com.flather.weatherstation.domain.constant.ExternalApiStatus;
 import java.time.ZonedDateTime;
 import lombok.*;
 
@@ -14,4 +15,5 @@ public class SystemHealthDashboardDto {
   private long recordsToday;
   private DataStatus status;
   private boolean mqttStatus;
+  private ExternalApiStatus externalApiStatus;
 }

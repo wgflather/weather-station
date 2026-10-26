@@ -121,6 +121,7 @@
     <div class="cloud-strip-wrapper">
         <div class="cloud-strip" id="cloud-strip" aria-label="Hourly cloud forecast"></div>
     </div>
+    <p class="cloud-strip-note" id="cloud-strip-note" hidden></p>
 </div>
 
 <div class="bg-pref-popover" id="bg-pref-popover" aria-hidden="true">
@@ -133,33 +134,43 @@
 <div class="health-popover" id="health-popover" aria-hidden="true">
     <div class="health-popover-inner">
         <div class="health-popover-title">System Health</div>
-        <div class="health-popover-row">
-            <span class="health-popover-label">Server</span>
+        <!-- Three things can fail independently, so each row sits under the one it
+             describes: this page's link to the server, the station feeding the
+             server over MQTT, and the external forecast API. -->
+        <div class="health-popover-section">Dashboard server</div>
+        <div class="health-popover-row" title="Whether this page is getting answers from the dashboard server">
+            <span class="health-popover-label">Connection</span>
             <span class="health-popover-val" id="serverStatus"></span>
         </div>
-        <div class="health-popover-row">
-            <span class="health-popover-label">Last Contact</span>
+        <div class="health-popover-row" title="When the dashboard server last answered this page, by this device's clock">
+            <span class="health-popover-label">Last response</span>
             <span class="health-popover-val" id="lastContact"></span>
         </div>
-        <div class="health-popover-row">
-            <span class="health-popover-label">Sensor Status</span>
+        <div class="health-popover-section">Weather station</div>
+        <div class="health-popover-row" title="Whether readings from the station are arriving on time">
+            <span class="health-popover-label">Sensors</span>
             <span class="health-popover-val" id="status"></span>
         </div>
-        <div class="health-popover-row">
+        <div class="health-popover-row" title="When the station last sent a reading">
+            <span class="health-popover-label">Last reading</span>
+            <span class="health-popover-val" id="lastUpdate"></span>
+        </div>
+        <div class="health-popover-row" title="How far the newest reading is behind now">
             <span class="health-popover-label">Lag</span>
             <span class="health-popover-val" id="lag"></span>
         </div>
         <div class="health-popover-row">
-            <span class="health-popover-label">Today Records</span>
+            <span class="health-popover-label">Readings today</span>
             <span class="health-popover-val" id="todayRecords"></span>
         </div>
-        <div class="health-popover-row">
-            <span class="health-popover-label">Last Update</span>
-            <span class="health-popover-val" id="lastUpdate"></span>
-        </div>
-        <div class="health-popover-row">
-            <span class="health-popover-label">MQTT</span>
+        <div class="health-popover-row" title="The server's connection to the broker the station publishes to">
+            <span class="health-popover-label">MQTT broker</span>
             <span class="health-popover-val" id="mqttStatus"></span>
+        </div>
+        <div class="health-popover-section">Open-Meteo</div>
+        <div class="health-popover-row" title="Whether the server can reach Open-Meteo, which feeds the forecast strip and any API-backed card">
+            <span class="health-popover-label">Forecast API</span>
+            <span class="health-popover-val" id="openMeteoStatus"></span>
         </div>
     </div>
 </div>

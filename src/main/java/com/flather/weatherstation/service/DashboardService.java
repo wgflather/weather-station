@@ -120,6 +120,7 @@ public class DashboardService {
           .lagMinutes(0)
           .recordsToday(0)
           .lastMeasuredAt(null)
+          .externalApiStatus(weatherClientService.getExternalApiStatus())
           .mqttStatus(sensorStateCache.isMqttConnected())
           .build();
     }
@@ -135,6 +136,7 @@ public class DashboardService {
         .recordsToday(todayRecordsCount)
         .status(dataStatus)
         .lagMinutes(lagMinutes)
+        .externalApiStatus(weatherClientService.getExternalApiStatus())
         .mqttStatus(sensorStateCache.isMqttConnected())
         .build();
   }

@@ -1,6 +1,7 @@
 package com.flather.weatherstation.controller;
 
 import com.flather.weatherstation.dto.error.ApiErrorResponse;
+import com.flather.weatherstation.exception.OpenMeteoUnavailableException;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.time.Instant;
@@ -112,6 +113,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     log.warn("Date Time Parse Exception Caught: {}", ex.getMessage(), ex);
     return buildErrorResponse(
         HttpStatus.BAD_REQUEST, "Invalid date format. Expected ISO-8601 format.", request);
+  }
+
+  /**
+   * Debug only: {@code OpenMeteoProvider} already logs the outage once when it starts and once when
+   * it ends, and this fires on every client's poll for as long as it lasts.
+   */
+  @ExceptionHandler(OpenMeteoUnavailableException.class)
+  protected ResponseEntity<Object> handleOpenMeteoUnavailable(
+      OpenMeteoUnavailableException ex, WebRequest request) {
+    log.debug("Open-Meteo unavailable: {}", ex.getMessage());
+    return buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
   }
 
   /** Helper method to build a consistent error response body. */

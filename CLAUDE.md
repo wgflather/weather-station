@@ -47,7 +47,7 @@ MQTT broker → `MqttConsumer` → `WeatherService` → PostgreSQL → REST API 
 - **`DashboardService`** — assembles the live dashboard DTO (metrics, system health, snapshots).
 - **`AstronomyEngine`** — wraps the cosinekitty astronomy lib; computes sun/moon altitude curves, rise/set/twilight times, moon phase.
 - **`AstronomySearch`** — binary-search horizon crossing finder used by `AstronomyEngine`.
-- **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists.
+- **`WeatherClientService`** — calls `OpenMeteoProvider` and maps the response to `WeatherConditionPoint` and `AstroForecastPoint` lists. Owns the forecast-only fallback policy — see "When Open-Meteo is down" below.
 - **`SeeingCalculator`** — Hufnagel-Valley HV 5/7 atmospheric turbulence model; inputs are jet-stream speed (200 hPa) and surface wind speed; outputs FWHM seeing in arc-seconds (Excellent / Good / Fair / Poor / Very Poor).
 - **`WeatherHistoryService`** — queries `HourlyWeatherRecord` and `DayPeriodMetrics` for the history modal; groups the per-period daily rows into one `FullDaySummary` per date. `getDayChart(date, metric)` is the only chart entry point: it resolves the date to midnight-to-midnight in the *station's* zone (not the caller's, which would straddle two station days and disagree with the per-period rows beside it) and routes on age — see `RAW_RETENTION_DAYS` below. `findHourlyDataPoints` is exhaustive over `Metric` for the same reason `getMetricChart` is. It once delegated to a `getChart(metric, from, to)` behind a second `/chart` endpoint; nothing consumed the range form, so both are gone.
 - **`SummaryCardService`** — decides which stat cards the history modal shows for a metric, and nothing else. Which period a metric reads, whether it answers with a date or an hour of the day, and whether it has a trend at all are per-metric decisions — see below. Each builder reads as a list of the questions its metric answers; the only arithmetic left here is surface wetness's ADC→% conversion, which is a property of the metric rather than of any selection rule.
@@ -71,6 +71,57 @@ forecast_days: 2
 Cached by `CacheConfig` (Caffeine):
 - `apiWeather` — 20-minute TTL, max 1 entry, key is `lat_lon` (5 decimal places).
 - Spring's default astronomy cache — 48-hour TTL, max 4 entries (one per day per zone).
+
+`OpenMeteoConfiguration` gives the `RestClient` a 5 s connect and 10 s read timeout. The call runs on
+the request thread, so a host that stops answering (rather than refusing) would otherwise hold
+dashboard requests open for as long as the JDK default allows.
+
+#### When Open-Meteo is down
+
+The station's own readings are the dashboard's subject; Open-Meteo is one optional source. So an
+outage degrades only what depends on it, and is reported rather than thrown:
+
+| Consumer | Behaviour during an outage |
+|---|---|
+| Live dashboard (`/api/weather/dashboard/live`) | **Always 200.** API-backed metrics come back null; `systemHealth.externalApiStatus` says why |
+| Forecast strip (`/api/forecast/clouds`) | the last good forecast with `stale: true` and its `fetchedAt`; **503** once that no longer reaches 8 h ahead |
+| API-backed 24-h chart | **503** |
+
+**Only the forecast falls back.** A forecast fetched this morning is still useful this afternoon;
+current conditions are not, so an API-backed temperature card goes blank and says so rather than
+showing an hour-old value as current. The fallback copy is *not* a second cache entry — it is
+`OpenMeteoProvider.lastValidForecast`, recorded inside the `@Cacheable` body, which runs only on a
+real fetch, so it is never refreshed by a cache hit. `WeatherClientService.getForecast()` is the only
+reader. It is cleared on `LocationUpdatedEvent` (published by `updateLocation`), or an outage right
+after a move would serve the old place's forecast. It is in memory only: a restart during an outage
+leaves the strip on its 503 until the API answers.
+
+**`fetchedAt` travels on `WeatherResponse`**, stamped by the provider at fetch time, not tracked in a
+field beside it. The response outlives its fetch twice — 20 minutes in the cache and for hours as the
+fallback — so a time held separately describes *the latest fetch*, which may not be the response
+being served.
+
+**Failures are not cached** (`unless = "#result == null"`). Caching the null blocked recovery for the
+whole 20-minute TTL after a blip. Not caching it means every caller would hit a down API, each
+waiting out the timeout — so the provider **backs off for 60 s** (`RETRY_AFTER`) after a failure and
+returns null without calling. The frontend's 60 s retries line up with that window.
+
+**An outage is two log lines**, written on the status transition (`markAvailable` /
+`markUnavailable`): a WARN with the root cause when it starts, an INFO when it recovers. The 503
+handler logs at DEBUG. The previous shape — an `IllegalStateException` into the generic handler —
+logged an ERROR with a stack trace per client per poll for as long as the outage lasted.
+
+A 503 *with* the dashboard payload was tried and rejected: the client's link-state logic reads any
+non-OK live response as "server unreachable", so an Open-Meteo outage dimmed the whole page and
+said "No connection". A status code describes the whole request; this one partly succeeded.
+
+On the dashboard, `metric-cards.js` **clears a card whose metric is missing** rather than returning
+early — the early return kept an API-backed card's pre-outage value on screen for the whole outage.
+It cannot read the provider of a missing metric (the provider travels inside the metric), so it
+infers it: the server omits a sensor-backed metric only when the station has no data at all
+(`EMPTY`), so a missing metric under any other status is an API-backed one Open-Meteo did not
+answer for. Those cards get "~ unavailable", a grey status circle (with no details the circle would
+rank the sensor status alone and glow a green "Live" over "--") and no details popup.
 
 ### Cache (`cache/`)
 
@@ -730,8 +781,19 @@ of the link, measured on the client clock from the last live poll that *succeede
 | `lost` | nothing recent and the last attempt failed | hollow grey ring, "No connection" |
 
 While not `ok`, `body.link-unverified` dims the metric cards and the 24-h chart, and the popover's
-Server / Last Contact rows say why. Dimming targets each card's *children*, not the card: opacity
-on a `backdrop-filter` element's ancestor makes it a backdrop root and drops the frosted blur.
+Dashboard server rows (Connection / Last response) say why. Dimming targets each card's *children*,
+not the card: opacity on a `backdrop-filter` element's ancestor makes it a backdrop root and drops
+the frosted blur.
+
+**The health popover is grouped by what can fail**, because three things can fail independently
+and their rows used to sit in one undifferentiated list: *Dashboard server* (this page's link —
+Connection, Last response), *Weather station* (Sensors, Last reading, Lag, Readings today, MQTT
+broker) and *Open-Meteo* (Forecast API). "Last response" and "Last reading" are the pair most easily
+confused — when the server last answered this page, against when the station last sent data — and
+the grouping is what keeps them apart. MQTT sits under the station because it is how the station's
+readings reach the server. Each row also carries a `title`, but tooltips do not exist on touch, so
+the labels have to stand without them. Open-Meteo does **not** drive the header dot: an outage of a
+forecast API is not the station being down.
 
 Three things keep it honest: the live fetch has a 10 s timeout (a hung request would otherwise
 sit in `syncing` forever), a 5 s watchdog re-judges the link between polls, and returning to the
@@ -747,6 +809,13 @@ bucket away. A successful poll also retries `loadDaily` if the boot-time load fa
   because a backgrounded tab or home-screen app has its timers frozen, which is exactly the case
   that goes stale. Without these the strip was fetched once and never again, so every other panel
   refreshed on the 30 s poll while the forecast silently rotted until a manual reload.
+- **During an Open-Meteo outage** (see "When Open-Meteo is down"): a `stale` response draws as
+  usual with "Forecast from HH:MM · Open-Meteo unreachable" under the strip, and a 503 replaces the
+  strip with a placeholder that holds a slot's height. Neither counts as a load, so the 60 s tick keeps
+  retrying. A retry that returns the same `fetchedAt` does **not** re-render — rendering resets the
+  strip's scroll, and the reader may have scrolled it — unless the hour has rolled over, since
+  `tickCloudForecast` hands a due tick to the loader instead of redrawing. A failure to reach *our*
+  server changes nothing here; the header's link state covers that.
 - `initTooltip` binds to `document` and `window` as well as the strip, so it is guarded to run
   once — calling it on every refresh would stack a new set of handlers each time.
 - Re-renders when `refreshCloudSunTimes` fires, and on the hour even when the data is still fresh,

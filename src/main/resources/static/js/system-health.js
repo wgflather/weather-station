@@ -1,8 +1,8 @@
 // system-health.js
 //
 // The header's health readout: the status dot, its label, and the popover
-// listing sensor status, data lag, MQTT connection, last reading and today's
-// record count.
+// listing sensor status, data lag, MQTT connection, Open-Meteo reachability,
+// last reading and today's record count.
 //
 // Pure presentation — renderSystemHealth() takes the systemHealth slice of the
 // live dashboard DTO and writes it out, renderConnection() takes whether the
@@ -61,6 +61,16 @@ const LINK_STYLE = {
     lost:    { label: 'No connection', server: 'Unreachable'   },
 };
 const LINK_COLOR = '#94a3b8';
+
+// Open-Meteo's reachability as the server last found it. It does not drive the
+// header dot: the station's own sensors are the dashboard's subject, and an
+// outage of a forecast API is not the station being down. UNKNOWN is a server
+// that has not called it yet since starting.
+const OPEN_METEO_STATUS = {
+    AVAILABLE:   { text: 'Reachable',   color: DATA_STATUS_COLORS.LIVE },
+    UNAVAILABLE: { text: 'Unreachable', color: DATA_STATUS_COLORS.OFFLINE },
+    UNKNOWN:     { text: 'Not checked', color: LINK_COLOR },
+};
 
 let lastHealth = null;
 let link       = { state: null, lastOkAt: null };   // null: first report always paints
@@ -136,6 +146,13 @@ function paintHealth(systemHealth) {
     if (mqttStatusEl) {
         mqttStatusEl.textContent = systemHealth.mqttStatus ? 'Connected' : 'Disconnected';
         mqttStatusEl.style.color = systemHealth.mqttStatus ? DATA_STATUS_COLORS.LIVE : DATA_STATUS_COLORS.OFFLINE;
+    }
+
+    const apiEl = document.getElementById('openMeteoStatus');
+    if (apiEl) {
+        const api = OPEN_METEO_STATUS[systemHealth.externalApiStatus] ?? OPEN_METEO_STATUS.UNKNOWN;
+        apiEl.textContent = api.text;
+        apiEl.style.color = api.color;
     }
 
     const color = DATA_STATUS_COLORS[systemHealth.status] ?? '#6b7280';

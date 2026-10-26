@@ -5,6 +5,7 @@ import com.flather.weatherstation.client.OpenMeteoProvider;
 import com.flather.weatherstation.domain.constant.BeaufortScale;
 import com.flather.weatherstation.domain.constant.DataProvider;
 import com.flather.weatherstation.domain.constant.DewPointRisk;
+import com.flather.weatherstation.domain.constant.ExternalApiStatus;
 import com.flather.weatherstation.domain.constant.Metric;
 import com.flather.weatherstation.domain.constant.PressureTrend;
 import com.flather.weatherstation.domain.constant.TrendDirection;
@@ -17,12 +18,14 @@ import com.flather.weatherstation.dto.forecast.ForecastDto;
 import com.flather.weatherstation.dto.forecast.WeatherConditionPoint;
 import com.flather.weatherstation.dto.forecast.WeatherConditionsForecast;
 import com.flather.weatherstation.dto.forecast.WeatherResponse;
+import com.flather.weatherstation.exception.OpenMeteoUnavailableException;
 import com.flather.weatherstation.mapper.MetricDataDetailsMapper;
 import com.flather.weatherstation.util.MeteoMath;
 import java.time.*;
 import java.util.ArrayList;
 import java.util.DoubleSummaryStatistics;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.math3.util.Precision;
@@ -36,9 +39,30 @@ public class WeatherClientService {
   private final MetricDataDetailsMapper metricDataDetailsMapper;
   private final Duration forecastChartTtl = Duration.ofMinutes(10);
 
+  /**
+   * The forecast strip, falling back to the last good forecast while Open-Meteo is down — the
+   * forecast is still useful for most of a day, unlike current conditions, which never fall back.
+   */
   public ForecastDto getForecast() {
-    WeatherResponse response = fetchWeatherOrThrow();
-    return new ForecastDto(response.units(), mapToConditionPoints(response.hourly()));
+    return fetchLive()
+        .filter(WeatherResponse::hasForecast)
+        .map(r -> toForecastDto(r, false))
+        .or(() -> client.getLastValidForecast().map(r -> toForecastDto(r, true)))
+        .orElseThrow(
+            () -> new OpenMeteoUnavailableException("Weather forecast is currently unavailable"));
+  }
+
+  public ExternalApiStatus getExternalApiStatus() {
+    return client.getExternalApiStatus();
+  }
+
+  private ForecastDto toForecastDto(WeatherResponse response, boolean stale) {
+    return new ForecastDto(
+        response.units(), mapToConditionPoints(response.hourly()), stale, response.fetchedAt());
+  }
+
+  private Optional<WeatherResponse> fetchLive() {
+    return Optional.ofNullable(getWeatherResponse());
   }
 
   public TemperatureDto getTemperature(WeatherResponse response) {
@@ -142,7 +166,10 @@ public class WeatherClientService {
   }
 
   public ChartDto getChart(Metric metric) {
-    WeatherResponse response = fetchWeatherOrThrow();
+    WeatherResponse response =
+        fetchLive()
+            .orElseThrow(
+                () -> new OpenMeteoUnavailableException("Open-Meteo is currently unavailable"));
     WeatherConditionsForecast forecast = response.hourly();
 
     List<LocalDateTime> time = forecast.time();
@@ -208,14 +235,6 @@ public class WeatherClientService {
 
   public WeatherResponse getWeatherResponse() {
     return client.fetchWeather(configurationCache.getLatitude(), configurationCache.getLongitude());
-  }
-
-  private WeatherResponse fetchWeatherOrThrow() {
-    WeatherResponse response = getWeatherResponse();
-    if (response == null) {
-      throw new IllegalStateException("Open-Meteo forecast is currently unavailable");
-    }
-    return response;
   }
 
   private List<WeatherConditionPoint> mapToConditionPoints(WeatherConditionsForecast forecast) {

@@ -332,6 +332,31 @@ function renderCloudStrip(forecastPoints) {
     scrollToCurrentHour(strip);
 }
 
+// Nothing to draw: say so in the strip's own space rather than leaving a blank
+// band, which reads as still loading. The placeholder keeps a slot's height so
+// the card does not jump when the forecast comes back.
+function renderUnavailable() {
+    const strip = document.getElementById('cloud-strip');
+    if (strip) {
+        strip.innerHTML = '<div class="cloud-strip-empty">Forecast unavailable — Open-Meteo unreachable</div>';
+    }
+    renderForecastNote(null);
+}
+
+// Shown only for a stale forecast: when it was fetched, so the reader knows
+// how far the icons could have drifted from what the sky is doing now.
+function renderForecastNote(fetchedAtIso) {
+    const note = document.getElementById('cloud-strip-note');
+    if (!note) return;
+    if (!fetchedAtIso) { note.hidden = true; return; }
+    const fetched = new Date(fetchedAtIso);
+    const time    = fetched.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const sameDay = fetched.toDateString() === new Date().toDateString();
+    const when    = sameDay ? time : `${fetched.toLocaleDateString('en-GB', { weekday: 'short' })} ${time}`;
+    note.textContent = `Forecast from ${when} · Open-Meteo unreachable`;
+    note.hidden = false;
+}
+
 function scrollToCurrentHour(strip) {
     const current = strip.querySelector('.cloud-slot.current');
     if (!current) return;
@@ -363,13 +388,38 @@ const FORECAST_TTL_MS = 20 * 60 * 1000;
 let _lastForecastLoad = 0;
 let _lastRenderedHour = -1;
 let _tooltipBound     = false;
+let _staleFetchedAt   = null;
 
+// While Open-Meteo is unreachable the server answers with the last forecast it
+// did get (stale: true, fetchedAt), and with a 503 once even that no longer
+// reaches far enough ahead. Neither counts as a load, so the 60 s tick keeps
+// retrying — the same cadence the server's own back-off allows a real attempt.
+// A failure to reach *our* server changes nothing here: the strip keeps what it
+// has, and the header's link state already says the page is not current.
 async function loadCloudForecast() {
     try {
         const res = await fetch('/api/forecast/clouds');
+        if (res.status === 503) {
+            _forecastPoints = null;
+            _staleFetchedAt = null;
+            renderUnavailable();
+            return;
+        }
         if (!res.ok) return;
         const data = await res.json();
-        _lastForecastLoad = Date.now();
+        renderForecastNote(data.stale ? data.fetchedAt : null);
+        if (data.stale) {
+            // Re-rendering resets the strip's scroll, so a retry that brings back
+            // the same old forecast leaves the strip alone — unless the hour has
+            // rolled over, which tickCloudForecast cannot redraw while a load is
+            // due, since it hands the tick to this function instead.
+            if (data.fetchedAt === _staleFetchedAt && _forecastPoints?.length
+                && _lastRenderedHour === new Date().getHours()) return;
+            _staleFetchedAt = data.fetchedAt;
+        } else {
+            _staleFetchedAt = null;
+            _lastForecastLoad = Date.now();
+        }
         _forecastPoints = data.forecastPoints ?? [];
         renderCloudStrip(_forecastPoints);
         _lastRenderedHour = new Date().getHours();

@@ -3,6 +3,7 @@ package com.flather.weatherstation.service;
 import com.flather.weatherstation.cache.ConfigurationCache;
 import com.flather.weatherstation.domain.entity.StationConfiguration;
 import com.flather.weatherstation.domain.event.ConfigurationUpdatedEvent;
+import com.flather.weatherstation.domain.event.LocationUpdatedEvent;
 import com.flather.weatherstation.dto.configuration.StationConfigurationResponse;
 import com.flather.weatherstation.dto.configuration.UpdateDataProviderRequest;
 import com.flather.weatherstation.dto.configuration.UpdateHardwareRequest;
@@ -43,7 +44,11 @@ public class StationConfigurationService {
     cfg.setLongitude(request.lon());
     cfg.setElevation(request.elevation());
 
-    return persistAndRefreshCache(cfg);
+    StationConfiguration updatedCfg = persistAndRefreshCache(cfg);
+
+    eventPublisher.publishEvent(
+        new LocationUpdatedEvent(updatedCfg.getLatitude(), updatedCfg.getLongitude()));
+    return updatedCfg;
   }
 
   @Transactional

@@ -460,6 +460,29 @@ body {
 }
 .cloud-strip::-webkit-scrollbar { display: none; }
 
+/* Open-Meteo unreachable and no usable forecast left. Holds a slot's height
+   (34px icon + gap + hour label) so the card does not jump either way. */
+.cloud-strip-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 51px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* A stale forecast's age. Below the strip, not over it, so the icons stay
+   readable. */
+.cloud-strip-note {
+    margin: 2px 0 0;
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+.cloud-strip-note[hidden] { display: none; }
+
 .cloud-slot {
     display: flex;
     flex-direction: column;
@@ -2757,6 +2780,20 @@ body.link-unverified .chart-container {
     padding: 7px 0;
     border-bottom: 1px solid var(--divider);
 }
+
+/* Groups the rows by what they describe. The row above a heading drops its
+   divider — the heading's own spacing separates the groups. */
+.health-popover-section {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--heading);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    opacity: 0.75;
+    margin-top: 10px;
+}
+.health-popover-title + .health-popover-section { margin-top: 0; }
+.health-popover-row:has(+ .health-popover-section) { border-bottom: none; }
 
 .health-popover-row:last-child {
     border-bottom: none;
