@@ -122,6 +122,19 @@ from the previous evening through to this morning — so this date's evening cou
 welds an evening onto the pre-dawn hours of a different night and puts the coldest and warmest parts
 of two separate nights in one row. Readers that stack the three periods must not imply they sum.
 
+**The boundary is sunrise/sunset (the standard −0.833° event), not civil twilight — decided, not
+an oversight.** Moving it to −6° was considered (Oct 2026) and rejected. On a clear night the
+temperature minimum falls at or just after sunrise, so ending Night ~33 min *earlier*, at civil
+dawn, hands the coldest part of the night to Daylight. Measured on 28 days of this station's
+data (Sep 28 – Oct 25, hourly resolution, so ±30 min): 10 morning minima fell hours before dawn
+(advective nights, unaffected), 9 in the ~33 min before sunrise, and 9 after sunrise. At −6°
+the middle 9 would move to Daylight, so Night would hold the low on about 10 of 28 days instead
+of 19 — and dew, peaking around dawn, would split the same way. Twilight answers a *light*
+question (is it dark?); this split is about heat and moisture. If the boundary ever moves, the
+physically motivated direction is the other way — a thermal night ending around sunrise + 1 h,
+which would also catch the 9 post-sunrise minima — at the cost of lopsided windows that are
+harder to caption. Either change leaves a seam at the 29-day retention boundary (see below).
+
 `AstronomySearch.getDayPeriodIntervalByDate(date, period)` is the single definition of these windows
 and is called by both sides: `WeatherRetentionService` when writing the aggregate, and
 `WeatherHistoryService` when describing it to the client. Keep it that way — two copies of "night for
